@@ -18,7 +18,7 @@ class TorchLinearInterpolator:
                 "number of entries along the timelike dimension."
             )
 
-        if torch.all(torch.diff(self.ts) > 0):
+        if not torch.all(torch.diff(self.ts) > 0):
             raise ValueError("`ts` must be monotonically increasing.")
 
     def _interpret_t(self, t: float, left: bool):
