@@ -94,7 +94,7 @@ class nddeint_ACA(torch.autograd.Function):
 
         adjoint_history = interpolators.TorchLinearInterpolator(
             adjoint_state.reshape(adjoint_state.shape[0], 1, *adjoint_state.shape[1:]),
-            torch.tensor(time_mesh[-1]).reshape(1).to(adjoint_state.device),
+            torch.tensor(time_mesh[-1]).reshape(1).to(adjoint_state.device), device= grad_output.get_device()
         )
 
         out2 = None
@@ -126,10 +126,10 @@ class nddeint_ACA(torch.autograd.Function):
                                 delayed_values.append(ctx.history(t + tau - tau2))
 
                         if tau == 0:
-                            out = ctx.func(t, z_var, *delayed_values)
+                            out = ctx.func(t, z_var, history=delayed_values)
                         else:
                             out = ctx.func(
-                                t + tau, ctx.history(t + tau), *delayed_values
+                                t + tau, ctx.history(t + tau), history=delayed_values
                             )
                         if tau == 0:
                             param_derivative_inc = torch.autograd.grad(
