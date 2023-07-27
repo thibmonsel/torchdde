@@ -18,7 +18,7 @@ class TorchLinearInterpolator:
                 "number of entries along the timelike dimension."
             )
 
-        if np.all(np.diff(self.ts) > 0):
+        if torch.all(torch.diff(self.ts) > 0):
             raise ValueError("`ts` must be monotonically increasing.")
 
     def _interpret_t(self, t: float, left: bool):
@@ -36,8 +36,8 @@ class TorchLinearInterpolator:
                 "Interpolation point is outside data range. ie t > ts[-1] or t < ts[0]"
             )
         index, fractional_part = self._interpret_t(t, left)
-        prev_ys = self.ys[index]
-        next_ys = self.ys[index + 1]
+        prev_ys = self.ys[:, index]
+        next_ys = self.ys[:, index + 1]
         prev_t = self.ts[index]
         next_t = self.ts[index + 1]
         diff_t = next_t - prev_t
@@ -46,22 +46,27 @@ class TorchLinearInterpolator:
     
     def add_point(self, new_t, new_y):
         # new_t : float
-        # new_y : torch.tensor size [N, 1, D]
+        # new_y : torch.tensor size [N, D]
         new_y = new_y.to(self.ts.device)
-        
+        new_y = torch.unsqueeze(new_y, dim=1)
+        new_t = torch.unsqueeze(torch.tensor(new_t), dim=0)
+        new_t = new_t.to(self.ts.device)
         if self.ys.shape[-1] != new_y.shape[-1]:
             raise ValueError("You tried to add a new value that doesn't fit the shape of self.ys ")
         
         index, fractional_part = self._interpret_t(new_t, left=True)
         if index == 0 :
-            new_ys, new_ts = torch.concat([new_y, self.ys], dim=1), torch.concat([new_t, self.ts], dim=0)
+            new_ys = torch.concat((new_y, self.ys), dim=1)
+            new_ts = torch.concat((new_t, self.ts))
         elif index == self.ts.shape[0] - 2:
-            new_ys, new_ts = torch.concat([self.ys, new_y], dim=1), torch.concat([self.ts, new_t], dim=0)
+            new_ys = torch.concat((self.ys, new_y), dim=1)
+            new_ts = torch.concat((self.ts, new_t))
         else : 
-            new_ys = torch.concat([self.ys[:index], new_y, self.ys[index:]], dim=1)
-            new_ts = torch.concat([self.ts[:index], new_t, self.ts[index:]], dim=0)
+            new_ys = torch.concat((self.ys[:, :index], new_y, self.ys[:, index:]), dim=1)
+            new_ts = torch.concat((self.ts[:index], new_t, self.ts[index:]))
         
         self.ys = new_ys
         self.ts = new_ts
-        if np.all(np.diff(self.ts) > 0):
+
+        if not torch.all(torch.diff(self.ts) > 0):
             raise ValueError("`ts` must be monotonically increasing. oups errors in add_point")

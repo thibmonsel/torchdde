@@ -27,6 +27,7 @@ tiny = 1e-8
 
 
 class nddeint_ACA(torch.autograd.Function):
+    
     @staticmethod
     def forward(ctx, history, func, options, *params):
 
@@ -52,13 +53,12 @@ class nddeint_ACA(torch.autograd.Function):
             values = [val]
             alltimes = [t]
             for i in range(ctx.nSteps):
-                val = val + ctx.dt * ctx.func(
-                    t, val, *[history(t - tau) for tau in delays]
-                )
+                val = val + ctx.dt * func(t, val, history = [history(t - tau) for tau in delays])
                 t += ctx.dt
                 history.add_point(t, val)
                 values.append(val)
                 alltimes.append(t)
+                
         # Retrieving the time stamps selected by the solver
         ctx.alltimes = alltimes
         ctx.history = history
