@@ -1,76 +1,48 @@
-import torch
 import numpy as np
+import torch
+
 
 class TorchLinearInterpolator():
 
-    def __init__(self,vals,time=None):
+    def __init__(self,ts, ys, device):
 
-        self.vals = vals
-        if time is None: self.time = torch.arange(vals.shape[0])
-        else: 
-            self.time = time
+        self.ts = ts.to(device) # [N_t]
+        self.ys = ys.to(device) # [N, N_t, D]
 
-        self.update_coeffs()
-
-    def update_coeffs(self):
-
-        if self.vals.shape[1]==1:
-            self.coeffs = None
-        else:
-
-            self.coeffs = self.vals[:,1:]-self.vals[:,:-1]
-            self.coeffs = self.coeffs / (self.time[1:] - self.time[:-1]).view(1,-1,1)
-    
-    def __call__(self,t):
-        if self.coeffs is None:
-            return self.vals[:,0]
-
-        if t in self.time:
-            t_i = torch.where(self.time==t)[0][0]
-            return self.vals[:,t_i]
-
-        ret = torch.where(t>=self.time)[0]
-        if len(ret)==0:
-            if abs(t-self.time[0])>1e-6: 
-                print('No Extrapolation',t,self.time[0],self.time[-1])
-                return None
-            else : ret = [0]
-        else:
-            if t>self.time[-1] :
-                print('No Extrapolation',t,self.time[0],self.time[-1])
-                return None
-
-        t_i = ret[-1]
-
-        dt = t-self.time[t_i]
-
-        ret = self.vals[:,t_i] + dt * self.coeffs[:,t_i]
-        return ret
-
-    def add_point(self,t,val):
-
-        if t in self.time:
-            t_i = torch.where(self.time==t)[0][0]
-            self.vals[:,t_i] = val
-            
-        else:
-            ret = torch.where(t>self.time)[0]
-
-            t_to_add = torch.tensor(t).to(self.time.device,self.time.dtype).reshape(1)
-            v_to_add = val.reshape(val.shape[0],1,*val.shape[1:])
-            if len(ret) == 0:
-                self.vals = torch.cat([v_to_add,self.vals],dim=1)
-                self.time = torch.cat([t_to_add,self.time])
-            elif t > self.time[-1]:
-                self.vals = torch.cat([self.vals,v_to_add],dim=1)
-                self.time = torch.cat([self.time,t_to_add])
-            else:
-                self.vals = torch.cat([self.vals[:,:t_i+1],v_to_add,
-                                        self.vals[:,t_i:]],dim=1)
-                self.time = torch.cat([self.time[:t_i+1],
-                                        t_to_add,self.time[t_i:]])
+    def __post_init__(self):
+        if self.ts.ndim != 1:
+            raise ValueError("`ts` must be one dimensional.")
         
-        self.update_coeffs()
+        if self.ys.shape[0] != self.ts.shape[0]:
+                raise ValueError(
+                    "Must have ts.shape[0] == ys.shape[0], that is to say the same "
+                    "number of entries along the timelike dimension."
+                )
+        
+        if np.all(np.diff(self.ts) > 0) :
+            raise ValueError("`ts` must be monotonically increasing.")
+                
+    def _interpret_t(self, t : float, left: bool):
+        maxlen = self.ts.shape[0] - 2
+        index = torch.searchsorted(self.ts, t, side="left" if left else "right")
+        index = torch.clip(index - 1, 0, maxlen)
+        # Will never access the final element of `ts`; this is correct behaviour.
+        fractional_part = t - self.ts[index]
+        return index, fractional_part
+    
+    def __call__(self, t, left=True):
+        
+        if t > self.ts[-1] or t < self.ts[0]:
+            raise ValueError("Interpolation point is outside data range. ie t > ts[-1] or t < ts[0]")
+        index, fractional_part = self._interpret_t(t, left)
+        prev_ys = self.ys[index]
+        next_ys = self.ys[index + 1]
+        prev_t = self.ts[index]
+        next_t = self.ts[index + 1]
+        diff_t = next_t - prev_t
+
+        return prev_ys + (next_ys - prev_ys) * (fractional_part / diff_t)
+
 
 
 
