@@ -7,7 +7,8 @@ class TorchLinearInterpolator:
 
         self.ts = ts.to(device)  # [N_t]
         self.ys = ys.to(device)  # [N, N_t, D]
-
+        self.device = device
+        
     def __post_init__(self):
         if self.ts.ndim != 1:
             raise ValueError("`ts` must be one dimensional.")
@@ -34,6 +35,8 @@ class TorchLinearInterpolator:
             raise ValueError(
                 "Interpolation point is outside data range. ie t > ts[-1] or t < ts[0]"
             )
+        t = torch.tensor(t)
+        t = t.to(self.device)
         index, fractional_part = self._interpret_t(t, left)
         prev_ys = self.ys[:, index]
         next_ys = self.ys[:, index + 1]
@@ -45,6 +48,9 @@ class TorchLinearInterpolator:
     def add_point(self, new_t, new_y):
         # new_t : float
         # new_y : torch.tensor size [N, D]
+        if new_t in self.ts :
+            return 
+        
         new_y = new_y.to(self.ts.device)
         new_y = torch.unsqueeze(new_y, dim=1)
         new_t = torch.unsqueeze(torch.tensor(new_t), dim=0)

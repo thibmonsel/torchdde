@@ -22,10 +22,6 @@ from . import interpolators
 # NB : This code is heavily based on the torch_ACA package (https://github.com/juntang-zhuang/torch_ACA)
 
 
-# Used for float comparisons
-tiny = 1e-8
-
-
 class nddeint_ACA(torch.autograd.Function):
     @staticmethod
     def forward(ctx, history, func, options, *params):
@@ -68,13 +64,14 @@ class nddeint_ACA(torch.autograd.Function):
         evaluations = ctx.allstates[options["eval_idx"]]
         return evaluations
 
+    
     @staticmethod
     def backward(ctx, *grad_y):
         # This function implements the adjoint gradient estimation method for NODEs
 
         # grad_output holds the gradient of the loss w.r.t. each evaluation step
         grad_output = grad_y[0]
-
+        print(grad_output.shape)
         # Retrieving the time mesh and the corresponding states created in forward()
         allstates = ctx.allstates
         time_mesh = ctx.alltimes
@@ -112,12 +109,11 @@ class nddeint_ACA(torch.autograd.Function):
         # The adjoint state as well as the parameters' gradient are integrated backwards in time.
         # Following the Adaptive Checkpoint Adjoint method, the time steps and corresponding states of the forward
         # integration are re-used by going backwards in the time mesh.
-        i = len(time_mesh)
-        for t in reversed(time_mesh[:-1]):
-            # t = time_mesh[i - 1]
-            # if i != len(time_mesh):
-            adjoint_interpolator.add_point(t, adjoint_state)
-            print(adjoint_interpolator.ts, t)
+        # i = len(time_mesh)
+        for i in range(len(time_mesh),0,-1):
+            t = time_mesh[i - 1]
+            if i != len(time_mesh):
+                adjoint_interpolator.add_point(t, adjoint_state)
             # Backward Integrating the adjoint state and the parameters' gradient between time i and i-1
 
             with torch.enable_grad():
@@ -133,12 +129,8 @@ class nddeint_ACA(torch.autograd.Function):
                 h_t_minus_tau = state_interpolator(t - tau)
                 out = ctx.func(t, h_t, history=[h_t_minus_tau])
 
-                rhs_adjoint_inc = torch.autograd.grad(out, h_t, -adjoint_state)[0]
+                rhs_adjoint_inc = torch.autograd.grad(out, h_t, adjoint_state, retain_graph=True)[0]
                 rhs_adjoint = rhs_adjoint + rhs_adjoint_inc
-
-                param_derivative_inc = torch.autograd.grad(
-                    out, params, -adjoint_state, retain_graph=True
-                )
 
                 # we need to add the the second term of rhs too in rhs_adjoint computation
                 if t < T - tau:
@@ -146,11 +138,15 @@ class nddeint_ACA(torch.autograd.Function):
                     h_t_plus_tau = state_interpolator(t + tau)
                     out_other = ctx.func(t, h_t_plus_tau, history=[h_t])
                     rhs_adjoint_inc = torch.autograd.grad(
-                        out_other, h_t, -adjoint_t_plus_tau
+                        out_other, h_t, adjoint_t_plus_tau
                     )[0]
                     rhs_adjoint = rhs_adjoint + rhs_adjoint_inc
 
-                adjoint_state = adjoint_state + ctx.dt * rhs_adjoint
+                param_derivative_inc = torch.autograd.grad(
+                    out, params, adjoint_state
+                )
+                
+                adjoint_state = adjoint_state - ctx.dt * rhs_adjoint
 
             # incrementing the parameters' grad
             if out2 is None:
@@ -159,14 +155,15 @@ class nddeint_ACA(torch.autograd.Function):
                 for _1, _2 in zip([*out2], [*param_derivative_inc]):
                     _1 = _1 - ctx.dt * _2
             # When reaching an evaluation step, the adjoint state is incremented with the gradient of the corresponding
-            # evaluation step
-            next_i = i - 1
-            if next_i in ctx.options["eval_idx"] and i != len(time_mesh):
+            # evaluation step 
+            next_i=i-1
+            if next_i in ctx.options['eval_idx'] and i!=len(time_mesh):
                 adjoint_state += grad_output[i_ev]
                 i_ev = i_ev - 1
 
         # Returning the gradient value for each forward() input
-        out = tuple([None] + [None, None]) + out2
+        out = tuple([None] + [None,  None])+out2
+
 
         return out
 
