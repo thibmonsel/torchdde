@@ -60,14 +60,16 @@ class TorchLinearInterpolator:
                 "You tried to add a new value that doesn't fit the shape of self.ys "
             )
 
-        index, fractional_part = self._interpret_t(new_t, left=True)
-        if index == 0:
+        rel_position = self.ts < new_t
+
+        if torch.all(rel_position) :
+            new_ys = torch.concat((self.ys, new_y), dim=1)
+            new_ts = torch.concat((self.ts, new_t)) 
+        elif not torch.all(rel_position) : 
             new_ys = torch.concat((new_y, self.ys), dim=1)
             new_ts = torch.concat((new_t, self.ts))
-        elif index == self.ts.shape[0] - 2:
-            new_ys = torch.concat((self.ys, new_y), dim=1)
-            new_ts = torch.concat((self.ts, new_t))
-        else:
+        else : 
+            index = rel_position.nonzero()[-1] - 1
             new_ys = torch.concat(
                 (self.ys[:, :index], new_y, self.ys[:, index:]), dim=1
             )

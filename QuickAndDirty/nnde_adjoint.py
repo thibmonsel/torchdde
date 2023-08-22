@@ -71,7 +71,6 @@ class nddeint_ACA(torch.autograd.Function):
 
         # grad_output holds the gradient of the loss w.r.t. each evaluation step
         grad_output = grad_y[0]
-        print(grad_output.shape)
         # Retrieving the time mesh and the corresponding states created in forward()
         allstates = ctx.allstates
         time_mesh = ctx.alltimes
