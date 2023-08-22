@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import torch
 
@@ -8,7 +10,7 @@ class TorchLinearInterpolator:
         self.ts = ts.to(device)  # [N_t]
         self.ys = ys.to(device)  # [N, N_t, D]
         self.device = device
-        
+
     def __post_init__(self):
         if self.ts.ndim != 1:
             raise ValueError("`ts` must be one dimensional.")
@@ -32,6 +34,7 @@ class TorchLinearInterpolator:
 
     def __call__(self, t, left=True):
         if t > self.ts[-1] or t < self.ts[0]:
+            # print(t, self.ts[-1], self.ts[0])
             raise ValueError(
                 "Interpolation point is outside data range. ie t > ts[-1] or t < ts[0]"
             )
@@ -48,9 +51,9 @@ class TorchLinearInterpolator:
     def add_point(self, new_t, new_y):
         # new_t : float
         # new_y : torch.tensor size [N, D]
-        if new_t in self.ts :
-            return 
-        
+        if new_t in self.ts:
+            warnings.warn("already have new_t point in interpolation, overwriting it ") 
+
         new_y = new_y.to(self.ts.device)
         new_y = torch.unsqueeze(new_y, dim=1)
         new_t = torch.unsqueeze(torch.tensor(new_t), dim=0)
@@ -62,13 +65,13 @@ class TorchLinearInterpolator:
 
         rel_position = self.ts < new_t
 
-        if torch.all(rel_position) :
+        if torch.all(rel_position):
             new_ys = torch.concat((self.ys, new_y), dim=1)
-            new_ts = torch.concat((self.ts, new_t)) 
-        elif not torch.all(rel_position) : 
+            new_ts = torch.concat((self.ts, new_t))
+        elif not torch.all(rel_position):
             new_ys = torch.concat((new_y, self.ys), dim=1)
             new_ts = torch.concat((new_t, self.ts))
-        else : 
+        else:
             index = rel_position.nonzero()[-1] - 1
             new_ys = torch.concat(
                 (self.ys[:, :index], new_y, self.ys[:, index:]), dim=1
@@ -78,7 +81,7 @@ class TorchLinearInterpolator:
         self.ys = new_ys
         self.ts = new_ts
 
-        if not torch.all(torch.diff(self.ts) > 0):
-            raise ValueError(
-                "`ts` must be monotonically increasing. oups errors in add_point"
-            )
+        # if not torch.all(torch.diff(self.ts) > 0):
+        #     raise ValueError(
+        #         "`ts` must be monotonically increasing. oups errors in add_point"
+        #     )
