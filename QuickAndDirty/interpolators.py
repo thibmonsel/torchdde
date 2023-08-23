@@ -36,7 +36,7 @@ class TorchLinearInterpolator:
         if t > self.ts[-1] or t < self.ts[0]:
             # print(t, self.ts[-1], self.ts[0])
             raise ValueError(
-                "Interpolation point is outside data range. ie t > ts[-1] or t < ts[0]"
+                f"Interpolation point is outside data range. ie t={t} > ts[-1]={self.ts[-1]} or t < ts[0]={self.ts[0]}"
             )
         t = torch.tensor(t)
         t = t.to(self.device)
@@ -52,11 +52,11 @@ class TorchLinearInterpolator:
         # new_t : float
         # new_y : torch.tensor size [N, D]
         if new_t in self.ts:
-            warnings.warn("already have new_t point in interpolation, overwriting it ") 
+            warnings.warn(f"already have new_t={new_t} point in interpolation, overwriting it ") 
 
         new_y = new_y.to(self.ts.device)
         new_y = torch.unsqueeze(new_y, dim=1)
-        new_t = torch.unsqueeze(torch.tensor(new_t), dim=0)
+        new_t = torch.unsqueeze(new_t.clone().detach(), dim=0)
         new_t = new_t.to(self.ts.device)
         if self.ys.shape[-1] != new_y.shape[-1]:
             raise ValueError(
@@ -64,11 +64,11 @@ class TorchLinearInterpolator:
             )
 
         rel_position = self.ts < new_t
-
-        if torch.all(rel_position):
+        last_insertion = torch.all(rel_position)
+        if last_insertion:
             new_ys = torch.concat((self.ys, new_y), dim=1)
             new_ts = torch.concat((self.ts, new_t))
-        elif not torch.all(rel_position):
+        elif not last_insertion:
             new_ys = torch.concat((new_y, self.ys), dim=1)
             new_ts = torch.concat((new_t, self.ts))
         else:

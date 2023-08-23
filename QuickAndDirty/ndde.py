@@ -10,29 +10,20 @@ from interpolators import TorchLinearInterpolator
 from QuickAndDirty.nnde_adjoint import nddesolve_adjoint
 
 
-# %%
-# tmax = 100
-# dt = 1e-2
-# ts = np.linspace(0, tmax, int(tmax / dt) + 1)
-# np_data = np.sin(ts)  # +np.sin(1.27*time)
-# print(ys.shape)
-# plt.plot(ys)
-# plt.show()
-
-# %%
 class NDDE(nn.Module):
     def __init__(self, dim, list_delays, width=64):
         super().__init__()
         self.in_dim = dim * (1 + len(list_delays))
         self.delays = list_delays
         self.model = nn.Sequential(
-            nn.Linear(self.in_dim, width),
-            nn.ReLU(),
-            nn.Linear(width, width),
-            nn.ReLU(),
-            nn.Linear(width, width),
-            nn.ReLU(),
-            nn.Linear(width, dim),
+            nn.Linear(self.in_dim, dim, bias=False)
+            # nn.Linear(self.in_dim, width),
+            # nn.ReLU(),
+            # nn.Linear(width, width),
+            # nn.ReLU(),
+            # nn.Linear(width, width),
+            # nn.ReLU(),
+            # nn.Linear(width, dim),
         )
 
     def forward(self, t, z, *, history):
@@ -51,24 +42,20 @@ def get_batch(
 ):
     """
     ts : [N_t]
-    ys : [N_t, #features]
+    ys : [B, N_t, #features]
     """
     dt = ts[1] - ts[0]
     max_delay = max(list_delays)
     max_delay_idx = int(max_delay / dt)
     # pick random indices for each batch
-    rand_idx = np.random.choice(
-        ys.shape[0] - max_delay_idx - length - 1, size=batch_size
-    )
+    rand_idx = np.random.choice(ys.shape[1] - max_delay_idx - length - 1)
     # history_batch : [batch_size, max_delay_idx, #features]
     # ts_history : [length] negative time
     # data_batch : [batch_size, length, #features]
-    history_batch = torch.stack([ys[i : i + max_delay_idx + 1] for i in rand_idx])
+    history_batch = ys[:, rand_idx : rand_idx + max_delay_idx + 1]
     ts_history = torch.linspace(0, max_delay, max_delay_idx + 1)
-    data_batch = torch.stack(
-        [ys[i + max_delay_idx : i + max_delay_idx + length + 1] for i in rand_idx]
-    )
-    ts_data = torch.linspace(0, float(length * dt), length + 1)
+    data_batch = ys[:, rand_idx + max_delay_idx : rand_idx + max_delay_idx + length + 1]
+    ts_data = torch.linspace(max_delay, float(length * dt), length + 1)
     interpolator = TorchLinearInterpolator(ts_history, history_batch, device)
     data_batch = data_batch.to(device)
     return interpolator, ts_data, data_batch
@@ -77,13 +64,15 @@ def get_batch(
 def vf(t, y, history):
     return 0.25 * history[0] / (1.0 + history[0] ** 10) - 0.1 * y
 
+def vf2(t, y, history):
+    return - history[0]
 
 def integrate(func, y0, t0, tf, dt, history, delays):
     num_steps = int((tf - t0) / dt)
     values = [y0]
     alltimes = [t0]
     val, t_current = y0, t0
-    for i in range(num_steps):
+    for i in range(num_steps+1):
         val = val + dt * func(
             t_current, val, history=[history(t_current - tau) for tau in delays]
         )
@@ -97,69 +86,45 @@ def integrate(func, y0, t0, tf, dt, history, delays):
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-list_delays = [1]
-dt, y0 = torch.tensor(1e-2), torch.tensor([1.2])
-ts_history = torch.tensor([0.0, 10.0]).reshape(2)
-ts_history = ts_history.to(device)
-y0 = y0.to(device)
-history = TorchLinearInterpolator(ts_history, y0.repeat(1, 2, 1), y0.device)
-tf =  torch.tensor(20.0)
-tf = tf.to(device)
+list_delays, number_datapoints = [1.0], 256
+uniform_dist = torch.distributions.Uniform(0.1, 2.0)
+y0_history = uniform_dist.sample(sample_shape=(number_datapoints,))
+ts_history, ts = torch.tensor([0.0, max(list_delays)]), torch.linspace(1, 10, 100)
+ys = torch.empty((number_datapoints, ts.shape[0], 1))
 
-ts, ys, histo = integrate(vf, y0, ts_history[-1], tf, dt, history, list_delays)
-print(ts.shape, ys.shape)
-# plt.plot(ys)
-# plt.title("data gen")
-# plt.show()
+for i, y0 in enumerate(y0_history) :
+    history = TorchLinearInterpolator(ts_history, y0.repeat(1, 2, 1), y0.device)
+    _, dyn , _ = integrate(vf2, y0, ts[0], ts[-1], ts[1]-ts[0], history, list_delays)
+    ys[i] = dyn 
 
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# # ys = torch.tensor(np_data).reshape(-1, 1)
-# ts = np.load("ts.npy")
-# ys = np.load("ys.npy")
-# ts = torch.tensor(ts)
-# ys = torch.tensor(ys).reshape(-1, 1)
-# dt = ts[1] - ts[0]
-# ts, ys = ts.to(device), ys.to(device)
-# interpolator, ts_data, data_batch = get_batch(ts, ys, [1.0, 2.0])
 
-# %%
-# plt.plot(ys.cpu())
-# plt.show()
-
-# %%
-length = 100
+dt =  ts[1] - ts[0]
+length = ys.shape[1] - 20
 integration_options = {
     "nSteps": length - 1,
     "dt": dt,
     "t0": ts_history[-1],
-    "eval_idx": np.arange(length),
+    "eval_idx": np.arange(length+1),
 }
-delay_pts = [10]
-list_delays = [d for d in delay_pts]
 model = NDDE(1, list_delays, width=64).to(ys.dtype).cuda()
 lossfunc = nn.MSELoss()
-opt = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
+opt = torch.optim.SGD(model.parameters(), lr=1e-5, weight_decay=1e-4)
 losses = []
 lens = []
 
 
-# # %%
-# history, ts_data, traj = get_batch(ts, ys, list_delays, device=device, length=length)
-# # traj = traj.to(device)
-# # %%
-# ret = nddesolve_adjoint(history, model, integration_options)
-# ret.shape
-
-# %%
-for i in range(200):
+for i in range(1000):
     opt.zero_grad()
     history, ts_data, traj = get_batch(ts, ys, list_delays, length=length)
     ret = nddesolve_adjoint(history, model, integration_options)
-    # loss = torch.mean(torch.sum((ret.permute(1,0,2)-traj)**4,axis=-1)**0.25)
-    loss = lossfunc(ret.permute(1, 0, 2), traj[:, 1:])
+    loss = lossfunc(ret.permute(1, 0, 2), traj)
     loss.backward()
     opt.step()
     if i % 100 == 0 :
+        for name, param in model.named_parameters():
+            if param.requires_grad:
+                print(name, param.data)
+                
         plt.plot(traj[0, 1:].cpu().detach().numpy())
         plt.plot(ret.permute(1, 0, 2)[0].cpu().detach().numpy(), '--')
         plt.pause(1)
@@ -167,16 +132,16 @@ for i in range(200):
     print("Epoch : {:4d}, length : {:4d}, Loss : {:.3e}".format(i, length, loss.item()))
     losses.append(loss.item())
     lens.append(length)
-    if losses[-1] < 1e-2:
+    if losses[-1] < 1e-5:
         length += 1
         integration_options = {
             "nSteps": length - 1,
             "dt": dt,
-            "t0": 0,
-            "eval_idx": np.arange(length),
+            "t0": ts_history[-1],
+            "eval_idx": np.arange(length+1),
         }
 
-    if length > 250:
+    if length > ys.shape[1] -10:
         break
 
 # %%
@@ -187,7 +152,8 @@ for i in range(200):
 # plt.semilogys
 # %%
 # history, ts_data, traj = get_batch(ts, ys, list_delays, device=device, length=length)
-inference_options = {"nSteps": length, "dt": dt, "t0": t0, "eval_idx": np.arange(length)}
+history, ts_data, traj = get_batch(ts, ys, list_delays, length=length)
+inference_options = {"nSteps": length-1, "dt": dt, "t0": ts_history[-1], "eval_idx": np.arange(length+1)}
 ret = nddesolve_adjoint(history, model, inference_options)
 
 # %%

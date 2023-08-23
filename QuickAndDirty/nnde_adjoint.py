@@ -1,8 +1,7 @@
 import numpy as np
-import scipy
-import scipy.integrate as sciinteg
 import torch
 import torch.nn as nn
+from matplotlib import pyplot as plt
 
 from . import interpolators
 
@@ -42,7 +41,7 @@ class nddeint_ACA(torch.autograd.Function):
         with torch.no_grad():
             values = [val]
             alltimes = [t]
-            for i in range(ctx.nSteps):
+            for i in range(ctx.nSteps+1):
                 val = val + ctx.dt * func(
                     t, val, history=[history(t - tau) for tau in delays]
                 )
@@ -72,6 +71,13 @@ class nddeint_ACA(torch.autograd.Function):
         params = ctx.saved_tensors
         state_interpolator = ctx.history
 
+        # aux = []
+        # for t in time_mesh :
+        #     aux.append(state_interpolator(t)[0])
+        
+        # aux = torch.tensor(aux)
+        # plt.plot(time_mesh, aux.cpu())
+        # plt.show()
         # The last step of the time mesh is an evaluation step, thus the adjoint state which corresponds to the
         # gradient of the loss w.r.t. the evaluation states is initialised with the gradient corresponding to
         # the last evaluation time.
@@ -79,8 +85,6 @@ class nddeint_ACA(torch.autograd.Function):
         # This is the adjoint state at t = T
         T = time_mesh[-1]
         adjoint_state = grad_output[-1]
-        # print(adjoint_state.shape)
-        i_ev = len(time_mesh) - 2
 
         adjoint_ys_final = adjoint_state.reshape(
             adjoint_state.shape[0], 1, *adjoint_state.shape[1:]
@@ -130,7 +134,7 @@ class nddeint_ACA(torch.autograd.Function):
                 if t < T - tau:
                     adjoint_t_plus_tau = adjoint_interpolator(t + tau)
                     h_t_plus_tau = state_interpolator(t + tau)
-                    out_other = ctx.func(t, h_t_plus_tau, history=[h_t])
+                    out_other = ctx.func(t+tau, h_t_plus_tau, history=[h_t])
                     rhs_adjoint_inc = torch.autograd.grad(
                         out_other, h_t, - adjoint_t_plus_tau
                     )[0]
