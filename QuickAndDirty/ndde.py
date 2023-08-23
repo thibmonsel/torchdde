@@ -30,7 +30,10 @@ class NDDE(nn.Module):
         inp = torch.cat([z, *history], dim=-1)
         return self.model(inp)
 
-
+    def init_weights(m):
+        if isinstance(m, nn.Linear):
+            torch.nn.init.constant_(m.weight, 0.0)
+            # m.bias.data.fill_(0.01)
 # %%
 def get_batch(
     ts,
@@ -89,7 +92,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 list_delays, number_datapoints = [1.0], 256
 uniform_dist = torch.distributions.Uniform(0.1, 2.0)
 y0_history = uniform_dist.sample(sample_shape=(number_datapoints,))
-ts_history, ts = torch.tensor([0.0, max(list_delays)]), torch.linspace(1, 10, 100)
+ts_history, ts = torch.tensor([0.0, max(list_delays)]), torch.linspace(1, 10, 100 + 1)
 ys = torch.empty((number_datapoints, ts.shape[0], 1))
 
 for i, y0 in enumerate(y0_history) :
@@ -99,7 +102,8 @@ for i, y0 in enumerate(y0_history) :
 
 
 dt =  ts[1] - ts[0]
-length = ys.shape[1] - 20
+length = 2*  int(max(list_delays) / dt)
+#ys.shape[1] - 20
 integration_options = {
     "nSteps": length - 1,
     "dt": dt,
@@ -108,12 +112,12 @@ integration_options = {
 }
 model = NDDE(1, list_delays, width=64).to(ys.dtype).cuda()
 lossfunc = nn.MSELoss()
-opt = torch.optim.SGD(model.parameters(), lr=1e-5, weight_decay=1e-4)
+opt = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-5)
 losses = []
 lens = []
 
 
-for i in range(1000):
+for i in range(10000):
     opt.zero_grad()
     history, ts_data, traj = get_batch(ts, ys, list_delays, length=length)
     ret = nddesolve_adjoint(history, model, integration_options)

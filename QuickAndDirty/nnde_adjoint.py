@@ -128,6 +128,7 @@ class nddeint_ACA(torch.autograd.Function):
                 rhs_adjoint_inc = torch.autograd.grad(
                     out, h_t, -adjoint_state, retain_graph=True
                 )[0]
+                # print("-a adjoint ", (rhs_adjoint_inc / adjoint_state)[0], params)
                 rhs_adjoint = rhs_adjoint + rhs_adjoint_inc
 
                 # we need to add the the second term of rhs too in rhs_adjoint computation
@@ -135,31 +136,29 @@ class nddeint_ACA(torch.autograd.Function):
                     adjoint_t_plus_tau = adjoint_interpolator(t + tau)
                     h_t_plus_tau = state_interpolator(t + tau)
                     out_other = ctx.func(t+tau, h_t_plus_tau, history=[h_t])
+                   
                     rhs_adjoint_inc = torch.autograd.grad(
                         out_other, h_t, - adjoint_t_plus_tau
                     )[0]
                     rhs_adjoint = rhs_adjoint + rhs_adjoint_inc
+                    # print("-b adjoint ", (rhs_adjoint_inc / adjoint_t_plus_tau)[0], params)
 
                 param_derivative_inc = torch.autograd.grad(out, params, -adjoint_state)
 
                 adjoint_state = adjoint_state - ctx.dt * rhs_adjoint
-
             # incrementing the parameters' grad
             if out2 is None:
-                out2 = tuple([-ctx.dt * p for p in param_derivative_inc])
+                out2 = tuple([ctx.dt * p for p in param_derivative_inc])
             else:
                 for _1, _2 in zip([*out2], [*param_derivative_inc]):
-                    _1 = _1 - ctx.dt * _2
-            # When reaching an evaluation step, the adjoint state is incremented with the gradient of the corresponding
-            # evaluation step
-            # next_i = i - 1
-            # if next_i in ctx.options["eval_idx"] and i != len(time_mesh):
-            #     adjoint_state += grad_output[i_ev]
-            #     i_ev = i_ev - 1
-
+                    _1 = _1 + ctx.dt * _2
         # Returning the gradient value for each forward() input
         out = tuple([None] + [None, None]) + out2
-
+     
+        # plt.plot(time_mesh, [adjoint_interpolator(t).cpu()[4] for t in time_mesh])
+        # plt.plot(time_mesh, [ grad_output[-1][4].cpu() * np.exp(ctx.func.model[0].weight[0][0].cpu()*t) for t in reversed(time_mesh)], '--')
+        # plt.plot("adjoint value and the first ")
+        # plt.show()
         return out
 
 
