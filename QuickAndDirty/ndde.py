@@ -34,12 +34,13 @@ class NDDE(nn.Module):
         if isinstance(m, nn.Linear):
             torch.nn.init.constant_(m.weight, 0.0)
             # m.bias.data.fill_(0.01)
+
+
 # %%
 def get_batch(
     ts,
     ys,
     list_delays,
-    batch_size=256,
     length=100,
     device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ):
@@ -67,15 +68,17 @@ def get_batch(
 def vf(t, y, history):
     return 0.25 * history[0] / (1.0 + history[0] ** 10) - 0.1 * y
 
+
 def vf2(t, y, history):
-    return - history[0]
+    return -history[0]
+
 
 def integrate(func, y0, t0, tf, dt, history, delays):
     num_steps = int((tf - t0) / dt)
     values = [y0]
     alltimes = [t0]
     val, t_current = y0, t0
-    for i in range(num_steps+1):
+    for i in range(num_steps + 1):
         val = val + dt * func(
             t_current, val, history=[history(t_current - tau) for tau in delays]
         )
@@ -84,35 +87,36 @@ def integrate(func, y0, t0, tf, dt, history, delays):
         values.append(val)
         alltimes.append(t_current)
     alltimes = torch.tensor(alltimes)
-    values = torch.tensor(values)
+    values = torch.hstack(values)
     return alltimes, torch.unsqueeze(values, -1), history
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 list_delays, number_datapoints = [1.0], 256
 uniform_dist = torch.distributions.Uniform(0.1, 2.0)
-y0_history = uniform_dist.sample(sample_shape=(number_datapoints,))
-ts_history, ts = torch.tensor([0.0, max(list_delays)]), torch.linspace(1, 10, 100 + 1)
+y0_history = uniform_dist.sample(sample_shape=(number_datapoints, 1))
+ts_history, ts = torch.tensor([0.0, max(list_delays)]), torch.linspace(1, 10, 250 + 1)
 ys = torch.empty((number_datapoints, ts.shape[0], 1))
 
-for i, y0 in enumerate(y0_history) :
-    history = TorchLinearInterpolator(ts_history, y0.repeat(1, 2, 1), y0.device)
-    _, dyn , _ = integrate(vf2, y0, ts[0], ts[-1], ts[1]-ts[0], history, list_delays)
-    ys[i] = dyn 
+history = TorchLinearInterpolator(
+    ts_history, torch.hstack([y0_history, y0_history])[..., None], y0_history.device
+)
+_, ys, _ = integrate(
+    vf2, y0_history, ts[0], ts[-1], ts[1] - ts[0], history, list_delays
+)
 
 
-dt =  ts[1] - ts[0]
-length = 2*  int(max(list_delays) / dt)
-#ys.shape[1] - 20
+dt = ts[1] - ts[0]
+length = 3 * int(max(list_delays) / dt)
 integration_options = {
     "nSteps": length - 1,
     "dt": dt,
     "t0": ts_history[-1],
-    "eval_idx": np.arange(length+1),
+    "eval_idx": np.arange(length + 1),
 }
 model = NDDE(1, list_delays, width=64).to(ys.dtype).cuda()
 lossfunc = nn.MSELoss()
-opt = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-5)
+opt = torch.optim.Adam(model.parameters(), lr=1e-9)
 losses = []
 lens = []
 
@@ -124,13 +128,13 @@ for i in range(10000):
     loss = lossfunc(ret.permute(1, 0, 2), traj)
     loss.backward()
     opt.step()
-    if i % 100 == 0 :
-        for name, param in model.named_parameters():
-            if param.requires_grad:
-                print(name, param.data)
-                
-        plt.plot(traj[0, 1:].cpu().detach().numpy())
-        plt.plot(ret.permute(1, 0, 2)[0].cpu().detach().numpy(), '--')
+    if i % 100 == 0:
+        # for name, param in model.named_parameters():
+        #     if param.requires_grad:
+        #         print(name, param.data)
+
+        plt.plot(traj[0].cpu().detach().numpy())
+        plt.plot(ret.permute(1, 0, 2)[0].cpu().detach().numpy(), "--")
         plt.pause(1)
         plt.close()
     print("Epoch : {:4d}, length : {:4d}, Loss : {:.3e}".format(i, length, loss.item()))
@@ -142,10 +146,10 @@ for i in range(10000):
             "nSteps": length - 1,
             "dt": dt,
             "t0": ts_history[-1],
-            "eval_idx": np.arange(length+1),
+            "eval_idx": np.arange(length + 1),
         }
 
-    if length > ys.shape[1] -10:
+    if length > ys.shape[1] - 10:
         break
 
 # %%
@@ -157,7 +161,12 @@ for i in range(10000):
 # %%
 # history, ts_data, traj = get_batch(ts, ys, list_delays, device=device, length=length)
 history, ts_data, traj = get_batch(ts, ys, list_delays, length=length)
-inference_options = {"nSteps": length-1, "dt": dt, "t0": ts_history[-1], "eval_idx": np.arange(length+1)}
+inference_options = {
+    "nSteps": length - 1,
+    "dt": dt,
+    "t0": ts_history[-1],
+    "eval_idx": np.arange(length + 1),
+}
 ret = nddesolve_adjoint(history, model, inference_options)
 
 # %%

@@ -58,11 +58,11 @@ class TorchLinearInterpolator:
         new_y = torch.unsqueeze(new_y, dim=1)
         new_t = torch.unsqueeze(new_t.clone().detach(), dim=0)
         new_t = new_t.to(self.ts.device)
+
         if self.ys.shape[-1] != new_y.shape[-1]:
             raise ValueError(
                 "You tried to add a new value that doesn't fit the shape of self.ys "
             )
-
         rel_position = self.ts < new_t
         last_insertion = torch.all(rel_position)
         if last_insertion:
