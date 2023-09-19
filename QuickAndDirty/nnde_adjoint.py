@@ -1,8 +1,10 @@
 import numpy as np
 import torch
 import torch.nn as nn
+from dde_solver import DDESolver
 from interpolators import TorchLinearInterpolator
 from matplotlib import pyplot as plt
+from ode_solver import *
 
 
 #
@@ -19,8 +21,7 @@ from matplotlib import pyplot as plt
 #
 # NB : This code is heavily based on the torch_ACA package (https://github.com/juntang-zhuang/torch_ACA)
 
-
-class nddeint_ACA(torch.autograd.Function):
+class nddeint2_ACA(torch.autograd.Function):
     @staticmethod
     def forward(ctx, history_func, func, ts, *params):
         # Saving parameters for backward()
@@ -30,44 +31,21 @@ class nddeint_ACA(torch.autograd.Function):
             ctx.save_for_backward(*params)
 
         ctx.ts = ts
-        ctx.dt = ctx.ts[1] - ctx.ts[0]
-        val = history_func(ctx.ts[0])
         delays = func.delays
-        y0 = history_func(ctx.ts[0])
         # Simulation
         with torch.no_grad():
-            values = [val]
-            alltimes = [ctx.ts[0]]
-            state_interpolator = TorchLinearInterpolator(
-                torch.tensor([ctx.ts[0]]),
-                torch.unsqueeze(torch.tensor(val), 1),
-                device=val.device,
-            )
-            # valid only for constant history functions
-            state_interpolator.add_point(ctx.ts[0] - max(delays), val)
-            for current_t in ctx.ts[1:]:
-                val = val + ctx.dt * func(
-                    current_t,
-                    val,
-                    history=[
-                        history_func(current_t - tau)
-                        if current_t - tau <= ctx.ts[0]
-                        else state_interpolator(current_t - tau)
-                        for tau in delays
-                    ],
-                )
-                state_interpolator.add_point(current_t, val)
-                values.append(val)
-                alltimes.append(current_t)
+            solver = Ralston()
+            dde_solver = DDESolver(solver, delays)
+            ys_interpolator = dde_solver.integrate(func, ts, history_func)
+            
+        ctx.alltimes = ts
+        ctx.history = ys_interpolator
 
-        # Retrieving the time stamps selected by the solver
-        ctx.y0 = y0
-        ctx.alltimes = alltimes
-        ctx.history = state_interpolator
-
-        ctx.allstates = torch.stack(values)
+        ctx.allstates = ys_interpolator.ys
+        ctx.y0 = ys_interpolator.ys[:, 0]
         return ctx.allstates
-    
+            
+
     @staticmethod
     def backward(ctx, *grad_y):
         # https://www.researchgate.net/publication/255686149_Adjoint_Sensitivity_Analysis_of_Neutral_Delay_Differential_Models
@@ -100,25 +78,25 @@ class nddeint_ACA(torch.autograd.Function):
         adjoint_ys_final = adjoint_state.reshape(
             adjoint_state.shape[0], 1, *adjoint_state.shape[1:]
         )
-    
+
         adjoint_ys_final = adjoint_ys_final.to(adjoint_state.device)
-       
+
         # adjoint history shape [N, D]
         # create an adjoint interpolator that is defined from [T, T+ dt] for initialization purposes
         # adjoint at T=t is equal to the gradient of the loss w.r.t. the evaluation state at t=T and the t> T is 0
         adjoint_interpolator = TorchLinearInterpolator(
             torch.tensor([T]),
-            adjoint_ys_final ,
-            device=adjoint_ys_final.device,
+            adjoint_ys_final,
+            # device=adjoint_ys_final.device,
         )
-        
+
         # adjoint_history = lambda t : adjoint_state if t==T else torch.zeros_like(adjoint_state)
         out2 = None
         # The adjoint state as well as the parameters' gradient are integrated backwards in time.
         # Following the Adaptive Checkpoint Adjoint method, the time steps and corresponding states of the forward
         # integration are re-used by going backwards in the time mesh.
         param_derivative_inc = 0
-        for j,t in enumerate(reversed(time_mesh[:-1])):
+        for j, t in enumerate(reversed(time_mesh[:-1])):
             # Backward Integrating the adjoint state and the parameters' gradient between time i and i-1
             with torch.enable_grad():
                 # Taking a step with the NODE function to build a graph which will be differentiated
@@ -136,47 +114,50 @@ class nddeint_ACA(torch.autograd.Function):
                 rhs_adjoint_inc_k1 = torch.autograd.grad(
                     out, h_t, -adjoint_state, retain_graph=True
                 )[0]
-                
-                rhs_adjoint = rhs_adjoint + rhs_adjoint_inc_k1 #+ rhs_adjoint_inc_k2
+
+                rhs_adjoint = rhs_adjoint + rhs_adjoint_inc_k1  # + rhs_adjoint_inc_k2
 
                 # we need to add the the second term of rhs too in rhs_adjoint computation
                 if t < T - tau:
-                    adjoint_t_plus_tau = adjoint_interpolator(t + tau) 
-                    h_t_plus_tau = state_interpolator(t + tau) 
+                    adjoint_t_plus_tau = adjoint_interpolator(t + tau)
+                    h_t_plus_tau = state_interpolator(t + tau)
                     out_other = ctx.func(t + tau, h_t_plus_tau, history=[h_t])
 
                     rhs_adjoint_inc_k1 = torch.autograd.grad(
                         out_other, h_t, -adjoint_t_plus_tau
                     )[0]
-                    
-        
-                    rhs_adjoint = rhs_adjoint + rhs_adjoint_inc_k1  #+ rhs_adjoint_inc_k2 
-                
+
+                    rhs_adjoint = (
+                        rhs_adjoint + rhs_adjoint_inc_k1
+                    )  # + rhs_adjoint_inc_k2
+
                 # print('grad_output',grad_output.shape, grad_output[j], torch.autograd.grad(out, params))
-                param_derivative_inc =  grad_output[j] * torch.autograd.grad(out, params, retain_graph=True)[0]
+                param_derivative_inc = (
+                    grad_output[j]
+                    * torch.autograd.grad(out, params, retain_graph=True)[0]
+                )
                 # param_derivative_inc = torch.autograd.grad(out, params, -adjoint_state, retain_graph=True)[0]
                 # param_derivative_inc = torch.autograd.grad(out, params, - grad_output[j], retain_graph=True)[0]
                 adjoint_state = adjoint_state - ctx.dt * rhs_adjoint
                 adjoint_interpolator.add_point(t, adjoint_state)
 
-                # for j, t in enumerate(time_mesh) : 
+                # for j, t in enumerate(time_mesh) :
                 # grad1 = torch.autograd.grad(out, params, retain_graph=True)[0]
                 # param_derivative_inc += grad_output[j] *  grad1
                 # Returning the gradient value for each forward() input
 
                 if out2 is None:
-                    out2 = tuple([- ctx.dt * p for p in param_derivative_inc])
+                    out2 = tuple([-ctx.dt * p for p in param_derivative_inc])
                 else:
                     for _1, _2 in zip([*out2], [*param_derivative_inc]):
-                        _1 = _1 - ctx.dt *  _2 
-                        
+                        _1 = _1 - ctx.dt * _2
+
         out = tuple([None] + [None, None]) + (param_derivative_inc,)
         # out = tuple([None] + [None] + [None] + [None] + [None] + [None] + [None, None]) + (param_derivative_inc,)
 
-                # print(out)
-            # incrementing the parameters' grad
-            
-                    
+        # print(out)
+        # incrementing the parameters' grad
+
         # print(grad_output.squeeze())
         # print('adjoint value a T', adjoint_interpolator(T))
         # plt.plot(time_mesh, [adjoint_interpolator(t).cpu()[0] for t in time_mesh])
@@ -185,7 +166,176 @@ class nddeint_ACA(torch.autograd.Function):
         # plt.pause(0.1)
         # plt.close()
         return out
-    
+
+class nddeint_ACA(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, history_func, func, ts, *params):
+        # Saving parameters for backward()
+        ctx.func = func
+        # ctx.flat_params = flat_params
+        with torch.no_grad():
+            ctx.save_for_backward(*params)
+
+        ctx.ts = ts
+        ctx.dt = ctx.ts[1] - ctx.ts[0]
+        val = history_func(ctx.ts[0])
+        delays = func.delays
+        y0 = history_func(ctx.ts[0])
+        # Simulation
+        with torch.no_grad():            
+            values = [val]
+            alltimes = [ctx.ts[0]]
+            state_interpolator = TorchLinearInterpolator(
+                torch.tensor([ctx.ts[0]]),
+                torch.unsqueeze(torch.tensor(val), 1),
+                device=val.device,
+            )
+            # valid only for constant history functions
+            state_interpolator.add_point(ctx.ts[0] - max(delays), val)
+            for current_t in ctx.ts[1:]:
+                val = val + ctx.dt * func(
+                    current_t,
+                    val,
+                    history=[
+                        history_func(current_t - tau)
+                        if current_t - tau <= ctx.ts[0]
+                        else state_interpolator(current_t - tau)
+                        for tau in delays
+                    ],
+                )
+                state_interpolator.add_point(current_t, val)
+                values.append(val)
+                alltimes.append(current_t)
+
+        # Retrieving the time stamps selected by the solver
+        ctx.y0 = y0
+        ctx.alltimes = alltimes
+        ctx.history = state_interpolator
+
+        ctx.allstates = torch.stack(values)
+        return ctx.allstates
+
+    @staticmethod
+    def backward(ctx, *grad_y):
+        # https://www.researchgate.net/publication/255686149_Adjoint_Sensitivity_Analysis_of_Neutral_Delay_Differential_Models
+        # This function implements the adjoint gradient estimation method for NODEs
+
+        # grad_output holds the gradient of the loss w.r.t. each evaluation step
+        grad_output = grad_y[0]
+        # Retrieving the time mesh and the corresponding states created in forward()
+        # allstates = ctx.allstates
+        time_mesh = ctx.alltimes
+        # f_params holds the NDDE parameters for which a gradient will be computed
+        params = ctx.saved_tensors
+        state_interpolator = ctx.history
+        # aux = []
+        # for t in time_mesh :
+        #     aux.append(state_interpolator(t)[0])
+
+        # aux = torch.tensor(aux)
+        # plt.plot(time_mesh, aux.cpu())
+        # plt.show()
+        # The last step of the time mesh is an evaluation step, thus the adjoint state which corresponds to the
+        # gradient of the loss w.r.t. the evaluation states is initialised with the gradient corresponding to
+        # the last evaluation time.
+        # print('grad_output',grad_output.shape, len(time_mesh), len(ctx.allstates))
+        # This is the adjoint state at t = T
+        T = time_mesh[-1]
+        # adjoint_state = grad_output[-1]
+        adjoint_state = torch.ones_like(grad_output[-1])
+        # print('adjoint_state', adjoint_state.shape)
+        adjoint_ys_final = adjoint_state.reshape(
+            adjoint_state.shape[0], 1, *adjoint_state.shape[1:]
+        )
+
+        adjoint_ys_final = adjoint_ys_final.to(adjoint_state.device)
+
+        # adjoint history shape [N, D]
+        # create an adjoint interpolator that is defined from [T, T+ dt] for initialization purposes
+        # adjoint at T=t is equal to the gradient of the loss w.r.t. the evaluation state at t=T and the t> T is 0
+        adjoint_interpolator = TorchLinearInterpolator(
+            torch.tensor([T]),
+            adjoint_ys_final,
+            # device=adjoint_ys_final.device,
+        )
+
+        # adjoint_history = lambda t : adjoint_state if t==T else torch.zeros_like(adjoint_state)
+        out2 = None
+        # The adjoint state as well as the parameters' gradient are integrated backwards in time.
+        # Following the Adaptive Checkpoint Adjoint method, the time steps and corresponding states of the forward
+        # integration are re-used by going backwards in the time mesh.
+        param_derivative_inc = 0
+        for j, t in enumerate(reversed(time_mesh[:-1])):
+            # Backward Integrating the adjoint state and the parameters' gradient between time i and i-1
+            with torch.enable_grad():
+                # Taking a step with the NODE function to build a graph which will be differentiated
+                # so as to integrate the adjoint state and the parameters' gradient
+                rhs_adjoint = 0.0
+
+                # correspond to h_t
+                h_t = torch.autograd.Variable(state_interpolator(t), requires_grad=True)
+                tau = max(ctx.func.delays)
+
+                # we are in the case where t > T - tau
+                h_t_minus_tau = state_interpolator(t - tau)
+                out = ctx.func(t, h_t, history=[h_t_minus_tau])
+
+                rhs_adjoint_inc_k1 = torch.autograd.grad(
+                    out, h_t, -adjoint_state, retain_graph=True
+                )[0]
+
+                rhs_adjoint = rhs_adjoint + rhs_adjoint_inc_k1  # + rhs_adjoint_inc_k2
+
+                # we need to add the the second term of rhs too in rhs_adjoint computation
+                if t < T - tau:
+                    adjoint_t_plus_tau = adjoint_interpolator(t + tau)
+                    h_t_plus_tau = state_interpolator(t + tau)
+                    out_other = ctx.func(t + tau, h_t_plus_tau, history=[h_t])
+
+                    rhs_adjoint_inc_k1 = torch.autograd.grad(
+                        out_other, h_t, -adjoint_t_plus_tau
+                    )[0]
+
+                    rhs_adjoint = (
+                        rhs_adjoint + rhs_adjoint_inc_k1
+                    )  # + rhs_adjoint_inc_k2
+
+                # print('grad_output',grad_output.shape, grad_output[j], torch.autograd.grad(out, params))
+                param_derivative_inc = (
+                    grad_output[j]
+                    * torch.autograd.grad(out, params, retain_graph=True)[0]
+                )
+                # param_derivative_inc = torch.autograd.grad(out, params, -adjoint_state, retain_graph=True)[0]
+                # param_derivative_inc = torch.autograd.grad(out, params, - grad_output[j], retain_graph=True)[0]
+                adjoint_state = adjoint_state - ctx.dt * rhs_adjoint
+                adjoint_interpolator.add_point(t, adjoint_state)
+
+                # for j, t in enumerate(time_mesh) :
+                # grad1 = torch.autograd.grad(out, params, retain_graph=True)[0]
+                # param_derivative_inc += grad_output[j] *  grad1
+                # Returning the gradient value for each forward() input
+
+                if out2 is None:
+                    out2 = tuple([-ctx.dt * p for p in param_derivative_inc])
+                else:
+                    for _1, _2 in zip([*out2], [*param_derivative_inc]):
+                        _1 = _1 - ctx.dt * _2
+
+        out = tuple([None] + [None, None]) + (param_derivative_inc,)
+        # out = tuple([None] + [None] + [None] + [None] + [None] + [None] + [None, None]) + (param_derivative_inc,)
+
+        # print(out)
+        # incrementing the parameters' grad
+
+        # print(grad_output.squeeze())
+        # print('adjoint value a T', adjoint_interpolator(T))
+        # plt.plot(time_mesh, [adjoint_interpolator(t).cpu()[0] for t in time_mesh])
+        # plt.title("adjoint value and the first ")
+        # plt.show()
+        # plt.pause(0.1)
+        # plt.close()
+        return out
+
 
 def nddesolve_adjoint(history, func, options):
     # Main function to be called to integrate the NODE
@@ -200,7 +350,8 @@ def nddesolve_adjoint(history, func, options):
     params = find_parameters(func)
 
     # Forward integrating the NODE and returning the state at each evaluation step
-    zs = nddeint_ACA.apply(history, func, options, *params)
+    zs = nddeint2_ACA.apply(history, func, options, *params)
+    # zs = nddeint_ACA.apply(history, func, options, *params)
     return zs
 
 

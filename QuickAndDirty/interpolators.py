@@ -1,20 +1,21 @@
 import warnings
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
 
 class TorchLinearInterpolator:
-    def __init__(self, ts, ys, device):
+    def __init__(self, ts, ys):
 
-        self.ts = ts.to(device)  # [N_t]
-        self.ys = ys.to(device)  # [N, N_t, D]
-        self.device = device
+        self.ts = ts  # [N_t]
+        self.ys = ys  # [N, N_t, D]
+        # self.device = device
 
     def __post_init__(self):
         if self.ts.ndim != 1:
             raise ValueError("`ts` must be one dimensional.")
-
+            
         if self.ys.shape[1] != self.ts.shape[0]:
             raise ValueError(
                 "Must have ts.shape[0] == ys.shape[0], that is to say the same "
@@ -38,8 +39,8 @@ class TorchLinearInterpolator:
             raise ValueError(
                 f"Interpolation point is outside data range. ie t={t} > ts[-1]={self.ts[-1]} or t < ts[0]={self.ts[0]}"
             )
-        t = torch.tensor(t)
-        t = t.to(self.device)
+        # t = torch.tensor(t)
+        # t = t.to(self.device)
         index, fractional_part = self._interpret_t(t, left)
         prev_ys = self.ys[:, index]
         next_ys = self.ys[:, index + 1]
@@ -81,6 +82,7 @@ class TorchLinearInterpolator:
         self.ys = new_ys
         self.ts = new_ts
 
+    
         # if not torch.all(torch.diff(self.ts) > 0):
         #     raise ValueError(
         #         "`ts` must be monotonically increasing. oups errors in add_point"

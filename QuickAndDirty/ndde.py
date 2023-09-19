@@ -10,6 +10,8 @@ import torch
 import torch.nn as nn
 from interpolators import TorchLinearInterpolator
 from nnde_adjoint import nddesolve_adjoint
+from scipy.integrate import solve_ivp
+from scipy.integrate._ivp.rk import RK23
 
 
 warnings.filterwarnings("ignore")
@@ -27,7 +29,7 @@ class NDDE(nn.Module):
         #   nn.Linear(32,32),
         #   nn.ReLU(),
         #   nn.Linear(32,dim))
-        
+
         self.Params = torch.nn.parameter.Parameter(
             1.65 * torch.ones((2,), dtype=torch.float32, requires_grad=True)
         )
@@ -35,14 +37,14 @@ class NDDE(nn.Module):
     def forward(self, t, z, *, history):
         # inp = torch.cat([z, *history], dim=-1)
         # return self.mlp(inp)
-        return self.Params[0] * z * (1.0 - self.Params[1] * history[0]) 
+        return self.Params[0] * z * (1.0 - self.Params[1] * history[0])
 
 
 def get_batch(
     ts,
     ys,
     list_delays,
-    device= "cpu" #torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+    device="cpu",  # torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ):
     """
     ts : [N_t]
@@ -64,35 +66,41 @@ def get_batch(
     data_batch = data_batch.to(device)
     return interpolator, ts_data, data_batch
 
+
 def vf2(t, y, history):
-    return  y * (1.0 -  history[0])
+    return y * (1.0 - history[0])
 
 
 def integrate(func, y0, ts, history, delays):
     values = [y0]
     alltimes = [ts[0]]
-    val, t_current, dt = y0, ts[0], ts[1]-ts[0]
+    val, t_current, dt = y0, ts[0], ts[1] - ts[0]
     for t_current in ts[1:]:
         # euler
         # val = val + dt * func(
         #     t_current, val, history=[history(t_current - tau) for tau in delays]
         # )
-        # rk2 
-        k1 = func(
-            t_current, val, history=[history(t_current - tau) for tau in delays]
+        # rk2
+        k1 = func(t_current, val, history=[history(t_current - tau) for tau in delays])
+        k2 = func(
+            t_current + dt,
+            val + dt * k1,
+            history=[
+                history(t_current + dt - tau) if t_current + dt - tau > ts[0] else y0
+                for tau in delays
+            ],
         )
-        k2 = func(t_current + dt, val + dt * k1, history=[history(t_current + dt- tau) if t_current + dt - tau > ts[0] else y0 for tau in delays])
-        val = val + dt /2* (k1 + k2)
+        val = val + dt / 2 * (k1 + k2)
         history.add_point(t_current, val)
         values.append(val)
         alltimes.append(t_current)
-        
+
     alltimes = torch.tensor(alltimes)
     values = torch.hstack(values)
     return alltimes, torch.unsqueeze(values, -1), history
 
 
-device = "cpu" #torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = "cpu"  # torch.device("cuda" if torch.cuda.is_available() else "cpu")
 list_delays, number_datapoints = [1.0], 1
 y0_history = torch.tensor([2.0]).reshape(number_datapoints, 1)
 ts_history, ts = torch.tensor([-max(list_delays), 0.0]), torch.linspace(0, 10, 100 + 1)
@@ -101,12 +109,13 @@ ts_history = ts_history.to(device)
 ys = ys.to(device)
 y0_history = y0_history.to(device)
 
+# history = TorchLinearInterpolator(
+#     ts_history, torch.hstack([y0_history, y0_history])[..., None], y0_history.device
+# )
+
 history = TorchLinearInterpolator(
-    ts_history, torch.hstack([y0_history, y0_history])[..., None], y0_history.device
-)
-_, ys, _ = integrate(
-    vf2, y0_history, ts, history, list_delays
-)
+    ts_history, torch.hstack([y0_history, y0_history])[..., None])
+_, ys, _ = integrate(vf2, y0_history, ts, history, list_delays)
 
 
 model = NDDE(1, list_delays, width=64).to(ys.dtype)
@@ -126,14 +135,14 @@ for i in range(1000):
     loss.backward()
     opt.step()
     if i % 100 == 0:
-    
+
         plt.plot(traj[0].cpu().detach().numpy(), label="Truth")
         plt.plot(ret.permute(1, 0, 2)[0].cpu().detach().numpy(), "--")
         plt.legend()
         plt.pause(2)
         plt.close()
     print("Epoch : {:4d}, Loss : {:.3e}".format(i, loss.item()))
-    
+
     losses.append(loss.item())
     if losses[-1] < 1e-5:
         plt.plot(traj[0].cpu().detach().numpy())
