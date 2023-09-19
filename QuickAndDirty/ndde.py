@@ -24,20 +24,20 @@ class NDDE(nn.Module):
         super().__init__()
         self.in_dim = dim * (1 + len(list_delays))
         self.delays = list_delays
-        # self.mlp = nn.Sequential(nn.Linear(self.in_dim,32),
-        #   nn.ReLU(),
-        #   nn.Linear(32,32),
-        #   nn.ReLU(),
-        #   nn.Linear(32,dim))
+        self.mlp = nn.Sequential(nn.Linear(self.in_dim,32),
+          nn.ReLU(),
+          nn.Linear(32,32),
+          nn.ReLU(),
+          nn.Linear(32,dim))
 
-        self.Params = torch.nn.parameter.Parameter(
-            1.65 * torch.ones((2,), dtype=torch.float32, requires_grad=True)
-        )
+        # self.Params = torch.nn.parameter.Parameter(
+        #     1.65 * torch.ones((2,), dtype=torch.float32, requires_grad=True)
+        # )
 
     def forward(self, t, z, *, history):
-        # inp = torch.cat([z, *history], dim=-1)
-        # return self.mlp(inp)
-        return self.Params[0] * z * (1.0 - self.Params[1] * history[0])
+        inp = torch.cat([z, *history], dim=-1)
+        return self.mlp(inp)
+        # return self.Params[0] * z * (1.0 - self.Params[1] * history[0])
 
 
 def get_batch(
@@ -121,12 +121,12 @@ _, ys, _ = integrate(vf2, y0_history, ts, history, list_delays)
 model = NDDE(1, list_delays, width=64).to(ys.dtype)
 model = model.to(device)
 lossfunc = nn.MSELoss()
-opt = torch.optim.Adam(model.parameters(), lr=0.01)
+opt = torch.optim.Adam(model.parameters(), lr=0.0001)
 losses = []
 lens = []
 
 print(ys.shape, ts.shape)
-for i in range(1000):
+for i in range(5000):
     opt.zero_grad()
     history, ts_data, traj = history, ts_history, ys
     # history, ts_data, traj = get_batch(ts, ys, list_delays, length=length)
