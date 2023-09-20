@@ -7,13 +7,15 @@ class NDDE(nn.Module):
         super().__init__()
         self.in_dim = dim * (1 + len(list_delays))
         self.delays = list_delays
-        self.mlp = nn.Sequential(nn.Linear(self.in_dim,64),
-          nn.ReLU(),
-          nn.Linear(64,64),
-          nn.ReLU(),
-            nn.Linear(64,64),
-          nn.ReLU(),
-          nn.Linear(64,dim))
+        self.mlp = nn.Sequential(
+            nn.Linear(self.in_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, dim),
+        )
 
     def forward(self, t, z, *, history):
         inp = torch.cat([z, *history], dim=-1)
@@ -26,18 +28,13 @@ class SimpleNDDE(nn.Module):
         self.in_dim = dim * (1 + len(list_delays))
         self.delays = list_delays
         self.linear = torch.nn.Linear(self.in_dim, 1, bias=False)
-     
- 
+
     def init_weight(self, value):
         with torch.no_grad():
-            self.linear.weight = nn.Parameter(torch.tensor([value ,- value]))
-    
+            self.linear.weight = nn.Parameter(torch.tensor([value, -value]))
+
     def forward(self, t, z, *, history):
         # with init_weight this is equivalent to theta_0 * z * (1 - theta_1 * history)
         z__history = z * history[0]
         inp = torch.hstack((z, z__history))
         return self.linear(inp)
-
-
-
-

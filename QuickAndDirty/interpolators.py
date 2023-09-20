@@ -15,7 +15,7 @@ class TorchLinearInterpolator:
     def __post_init__(self):
         if self.ts.ndim != 1:
             raise ValueError("`ts` must be one dimensional.")
-            
+
         if self.ys.shape[1] != self.ts.shape[0]:
             raise ValueError(
                 "Must have ts.shape[0] == ys.shape[0], that is to say the same "
@@ -53,7 +53,9 @@ class TorchLinearInterpolator:
         # new_t : float
         # new_y : torch.tensor size [N, D]
         if new_t in self.ts:
-            warnings.warn(f"already have new_t={new_t} point in interpolation, overwriting it ") 
+            warnings.warn(
+                f"already have new_t={new_t} point in interpolation, overwriting it "
+            )
 
         new_y = new_y.to(self.ts.device)
         new_y = torch.unsqueeze(new_y, dim=1)
@@ -82,7 +84,6 @@ class TorchLinearInterpolator:
         self.ys = new_ys
         self.ts = new_ts
 
-    
         # if not torch.all(torch.diff(self.ts) > 0):
         #     raise ValueError(
         #         "`ts` must be monotonically increasing. oups errors in add_point"

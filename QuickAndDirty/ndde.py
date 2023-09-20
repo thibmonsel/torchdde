@@ -23,7 +23,8 @@ seaborn.set_style(style="darkgrid")
 
 
 def simple_dde(t, y, *, history):
-    return y * (1 -history[0])
+    return y * (1 - history[0])
+
 
 def simple_dde2(t, y, *, history):
     return -y

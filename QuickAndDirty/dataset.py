@@ -28,4 +28,3 @@ def get_batch(
     interpolator = TorchLinearInterpolator(ts_history, history_batch, device)
     data_batch = data_batch.to(device)
     return interpolator, ts_data, data_batch
-
