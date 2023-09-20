@@ -57,7 +57,7 @@ class TorchLinearInterpolator:
 
         new_y = new_y.to(self.ts.device)
         new_y = torch.unsqueeze(new_y, dim=1)
-        new_t = torch.unsqueeze(new_t.clone().detach(), dim=0)
+        new_t = torch.unsqueeze(new_t.clone(), dim=0)
         new_t = new_t.to(self.ts.device)
 
         if self.ys.shape[-1] != new_y.shape[-1]:

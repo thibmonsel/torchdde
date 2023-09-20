@@ -8,8 +8,11 @@ import numpy as np
 import seaborn
 import torch
 import torch.nn as nn
+from dde_solver import *
 from interpolators import TorchLinearInterpolator
+from model import NDDE, SimpleNDDE
 from nnde_adjoint import nddesolve_adjoint
+from ode_solver import *
 from scipy.integrate import solve_ivp
 from scipy.integrate._ivp.rk import RK23
 
@@ -19,125 +22,45 @@ seaborn.set_context(context="paper")
 seaborn.set_style(style="darkgrid")
 
 
-class NDDE(nn.Module):
-    def __init__(self, dim, list_delays, width=64):
-        super().__init__()
-        self.in_dim = dim * (1 + len(list_delays))
-        self.delays = list_delays
-        self.mlp = nn.Sequential(nn.Linear(self.in_dim,32),
-          nn.ReLU(),
-          nn.Linear(32,32),
-          nn.ReLU(),
-          nn.Linear(32,dim))
+def simple_dde(t, y, *, history):
+    return y * (1 -history[0])
 
-        # self.Params = torch.nn.parameter.Parameter(
-        #     1.65 * torch.ones((2,), dtype=torch.float32, requires_grad=True)
-        # )
-
-    def forward(self, t, z, *, history):
-        inp = torch.cat([z, *history], dim=-1)
-        return self.mlp(inp)
-        # return self.Params[0] * z * (1.0 - self.Params[1] * history[0])
+def simple_dde2(t, y, *, history):
+    return -y
 
 
-def get_batch(
-    ts,
-    ys,
-    list_delays,
-    device="cpu",  # torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-):
-    """
-    ts : [N_t]
-    ys : [B, N_t, #features]
-    """
-    dt = ts[1] - ts[0]
-    max_delay = max(list_delays)
-    max_delay_idx = int(max_delay / dt)
-    # pick random indices for each batch
-    rand_idx = np.random.choice(ys.shape[1] - max_delay_idx - length - 1)
-    # history_batch : [batch_size, max_delay_idx, #features]
-    # ts_history : [length] negative time
-    # data_batch : [batch_size, length, #features]
-    history_batch = ys[:, rand_idx : rand_idx + max_delay_idx + 1]
-    ts_history = torch.linspace(0, max_delay, max_delay_idx + 1)
-    data_batch = ys[:, rand_idx + max_delay_idx : rand_idx + max_delay_idx + length + 1]
-    ts_data = torch.linspace(max_delay, float(length * dt), length + 1)
-    interpolator = TorchLinearInterpolator(ts_history, history_batch, device)
-    data_batch = data_batch.to(device)
-    return interpolator, ts_data, data_batch
+device = "cpu"
 
+history_values = torch.tensor([[3.0]])
+history_values = history_values.view(history_values.shape[1], 1)
+history_function = lambda t: history_values
+print("history_values", history_values.shape)
 
-def vf2(t, y, history):
-    return y * (1.0 - history[0])
+ts = torch.linspace(0, 1, 101)
+list_delays = [1.0]
+solver = RK4()
+dde_solver = DDESolver(solver, list_delays)
+ys, _ = dde_solver.integrate(simple_dde, ts, history_function)
 
-
-def integrate(func, y0, ts, history, delays):
-    values = [y0]
-    alltimes = [ts[0]]
-    val, t_current, dt = y0, ts[0], ts[1] - ts[0]
-    for t_current in ts[1:]:
-        # euler
-        # val = val + dt * func(
-        #     t_current, val, history=[history(t_current - tau) for tau in delays]
-        # )
-        # rk2
-        k1 = func(t_current, val, history=[history(t_current - tau) for tau in delays])
-        k2 = func(
-            t_current + dt,
-            val + dt * k1,
-            history=[
-                history(t_current + dt - tau) if t_current + dt - tau > ts[0] else y0
-                for tau in delays
-            ],
-        )
-        val = val + dt / 2 * (k1 + k2)
-        history.add_point(t_current, val)
-        values.append(val)
-        alltimes.append(t_current)
-
-    alltimes = torch.tensor(alltimes)
-    values = torch.hstack(values)
-    return alltimes, torch.unsqueeze(values, -1), history
-
-
-device = "cpu"  # torch.device("cuda" if torch.cuda.is_available() else "cpu")
-list_delays, number_datapoints = [1.0], 1
-y0_history = torch.tensor([2.0]).reshape(number_datapoints, 1)
-ts_history, ts = torch.tensor([-max(list_delays), 0.0]), torch.linspace(0, 10, 100 + 1)
-ys = torch.empty((number_datapoints, ts.shape[0], 1))
-ts_history = ts_history.to(device)
-ys = ys.to(device)
-y0_history = y0_history.to(device)
-
-# history = TorchLinearInterpolator(
-#     ts_history, torch.hstack([y0_history, y0_history])[..., None], y0_history.device
-# )
-
-history = TorchLinearInterpolator(
-    ts_history, torch.hstack([y0_history, y0_history])[..., None])
-_, ys, _ = integrate(vf2, y0_history, ts, history, list_delays)
-
-
-model = NDDE(1, list_delays, width=64).to(ys.dtype)
+model = NDDE(history_values.shape[-1], list_delays)
 model = model.to(device)
 lossfunc = nn.MSELoss()
-opt = torch.optim.Adam(model.parameters(), lr=0.0001)
+opt = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-4)
 losses = []
 lens = []
 
-print(ys.shape, ts.shape)
 for i in range(5000):
     opt.zero_grad()
-    history, ts_data, traj = history, ts_history, ys
-    # history, ts_data, traj = get_batch(ts, ys, list_delays, length=length)
-    ret = nddesolve_adjoint(history, model, ts)
-    loss = lossfunc(ret.permute(1, 0, 2), traj)
+    # history, ts_data, traj = history, ts_history, ys
+    # # history, ts_data, traj = get_batch(ts, ys, list_delays, length=length)
+    ret = nddesolve_adjoint(history_function, model, ts)
+    loss = lossfunc(ret, ys)
     loss.backward()
     opt.step()
     if i % 100 == 0:
 
-        plt.plot(traj[0].cpu().detach().numpy(), label="Truth")
-        plt.plot(ret.permute(1, 0, 2)[0].cpu().detach().numpy(), "--")
+        plt.plot(ys[0].cpu().detach().numpy(), label="Truth")
+        plt.plot(ret[0].cpu().detach().numpy(), "--")
         plt.legend()
         plt.pause(2)
         plt.close()
@@ -145,8 +68,8 @@ for i in range(5000):
 
     losses.append(loss.item())
     if losses[-1] < 1e-5:
-        plt.plot(traj[0].cpu().detach().numpy())
-        plt.plot(ret.permute(1, 0, 2)[0].cpu().detach().numpy(), "--")
+        plt.plot(ys[0].cpu().detach().numpy())
+        plt.plot(ret[0].cpu().detach().numpy(), "--")
         plt.show()
         break
 

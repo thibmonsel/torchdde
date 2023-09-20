@@ -12,7 +12,7 @@ class AbstractOdeSolver(ABC):
     
     def integrate(self, func, ts, y0):
         dt = ts[1] -ts[0]
-        ys = y0.clone().detach()
+        ys = y0.clone()
         current_y = y0
         for current_t in ts[1:]:
             y = self.step(func, current_t, current_y, dt)
