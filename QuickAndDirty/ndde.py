@@ -36,7 +36,7 @@ history_values = history_values.view(history_values.shape[0], 1)
 history_function = lambda t: history_values
 print("history_values", history_values.shape)
 
-ts = torch.linspace(0, 10, 101)
+ts = torch.linspace(0, 10, 501)
 list_delays = [1.0]
 solver = RK4()
 dde_solver = DDESolver(solver, list_delays)
@@ -50,7 +50,7 @@ model = SimpleNDDE(history_values.shape[-1], list_delays)
 #     pass
 model = model.to(device)
 lossfunc = nn.MSELoss()
-opt = torch.optim.Adam(model.parameters(), lr=0.001)
+opt = torch.optim.Adam(model.parameters(), lr=0.1)
 losses = []
 lens = []
 
@@ -62,7 +62,7 @@ for i in range(5000):
     loss = lossfunc(ret, ys)
     loss.backward()
     opt.step()
-    if i % 100 == 0:
+    if i % 50 == 0:
         plt.plot(ys[0].cpu().detach().numpy(), label="Truth")
         plt.plot(ret[0].cpu().detach().numpy(), "--")
         plt.legend()

@@ -221,13 +221,13 @@ class nddeint_ACA(torch.autograd.Function):
         # Following the Adaptive Checkpoint Adjoint method, the time steps and corresponding states of the forward
         # integration are re-used by going backwards in the time mesh.
         param_derivative_inc = 0
-
+        aux = []
         for j, t in enumerate(reversed(time_mesh)):
             # Backward Integrating the adjoint state and the parameters' gradient between time i and i-1
             with torch.enable_grad():
                 # Taking a step with the NODE function to build a graph which will be differentiated
                 # so as to integrate the adjoint state and the parameters' gradient
-                rhs_adjoint = 0.0
+                rhs_adjoint = grad_output[:, -j-1]
 
                 # correspond to h_t
                 h_t = torch.autograd.Variable(state_interpolator(t), requires_grad=True)
@@ -260,7 +260,7 @@ class nddeint_ACA(torch.autograd.Function):
                 param_derivative_inc = torch.autograd.grad(
                     out, params, -adjoint_state, retain_graph=True
                 )
-                # param_derivative_inc = torch.autograd.grad(out, params, - grad_output[-j-1], retain_graph=True)[0]
+                aux.append(*param_derivative_inc)
                 adjoint_state = adjoint_state - ctx.dt * rhs_adjoint
                 adjoint_interpolator.add_point(t, adjoint_state)
 
@@ -269,8 +269,16 @@ class nddeint_ACA(torch.autograd.Function):
                 else:
                     for _1, _2 in zip([*out2], [*param_derivative_inc]):
                         _1 = _1 - ctx.dt * _2
-     
-        return None, None, None, *out2
+        values = np.array(aux)
+        # print('values,', values.shape)
+        sum_cum_values = ctx.dt * torch.from_numpy(np.sum(np.cumsum(values, axis=1), axis=0))
+
+        # print("cum_values", sum_cum_values.shape, sum_cum_values, *out2)
+        # plt.plot(values)
+        # plt.show()
+        # print(aux[-1].shape, values.shape, *out2)
+        return None, None, None, sum_cum_values
+        # return None, None, None, *out2
 
 
 def nddesolve_adjoint(history, func, options):
