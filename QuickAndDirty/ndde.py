@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 from dde_solver import *
 from interpolators import TorchLinearInterpolator
-from model import NDDE, SimpleNDDE, SimpleNDDE2
+from model import NDDE, SimpleNDDE
 from nnde_adjoint import nddesolve_adjoint
 from ode_solver import *
 from scipy.integrate import solve_ivp
@@ -31,8 +31,8 @@ def simple_dde2(t, y, *, history):
 
 
 device = "cpu"
-history_values = torch.tensor([[3.0]])
-history_values = history_values.view(history_values.shape[1], 1)
+history_values = torch.tensor([3.0, 4.0])
+history_values = history_values.view(history_values.shape[0], 1)
 history_function = lambda t: history_values
 print("history_values", history_values.shape)
 
@@ -40,11 +40,12 @@ ts = torch.linspace(0, 10, 101)
 list_delays = [1.0]
 solver = RK4()
 dde_solver = DDESolver(solver, list_delays)
-ys, _ = dde_solver.integrate(simple_dde2, ts, history_function)
+ys, _ = dde_solver.integrate(simple_dde, ts, history_function)
 print(ys.shape)
 
-model = NDDE(history_values.shape[-1], list_delays)
-# model.init_weight(-1.0)
+model = SimpleNDDE(history_values.shape[-1], list_delays)
+print(model.linear.weight.shape)
+model.init_weight(-1.0)
 model = model.to(device)
 lossfunc = nn.MSELoss()
 opt = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-4)

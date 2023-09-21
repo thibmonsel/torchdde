@@ -31,12 +31,10 @@ class SimpleNDDE(nn.Module):
 
     def init_weight(self, value):
         with torch.no_grad():
-            self.linear.weight = nn.Parameter(torch.tensor([value, value]))
+            self.linear.weight = nn.Parameter(torch.tensor([[value, value]]))
 
     def forward(self, t, z, *, history):
-        # print('z, hist', z.shape, history[0].shape)
         inp = torch.cat([z, *history], dim=-1)
-        # print('self.linear(inp)', self.linear(inp).shape, inp.shape)
         return self.linear(inp)
 
 
