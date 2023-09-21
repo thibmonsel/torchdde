@@ -23,7 +23,7 @@ seaborn.set_style(style="darkgrid")
 
 
 def simple_dde(t, y, *, history):
-    return 1/2 * y  - history[0]
+    return  y * (1 - history[0])
 
 
 def simple_dde2(t, y, *, history):
@@ -44,11 +44,13 @@ ys, _ = dde_solver.integrate(simple_dde, ts, history_function)
 print(ys.shape)
 
 model = SimpleNDDE(history_values.shape[-1], list_delays)
-print(model.linear.weight.shape)
-model.init_weight(-1.0)
+# try : 
+#     model.init_weight(1.75)
+# except:
+#     pass
 model = model.to(device)
 lossfunc = nn.MSELoss()
-opt = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-4)
+opt = torch.optim.Adam(model.parameters(), lr=0.001)
 losses = []
 lens = []
 
@@ -61,7 +63,6 @@ for i in range(5000):
     loss.backward()
     opt.step()
     if i % 100 == 0:
-
         plt.plot(ys[0].cpu().detach().numpy(), label="Truth")
         plt.plot(ret[0].cpu().detach().numpy(), "--")
         plt.legend()
@@ -70,6 +71,7 @@ for i in range(5000):
     print("Epoch : {:4d}, Loss : {:.3e}".format(i, loss.item()))
 
     losses.append(loss.item())
+    
     if losses[-1] < 1e-5:
         plt.plot(ys[0].cpu().detach().numpy())
         plt.plot(ret[0].cpu().detach().numpy(), "--")
