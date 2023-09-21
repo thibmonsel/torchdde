@@ -271,7 +271,8 @@ class nddeint_ACA(torch.autograd.Function):
                         _1 = _1 - ctx.dt * _2
         values = np.array(aux)
         # print('values,', values.shape)
-        sum_cum_values = ctx.dt * torch.from_numpy(np.sum(np.cumsum(values, axis=1), axis=0))
+        sum_cum_values = ctx.dt * torch.from_numpy(np.trapz(np.cumsum(values, axis=1), axis=0))
+        # sum_cum_values = ctx.dt * torch.from_numpy(np.sum(np.cumsum(values, axis=1), axis=0))
 
         # print("cum_values", sum_cum_values.shape, sum_cum_values, *out2)
         # plt.plot(values)
