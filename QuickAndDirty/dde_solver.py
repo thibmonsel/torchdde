@@ -30,14 +30,18 @@ class DDESolver:
                 ys_interpolation(t - tau) if t - tau >= ts[0] else history_func(t - tau)
                 for tau in self.delays
             ]
+            # print("ode func", y.shape, history[0].shape)
             return func(t, y, history=history)
 
         current_y = y0[:, 0]
         ys = torch.unsqueeze(current_y, dim=1)
+        # print("current y / y0", current_y.shape, ys.shape)
         for current_t in ts[:-1]:
             # the stepping method give the next y with a shape [batch, features]
+            # print("current y", current_t, current_y.shape)
             y = self.solver.step(ode_func, current_t, current_y, dt)
             current_y = y
+            # print("y step", y.shape)
             # by adding the y to the interpolator, it is unsqueezed in the interpolator class
             ys_interpolation.add_point(current_t + dt, current_y)
             ys = torch.concat((ys, torch.unsqueeze(current_y, dim=1)), dim=1)
