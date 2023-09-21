@@ -95,12 +95,12 @@ class nddeint2_ACA(torch.autograd.Function):
 
             return rhs_adjoint  # , param_derivative_inc
 
-        solver = Ralston()
+        solver = RK2()
         current_adjoint = adjoint_history_func(ts[-1])
 
         out2 = None
         with torch.enable_grad():
-            for j, current_t in enumerate(reversed(ts[1:])):
+            for j, current_t in enumerate(reversed(ts)[:-1]):
                 adj = solver.step(adjoint_dyn, current_t, current_adjoint, dt)
                 
                 h_t = torch.autograd.Variable(
