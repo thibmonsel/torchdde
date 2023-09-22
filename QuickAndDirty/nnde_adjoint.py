@@ -6,7 +6,6 @@ from interpolators import TorchLinearInterpolator
 from matplotlib import pyplot as plt
 from ode_solver import *
 
-
 #
 # Implements a version of the NeuralODE adjoint optimisation algorithm, with the Adaptive Checkpoint Adjoint method
 #
@@ -103,20 +102,30 @@ class nddeint2_ACA(torch.autograd.Function):
                 adjoint_interpolator.add_point(current_t + dt, adj)
             
             # Computing the gradient of the loss w.r.t. the parameters
-            out2 = None
-            dt_params = ts[1] - ts[0]
-            aux = []
-            for j, t in enumerate(ts[:-1]) : 
+            def loss_dynamics(t):
                 h_t = torch.autograd.Variable(state_interpolator(t), requires_grad=True)
-                h_t_minus_tau = state_interpolator(t - tau) if t - tau >= ctx.ts[0] else history_func(t)
+                h_t_minus_tau = (
+                    state_interpolator(t - tau) if t - tau >= ctx.ts[0] else history_func(t)
+                )
                 out = ctx.func(t, h_t, history=[h_t_minus_tau])
-                param_derivative_inc = torch.autograd.grad(out, params, adjoint_interpolator(t), retain_graph=True)
-                aux.append(*param_derivative_inc)
-                if out2 is None:
-                    out2 = tuple([dt_params * p for p in param_derivative_inc])
-                else:
-                    for _1, _2 in zip([*out2], [*param_derivative_inc]):
-                        _1 = _1 + dt_params * _2
+                params_dyn = torch.autograd.grad(out, params, adjoint_interpolator(t), retain_graph=True)
+                return params_dyn
+
+            out2 = tuple([dt * loss_dynamics(t) for t in ts])    
+            # out2 = None
+            # dt_params = ts[1] - ts[0]
+            # aux = []
+            # for j, t in enumerate(ts[:-1]) : 
+            #     h_t = torch.autograd.Variable(state_interpolator(t), requires_grad=True)
+            #     h_t_minus_tau = state_interpolator(t - tau) if t - tau >= ctx.ts[0] else history_func(t)
+            #     out = ctx.func(t, h_t, history=[h_t_minus_tau])
+            #     param_derivative_inc = torch.autograd.grad(out, params, adjoint_interpolator(t), retain_graph=True)
+            #     aux.append(*param_derivative_inc)
+            #     if out2 is None:
+            #         out2 = tuple([dt_params * p for p in param_derivative_inc])
+            #     else:
+            #         for _1, _2 in zip([*out2], [*param_derivative_inc]):
+            #             _1 = _1 + dt_params * _2
         # print(torch.stack(aux).shape)
         # plt.plot(torch.stack(aux)[:, 0])
         # plt.title("dyn of los")
@@ -198,8 +207,8 @@ class nddeint_ACA(torch.autograd.Function):
         #     aux.append(state_interpolator(t)[0])
 
         T = time_mesh[-1]
-        adjoint_state = grad_output[:, -1]
-        # adjoint_state = torch.zeros_like(grad_output[-1])
+        # adjoint_state = grad_output[:, -1]
+        adjoint_state = torch.zeros_like(grad_output[:, -1])
         adjoint_ys_final = adjoint_state.reshape(
             adjoint_state.shape[0], 1, *adjoint_state.shape[1:]
         )
@@ -220,8 +229,7 @@ class nddeint_ACA(torch.autograd.Function):
         # The adjoint state as well as the parameters' gradient are integrated backwards in time.
         # Following the Adaptive Checkpoint Adjoint method, the time steps and corresponding states of the forward
         # integration are re-used by going backwards in the time mesh.
-        param_derivative_inc = 0
-        aux = []
+        stacked_params = None
         for j, t in enumerate(reversed(time_mesh)):
             # Backward Integrating the adjoint state and the parameters' gradient between time i and i-1
             with torch.enable_grad():
@@ -260,25 +268,38 @@ class nddeint_ACA(torch.autograd.Function):
                 param_derivative_inc = torch.autograd.grad(
                     out, params, -adjoint_state, retain_graph=True
                 )
-                aux.append(*param_derivative_inc)
+
+                if stacked_params is None:
+                    stacked_params = tuple([torch.unsqueeze(p, dim=-1) for p in param_derivative_inc])
+                else : 
+                    stacked_params = tuple([torch.concat([_1, torch.unsqueeze(_2, dim=-1)], dim=-1) for _1, _2 in zip(stacked_params, param_derivative_inc)])
+                
+                # for p in stacked_params: 
+                #     print("stacked_params", p.shape)
+                # aux.append(param_derivative_inc)
                 adjoint_state = adjoint_state - ctx.dt * rhs_adjoint
                 adjoint_interpolator.add_point(t, adjoint_state)
 
                 if out2 is None:
-                    out2 = tuple([-ctx.dt * p for p in param_derivative_inc])
+                    out2 = tuple([- ctx.dt* p for p in param_derivative_inc])
                 else:
                     for _1, _2 in zip([*out2], [*param_derivative_inc]):
-                        _1 = _1 - ctx.dt * _2
-        values = np.array(aux)
+                        _1 = _1 - ctx.dt* _2
+        
+        cum_sum = tuple([ctx.dt * torch.cumsum(p, dim=-1) for p in stacked_params])
+        sum_cum_sum = tuple([torch.trapezoid(p, dim=-1) for p in cum_sum])
+        
+        # print(*out2, "out2")
+        # values = np.array(aux)
         # print('values,', values.shape)
-        sum_cum_values = ctx.dt * torch.from_numpy(np.trapz(np.cumsum(values, axis=1), axis=0))
+        # sum_cum_values = ctx.dt * torch.from_numpy(np.trapz(np.cumsum(values, axis=1), axis=0))
         # sum_cum_values = ctx.dt * torch.from_numpy(np.sum(np.cumsum(values, axis=1), axis=0))
-
+        # print(sum_cum_values, *out2)
         # print("cum_values", sum_cum_values.shape, sum_cum_values, *out2)
         # plt.plot(values)
         # plt.show()
         # print(aux[-1].shape, values.shape, *out2)
-        return None, None, None, sum_cum_values
+        return None, None, None, *sum_cum_sum
         # return None, None, None, *out2
 
 

@@ -16,7 +16,6 @@ from ode_solver import *
 from scipy.integrate import solve_ivp
 from scipy.integrate._ivp.rk import RK23
 
-
 warnings.filterwarnings("ignore")
 seaborn.set_context(context="paper")
 seaborn.set_style(style="darkgrid")
@@ -30,8 +29,8 @@ def simple_dde2(t, y, *, history):
     return -history[0]
 
 def simple_dde3(t, y, *, history):
-    # return 0.25 * (history[0]) / (1.0 + history[0] ** 10) - 0.1 * y
-    return 1/2*y -history[0]
+    return 0.25 * (history[0]) / (1.0 + history[0] ** 10) - 0.1 * y
+    # return 1/2*y -history[0]
 
 device = "cpu"
 history_values = torch.tensor([1.0, 2.0, 3.0, 4.0])
@@ -43,7 +42,7 @@ ts = torch.linspace(0, 10, 101)
 list_delays = [1.0]
 solver = RK4()
 dde_solver = DDESolver(solver, list_delays)
-ys, _ = dde_solver.integrate(simple_dde2, ts, history_function)
+ys, _ = dde_solver.integrate(simple_dde, ts, history_function)
 print(ys.shape)
 
 for i in range(ys.shape[0]):
@@ -51,14 +50,15 @@ for i in range(ys.shape[0]):
 plt.pause(2)
 plt.close() 
 
-model = SimpleNDDE2(history_values.shape[-1], list_delays)
-# try : 
-#     model.init_weight(1.75)
-# except:
-#     pass
+model = NDDE(history_values.shape[-1], list_delays)
+try : 
+    model.init_weight(1/2)
+except:
+    pass
+
 model = model.to(device)
 lossfunc = nn.MSELoss()
-opt = torch.optim.SGD(model.parameters(), lr=0.1)
+opt = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=10e-4)
 losses = []
 lens = []
 
@@ -71,7 +71,7 @@ for i in range(max_epoch):
     loss = lossfunc(ret, ys)
     loss.backward()
     opt.step()
-    if i % 100 == 0:
+    if i % 50 == 0:
         for i in range(ys.shape[0]):
             plt.plot(ys[i].cpu().detach().numpy(), label="Truth")
             plt.plot(ret[i].cpu().detach().numpy(), "--")
@@ -87,35 +87,3 @@ for i in range(max_epoch):
         plt.plot(ret[0].cpu().detach().numpy(), "--")
         plt.show()
         break
-
-
-# %%
-# plt.plot(ret[:, 0].detach().cpu().numpy())
-# plt.plot(traj[0, :].detach().cpu())
-# plt.show()
-# %%
-# plt.semilogys
-# %%
-# history, ts_data, traj = get_batch(ts, ys, list_delays, device=device, length=length)
-# history, ts_data, traj = get_batch(ts, ys, list_delays, length=length)
-# inference_options = {
-#     "nSteps": length ,
-#     "dt": dt,
-#     "t0": ts_history[-1],
-#     "eval_idx": np.arange(length + 1),
-# }
-# ret = nddesolve_adjoint(history, model, inference_options)
-
-# # %%
-# fig, axs = plt.subplots(ncols=2, figsize=(16, 5))
-# plt.sca(axs[0])
-# plt.plot(ret[:, 0].detach().cpu().numpy(), label="Prediction", lw=3)
-# plt.plot(traj[0, :].detach().cpu(), "--", label="Truth", lw=3)
-# plt.legend()
-# plt.sca(axs[1])
-# plt.semilogy(losses, lw=2, label="Losses")
-# plt.legend(loc="upper center")
-# ax = axs[1].twinx()
-# ax.plot(lens, label="Traj Length", color="tab:green")
-# plt.legend(loc="lower center")
-# plt.show()
