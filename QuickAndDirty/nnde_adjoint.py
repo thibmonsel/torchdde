@@ -209,7 +209,7 @@ class nddeint_ACA(torch.autograd.Function):
         T = time_mesh[-1]
         # adjoint_state = grad_output[:, -1]
         adjoint_state = torch.zeros_like(grad_output[:, -1])
-        adjoint_ys_final = adjoint_state.reshape(
+        adjoint_ys_final = -grad_output[:, -1].reshape(
             adjoint_state.shape[0], 1, *adjoint_state.shape[1:]
         )
 
@@ -232,10 +232,12 @@ class nddeint_ACA(torch.autograd.Function):
         stacked_params = None
         for j, t in enumerate(reversed(time_mesh)):
             # Backward Integrating the adjoint state and the parameters' gradient between time i and i-1
+            adjoint_state -= grad_output[:, -j-1]
+            adjoint_interpolator.add_point(t, adjoint_state)
             with torch.enable_grad():
                 # Taking a step with the NODE function to build a graph which will be differentiated
                 # so as to integrate the adjoint state and the parameters' gradient
-                rhs_adjoint = grad_output[:, -j-1]
+                rhs_adjoint = 0.0
 
                 # correspond to h_t
                 h_t = torch.autograd.Variable(state_interpolator(t), requires_grad=True)
@@ -278,13 +280,12 @@ class nddeint_ACA(torch.autograd.Function):
                 #     print("stacked_params", p.shape)
                 # aux.append(param_derivative_inc)
                 adjoint_state = adjoint_state - ctx.dt * rhs_adjoint
-                adjoint_interpolator.add_point(t, adjoint_state)
 
                 if out2 is None:
-                    out2 = tuple([- ctx.dt* p for p in param_derivative_inc])
+                    out2 = tuple([+ ctx.dt* p for p in param_derivative_inc])
                 else:
                     for _1, _2 in zip([*out2], [*param_derivative_inc]):
-                        _1 = _1 - ctx.dt* _2
+                        _1 = _1 + ctx.dt* _2
         
         cum_sum = tuple([ctx.dt * torch.cumsum(p, dim=-1) for p in stacked_params])
         sum_cum_sum = tuple([torch.trapezoid(p, dim=-1) for p in cum_sum])
