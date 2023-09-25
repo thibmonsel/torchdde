@@ -30,14 +30,6 @@ def simple_dde3(t, y, *, history):
     return 0.25 * (history[0]) / (1.0 + history[0] ** 10) - 0.1 * y
     # return 1/2*y -history[0]
 
-class DDEModule(nn.Module):
-    def __init__(self,list_delays):
-        super().__init__()
-        self.delays = list_delays
-
-    def forward(self,t,y,*,history):
-
-        return  y * (1 - history[0])
 
 device = "cpu"
 history_values = torch.tensor([1.0, 2.0, 3.0, 4.0])
@@ -49,7 +41,7 @@ ts = torch.linspace(0, 10, 101)
 list_delays = [0.5, 1.0]
 solver = RK4()
 dde_solver = DDESolver(solver, list_delays)
-ys, _ = dde_solver.integrate(simple_dde2, ts, history_function)
+ys, _ = dde_solver.integrate(simple_dde, ts, history_function)
 print(ys.shape)
 
 for i in range(ys.shape[0]):
@@ -58,11 +50,6 @@ plt.pause(2)
 plt.close() 
 
 model = NDDE(history_values.shape[-1], list_delays)
-# try : 
-#     model.init_weight(1/2)
-# except:
-#     pass
-
 model = model.to(device)
 lossfunc = nn.MSELoss()
 opt = torch.optim.Adam(model.parameters(), lr=3e-3, weight_decay=0)

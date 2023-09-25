@@ -171,12 +171,12 @@ class nddeint_ACA(torch.autograd.Function):
                 val = val + ctx.dt * func(
                     current_t,
                     val,
-                    history=[
+                    history = torch.hstack([
                         history_func(current_t - tau)
                         if current_t - tau <= ctx.ts[0]
                         else state_interpolator(current_t - tau)
                         for tau in delays
-                    ],
+                    ]),
                 )
                 state_interpolator.add_point(current_t, val)
                 values.append(val)
@@ -187,7 +187,6 @@ class nddeint_ACA(torch.autograd.Function):
         ctx.alltimes = alltimes
         ctx.history = state_interpolator
         ctx.allstates = torch.hstack(values)[..., None]
-        # print("tx.ys.grad_fn", ctx.allstates.grad_fn)
         return ctx.allstates
 
     @staticmethod
@@ -203,12 +202,9 @@ class nddeint_ACA(torch.autograd.Function):
         # f_params holds the NDDE parameters for which a gradient will be computed
         params = ctx.saved_tensors
         state_interpolator = ctx.history
-        # aux = []
-        # for t in time_mesh :
-        #     aux.append(state_interpolator(t)[0])
-
+     
         T = time_mesh[-1]
-        # adjoint_state = grad_output[:, -1]
+
         adjoint_state = torch.zeros_like(grad_output[:, -1])
         adjoint_ys_final = -grad_output[:, -1].reshape(
             adjoint_state.shape[0], 1, *adjoint_state.shape[1:]
@@ -225,8 +221,6 @@ class nddeint_ACA(torch.autograd.Function):
             # device=adjoint_ys_final.device,
         )
 
-        # adjoint_history = lambda t : adjoint_state if t==T else torch.zeros_like(adjoint_state)
-        out2 = None
         # The adjoint state as well as the parameters' gradient are integrated backwards in time.
         # Following the Adaptive Checkpoint Adjoint method, the time steps and corresponding states of the forward
         # integration are re-used by going backwards in the time mesh.
@@ -244,7 +238,7 @@ class nddeint_ACA(torch.autograd.Function):
                 h_t = torch.autograd.Variable(state_interpolator(t), requires_grad=True)
 
                 # we are in the case where t > T - tau
-                h_t_minus_tau = [state_interpolator(t - tau) if t - tau >= ctx.ts[0] else ctx.y0 for tau in ctx.func.delays]
+                h_t_minus_tau = torch.hstack([state_interpolator(t - tau) if t - tau >= ctx.ts[0] else ctx.y0 for tau in ctx.func.delays])
                 out = ctx.func(t, h_t, history=h_t_minus_tau)
     
                 rhs_adjoint_inc_k1 = torch.autograd.grad(
@@ -258,12 +252,11 @@ class nddeint_ACA(torch.autograd.Function):
                     if t < T - tau_i:
                         adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
                         h_t_plus_tau = state_interpolator(t + tau_i)
-                        history = [state_interpolator(t + tau_i - tau_j) if t + tau_i - tau_j >= ctx.ts[0] else ctx.y0 for tau_j in ctx.func.delays]
+                        history = torch.cat([state_interpolator(t + tau_i - tau_j)  if t + tau_i - tau_j >= ctx.ts[0] else ctx.y0 for tau_j in ctx.func.delays], dim=-1)
                         out_other = ctx.func(t + tau_i, h_t_plus_tau, history=history)
-                        print(out_other.grad_fn, h_t.grad_fn)
-                        print(adjoint_t_plus_tau.grad_fn)
+                        # out_other = ctx.func(t + tau_i, h_t_plus_tau, history=h_t)
                         rhs_adjoint_inc_k1 = torch.autograd.grad(
-                            out_other, h_t, -adjoint_t_plus_tau
+                            out_other, h_t, -adjoint_t_plus_tau, retain_graph=True
                         )[0]
                     
                         rhs_adjoint = rhs_adjoint + rhs_adjoint_inc_k1
@@ -281,26 +274,10 @@ class nddeint_ACA(torch.autograd.Function):
                 #     print("stacked_params", p.shape)
                 # aux.append(param_derivative_inc)
                 adjoint_state = adjoint_state - ctx.dt * rhs_adjoint
-
-                if out2 is None:
-                    out2 = tuple([+ ctx.dt* p for p in param_derivative_inc])
-                else:
-                    for _1, _2 in zip([*out2], [*param_derivative_inc]):
-                        _1 = _1 + ctx.dt* _2
         
         cum_sum = tuple([ctx.dt * torch.cumsum(p, dim=-1) for p in stacked_params])
         sum_cum_sum = tuple([torch.trapezoid(p, dim=-1) for p in cum_sum])
         
-        # print(*out2, "out2")
-        # values = np.array(aux)
-        # print('values,', values.shape)
-        # sum_cum_values = ctx.dt * torch.from_numpy(np.trapz(np.cumsum(values, axis=1), axis=0))
-        # sum_cum_values = ctx.dt * torch.from_numpy(np.sum(np.cumsum(values, axis=1), axis=0))
-        # print(sum_cum_values, *out2)
-        # print("cum_values", sum_cum_values.shape, sum_cum_values, *out2)
-        # plt.plot(values)
-        # plt.show()
-        # print(aux[-1].shape, values.shape, *out2)
         return None, None, None, *sum_cum_sum
         # return None, None, None, *out2
 
