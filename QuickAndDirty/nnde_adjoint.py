@@ -268,7 +268,7 @@ class nddeint_ACA(torch.autograd.Function):
                     rhs_adjoint = rhs_adjoint + rhs_adjoint_inc_k1
 
                 param_derivative_inc = torch.autograd.grad(
-                    out, params, -adjoint_state, retain_graph=True
+                    out, params, -adjoint_state, retain_graph=False
                 )
 
                 if stacked_params is None:
@@ -289,7 +289,7 @@ class nddeint_ACA(torch.autograd.Function):
         
         cum_sum = tuple([ctx.dt * torch.cumsum(p, dim=-1) for p in stacked_params])
         sum_cum_sum = tuple([torch.trapezoid(p, dim=-1) for p in cum_sum])
-        
+        test_out = tuple([ctx.dt*p.sum(dim=-1) for p in stacked_params])
         # print(*out2, "out2")
         # values = np.array(aux)
         # print('values,', values.shape)
@@ -300,8 +300,11 @@ class nddeint_ACA(torch.autograd.Function):
         # plt.plot(values)
         # plt.show()
         # print(aux[-1].shape, values.shape, *out2)
-        return None, None, None, *sum_cum_sum
-        # return None, None, None, *out2
+        
+        print('{:.3e}'.format(max([p.max().item() for p in out2])))
+        print('{:.3e}'.format(max([p.max().item() for p in sum_cum_sum])))
+        #return None, None, None, *sum_cum_sum
+        return None, None, None, *test_out
 
 
 def nddesolve_adjoint(history, func, options):
