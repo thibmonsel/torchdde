@@ -249,7 +249,7 @@ class nddeint_ACA(torch.autograd.Function):
                 # we need to add the the second term of rhs too in rhs_adjoint computation
                 for idx,tau_i in enumerate(ctx.func.delays):
                     if t < T - tau_i:
-                        index_de_h_t = [tau - tau_i == 0 for tau in ctx.func.delays].index(True)
+                        #index_de_h_t = [tau - tau_i == 0 for tau in ctx.func.delays].index(True)
                         #print("index_de_h_t", index_de_h_t)
                         adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
                         h_t_plus_tau = state_interpolator(t + tau_i)
