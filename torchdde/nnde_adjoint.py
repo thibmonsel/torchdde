@@ -247,16 +247,18 @@ class nddeint_ACA(torch.autograd.Function):
                 rhs_adjoint += rhs_adjoint_inc_k1
 
                 # we need to add the the second term of rhs too in rhs_adjoint computation
-                for tau_i in ctx.func.delays:
+                for idx,tau_i in enumerate(ctx.func.delays):
                     if t < T - tau_i:
                         adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
                         h_t_plus_tau = state_interpolator(t + tau_i)
-                        history = torch.hstack([state_interpolator(t + tau_i - tau_j)  if t + tau_i - tau_j >= ctx.ts[0] else ctx.y0 for tau_j in ctx.func.delays])
+                        history = [state_interpolator(t + tau_i - tau_j)  if t + tau_i - tau_j >= ctx.ts[0] else ctx.y0 for tau_j in ctx.func.delays]
+                        history[idx] = h_t
                         # out_other = ctx.func(t + tau_i, h_t_plus_tau, history=torch.hstack([h_t_plus_tau, h_t_plus_tau])) # doesn't work
-                        out_other = ctx.func(t + tau_i, h_t_plus_tau, history=torch.hstack([h_t, h_t])) #  work
+                        
+                        out_other = ctx.func(t + tau_i, h_t_plus_tau, history=history) #  work
                         # out_other = ctx.func(t + tau_i, h_t_plus_tau, history=h_t_minus_tau) # doesnt works
                         rhs_adjoint_inc_k1 = torch.autograd.grad(
-                            out_other, h_t, -adjoint_t_plus_tau, retain_graph=True
+                            out_other, h_t, -adjoint_t_plus_tau
                         )[0]
                     
                         rhs_adjoint = rhs_adjoint + rhs_adjoint_inc_k1
