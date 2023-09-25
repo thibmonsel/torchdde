@@ -242,13 +242,10 @@ class nddeint_ACA(torch.autograd.Function):
 
                 # correspond to h_t
                 h_t = torch.autograd.Variable(state_interpolator(t), requires_grad=True)
-                tau = max(ctx.func.delays)
 
                 # we are in the case where t > T - tau
-                h_t_minus_tau = (
-                    state_interpolator(t - tau) if t - tau >= ctx.ts[0] else ctx.y0
-                )
-                out = ctx.func(t, h_t, history=[h_t_minus_tau])
+                h_t_minus_tau = [state_interpolator(t - tau) if t - tau >= ctx.ts[0] else ctx.y0 for tau in ctx.func.delays]
+                out = ctx.func(t, h_t, history=h_t_minus_tau)
     
                 rhs_adjoint_inc_k1 = torch.autograd.grad(
                     out, h_t, -adjoint_state, retain_graph=True
@@ -257,16 +254,19 @@ class nddeint_ACA(torch.autograd.Function):
                 rhs_adjoint += rhs_adjoint_inc_k1
 
                 # we need to add the the second term of rhs too in rhs_adjoint computation
-                if t < T - tau:
-                    adjoint_t_plus_tau = adjoint_interpolator(t + tau)
-                    h_t_plus_tau = state_interpolator(t + tau)
-                    out_other = ctx.func(t + tau, h_t_plus_tau, history=[h_t])
-
-                    rhs_adjoint_inc_k1 = torch.autograd.grad(
-                        out_other, h_t, -adjoint_t_plus_tau
-                    )[0]
-
-                    rhs_adjoint = rhs_adjoint + rhs_adjoint_inc_k1
+                for tau_i in ctx.func.delays:
+                    if t < T - tau_i:
+                        adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
+                        h_t_plus_tau = state_interpolator(t + tau_i)
+                        history = [state_interpolator(t + tau_i - tau_j) if t + tau_i - tau_j >= ctx.ts[0] else ctx.y0 for tau_j in ctx.func.delays]
+                        out_other = ctx.func(t + tau_i, h_t_plus_tau, history=history)
+                        print(out_other.grad_fn, h_t.grad_fn)
+                        print(adjoint_t_plus_tau.grad_fn)
+                        rhs_adjoint_inc_k1 = torch.autograd.grad(
+                            out_other, h_t, -adjoint_t_plus_tau
+                        )[0]
+                    
+                        rhs_adjoint = rhs_adjoint + rhs_adjoint_inc_k1
 
                 param_derivative_inc = torch.autograd.grad(
                     out, params, -adjoint_state, retain_graph=True
