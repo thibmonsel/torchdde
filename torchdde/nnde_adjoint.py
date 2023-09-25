@@ -171,7 +171,7 @@ class nddeint_ACA(torch.autograd.Function):
                 val = val + ctx.dt * func(
                     current_t,
                     val,
-                    history=[
+                    history =[
                         history_func(current_t - tau)
                         if current_t - tau <= ctx.ts[0]
                         else state_interpolator(current_t - tau)
@@ -187,7 +187,6 @@ class nddeint_ACA(torch.autograd.Function):
         ctx.alltimes = alltimes
         ctx.history = state_interpolator
         ctx.allstates = torch.hstack(values)[..., None]
-        # print("tx.ys.grad_fn", ctx.allstates.grad_fn)
         return ctx.allstates
 
     @staticmethod
@@ -203,12 +202,9 @@ class nddeint_ACA(torch.autograd.Function):
         # f_params holds the NDDE parameters for which a gradient will be computed
         params = ctx.saved_tensors
         state_interpolator = ctx.history
-        # aux = []
-        # for t in time_mesh :
-        #     aux.append(state_interpolator(t)[0])
-
+     
         T = time_mesh[-1]
-        # adjoint_state = grad_output[:, -1]
+
         adjoint_state = torch.zeros_like(grad_output[:, -1])
         adjoint_ys_final = -grad_output[:, -1].reshape(
             adjoint_state.shape[0], 1, *adjoint_state.shape[1:]
@@ -225,8 +221,6 @@ class nddeint_ACA(torch.autograd.Function):
             # device=adjoint_ys_final.device,
         )
 
-        # adjoint_history = lambda t : adjoint_state if t==T else torch.zeros_like(adjoint_state)
-        out2 = None
         # The adjoint state as well as the parameters' gradient are integrated backwards in time.
         # Following the Adaptive Checkpoint Adjoint method, the time steps and corresponding states of the forward
         # integration are re-used by going backwards in the time mesh.
@@ -242,14 +236,10 @@ class nddeint_ACA(torch.autograd.Function):
 
                 # correspond to h_t
                 h_t = torch.autograd.Variable(state_interpolator(t), requires_grad=True)
-                tau = max(ctx.func.delays)
 
                 # we are in the case where t > T - tau
-                h_t_minus_tau = (
-                    state_interpolator(t - tau) if t - tau >= ctx.ts[0] else ctx.y0
-                )
-                out = ctx.func(t, h_t, history=[h_t_minus_tau])
-    
+                h_t_minus_tau = [state_interpolator(t - tau) if t - tau >= ctx.ts[0] else ctx.y0 for tau in ctx.func.delays]
+                out = ctx.func(t, h_t, history=h_t_minus_tau)
                 rhs_adjoint_inc_k1 = torch.autograd.grad(
                     out, h_t, -adjoint_state, retain_graph=True
                 )[0]
@@ -257,19 +247,27 @@ class nddeint_ACA(torch.autograd.Function):
                 rhs_adjoint += rhs_adjoint_inc_k1
 
                 # we need to add the the second term of rhs too in rhs_adjoint computation
-                if t < T - tau:
-                    adjoint_t_plus_tau = adjoint_interpolator(t + tau)
-                    h_t_plus_tau = state_interpolator(t + tau)
-                    out_other = ctx.func(t + tau, h_t_plus_tau, history=[h_t])
-
-                    rhs_adjoint_inc_k1 = torch.autograd.grad(
-                        out_other, h_t, -adjoint_t_plus_tau
-                    )[0]
-
-                    rhs_adjoint = rhs_adjoint + rhs_adjoint_inc_k1
+                for idx,tau_i in enumerate(ctx.func.delays):
+                    if t < T - tau_i:
+                        #index_de_h_t = [tau - tau_i == 0 for tau in ctx.func.delays].index(True)
+                        #print("index_de_h_t", index_de_h_t)
+                        adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
+                        h_t_plus_tau = state_interpolator(t + tau_i)
+                        history = [state_interpolator(t + tau_i - tau_j)  if t + tau_i - tau_j >= ctx.ts[0] \
+                            else ctx.y0 for tau_j in ctx.func.delays]
+                        history[idx] = h_t
+                        # out_other = ctx.func(t + tau_i, h_t_plus_tau, history=torch.hstack([h_t_plus_tau, h_t_plus_tau])) # doesn't work
+                        
+                        out_other = ctx.func(t + tau_i, h_t_plus_tau, history=history) #  work
+                        # out_other = ctx.func(t + tau_i, h_t_plus_tau, history=h_t_minus_tau) # doesnt works
+                        rhs_adjoint_inc_k1 = torch.autograd.grad(
+                            out_other, h_t, -adjoint_t_plus_tau
+                        )[0]
+                    
+                        rhs_adjoint = rhs_adjoint + rhs_adjoint_inc_k1
 
                 param_derivative_inc = torch.autograd.grad(
-                    out, params, -adjoint_state, retain_graph=True
+                    out, params, -adjoint_state, retain_graph=False
                 )
 
                 if stacked_params is None:
@@ -277,30 +275,11 @@ class nddeint_ACA(torch.autograd.Function):
                 else : 
                     stacked_params = tuple([torch.concat([_1, torch.unsqueeze(_2, dim=-1)], dim=-1) for _1, _2 in zip(stacked_params, param_derivative_inc)])
                 
-                # for p in stacked_params: 
-                #     print("stacked_params", p.shape)
-                # aux.append(param_derivative_inc)
                 adjoint_state = adjoint_state - ctx.dt * rhs_adjoint
-
-                if out2 is None:
-                    out2 = tuple([+ ctx.dt* p for p in param_derivative_inc])
-                else:
-                    for _1, _2 in zip([*out2], [*param_derivative_inc]):
-                        _1 = _1 + ctx.dt* _2
         
         cum_sum = tuple([ctx.dt * torch.cumsum(p, dim=-1) for p in stacked_params])
         sum_cum_sum = tuple([torch.trapezoid(p, dim=-1) for p in cum_sum])
         
-        # print(*out2, "out2")
-        # values = np.array(aux)
-        # print('values,', values.shape)
-        # sum_cum_values = ctx.dt * torch.from_numpy(np.trapz(np.cumsum(values, axis=1), axis=0))
-        # sum_cum_values = ctx.dt * torch.from_numpy(np.sum(np.cumsum(values, axis=1), axis=0))
-        # print(sum_cum_values, *out2)
-        # print("cum_values", sum_cum_values.shape, sum_cum_values, *out2)
-        # plt.plot(values)
-        # plt.show()
-        # print(aux[-1].shape, values.shape, *out2)
         return None, None, None, *sum_cum_sum
         # return None, None, None, *out2
 
