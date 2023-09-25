@@ -1,6 +1,7 @@
 import numpy as np
 import torch
-from interpolators import TorchLinearInterpolator
+
+from torchdde.interpolation.linear_interpolation import TorchLinearInterpolator
 
 
 def get_batch(

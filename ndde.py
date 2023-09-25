@@ -8,13 +8,11 @@ import numpy as np
 import seaborn
 import torch
 import torch.nn as nn
-from dde_solver import *
-from interpolators import TorchLinearInterpolator
-from model import NDDE, SimpleNDDE, SimpleNDDE2
-from nnde_adjoint import nddesolve_adjoint
-from ode_solver import *
 from scipy.integrate import solve_ivp
-from scipy.integrate._ivp.rk import RK23
+
+from model import NDDE, SimpleNDDE, SimpleNDDE2
+from torchdde import (RK2, RK4, DDESolver, Euler, Ralston,
+                      TorchLinearInterpolator, nddesolve_adjoint)
 
 warnings.filterwarnings("ignore")
 seaborn.set_context(context="paper")
@@ -52,8 +50,6 @@ list_delays = [1.0]
 solver = RK4()
 dde_solver = DDESolver(solver, list_delays)
 ys, _ = dde_solver.integrate(simple_dde, ts, history_function)
-with torch.no_grad():
-    ys = nddesolve_adjoint(history_function, DDEModule(list_delays), ts).detach()
 print(ys.shape)
 
 for i in range(ys.shape[0]):
@@ -79,11 +75,8 @@ mask = torch.tensor(mask.reshape(1,mask.shape[0],1),device=device)
 max_epoch = 5000
 for i in range(max_epoch):
     opt.zero_grad()
-    # history, ts_data, traj = history, ts_history, ys
-    # # history, ts_data, traj = get_batch(ts, ys, list_delays, length=length)
     ret = nddesolve_adjoint(history_function, model, ts)
     loss = lossfunc(ret, ys)
-    #loss = torch.mean((mask * (ret-ys))**2)
     loss.backward()
     opt.step()
     if i % 50 == 0:

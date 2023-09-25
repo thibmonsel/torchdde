@@ -1,10 +1,11 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from dde_solver import DDESolver
-from interpolators import TorchLinearInterpolator
 from matplotlib import pyplot as plt
-from ode_solver import *
+
+from torchdde.interpolation.linear_interpolation import TorchLinearInterpolator
+from torchdde.solver.dde_solver import DDESolver
+from torchdde.solver.ode_solver import *
 
 #
 # Implements a version of the NeuralODE adjoint optimisation algorithm, with the Adaptive Checkpoint Adjoint method
