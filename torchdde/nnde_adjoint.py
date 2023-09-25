@@ -251,7 +251,8 @@ class nddeint_ACA(torch.autograd.Function):
                     if t < T - tau_i:
                         adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
                         h_t_plus_tau = state_interpolator(t + tau_i)
-                        history = [state_interpolator(t + tau_i - tau_j)  if t + tau_i - tau_j >= ctx.ts[0] else ctx.y0 for tau_j in ctx.func.delays]
+                        history = [state_interpolator(t + tau_i - tau_j)  if t + tau_i - tau_j >= ctx.ts[0] \
+                            else ctx.y0 for tau_j in ctx.func.delays]
                         history[idx] = h_t
                         # out_other = ctx.func(t + tau_i, h_t_plus_tau, history=torch.hstack([h_t_plus_tau, h_t_plus_tau])) # doesn't work
                         
@@ -264,7 +265,7 @@ class nddeint_ACA(torch.autograd.Function):
                         rhs_adjoint = rhs_adjoint + rhs_adjoint_inc_k1
 
                 param_derivative_inc = torch.autograd.grad(
-                    out, params, -adjoint_state, retain_graph=True
+                    out, params, -adjoint_state, retain_graph=False
                 )
 
                 if stacked_params is None:
