@@ -250,7 +250,7 @@ class nddeint_ACA(torch.autograd.Function):
                 for idx,tau_i in enumerate(ctx.func.delays):
                     if t < T - tau_i:
                         index_de_h_t = [tau - tau_i == 0 for tau in ctx.func.delays].index(True)
-                        print("index_de_h_t", index_de_h_t)
+                        #print("index_de_h_t", index_de_h_t)
                         adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
                         h_t_plus_tau = state_interpolator(t + tau_i)
                         history = [state_interpolator(t + tau_i - tau_j)  if t + tau_i - tau_j >= ctx.ts[0] \
