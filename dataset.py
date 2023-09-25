@@ -1,7 +1,29 @@
 import numpy as np
 import torch
+from scipy.integrate import solve_ivp
 
 from torchdde.interpolation.linear_interpolation import TorchLinearInterpolator
+
+
+def brusellator(y0, ts, args):
+    a, b = args
+    def vector_field(t, x):
+        x1, x2 = x
+        dxdt = a - (1 + b) * x1 + x1**2 * x2
+        dydt = b * x1 - x1**2 * x2
+        return np.stack(
+            [
+                dxdt,
+                dydt,
+            ],
+            axis=-1,
+        )
+
+    sol = np.empty((len(y0), len(ts), 1))
+    for i, y0_ in enumerate(y0):
+        sol[i] = solve_ivp(vector_field, (ts[0], ts[-1]), y0_, t_eval=ts).y[0][..., None]
+    return torch.from_numpy(sol) 
+
 
 
 def get_batch(
