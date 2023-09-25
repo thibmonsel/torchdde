@@ -4,6 +4,7 @@
 import warnings
 
 import matplotlib.pyplot as plt
+from matplotlib.pyplot import cm
 import numpy as np
 import seaborn
 import torch
@@ -71,7 +72,7 @@ lens = []
 
 mask = np.logspace(1,1e-1,ts.shape[0])/10
 mask = torch.tensor(mask.reshape(1,mask.shape[0],1),device=device)
-
+colors = cm.jet(np.linspace(0,1,len(history_values)))
 max_epoch = 5000
 for i in range(max_epoch):
     opt.zero_grad()
@@ -80,9 +81,9 @@ for i in range(max_epoch):
     loss.backward()
     opt.step()
     if i % 50 == 0:
-        for i in range(ys.shape[0]):
-            plt.plot(ys[i].cpu().detach().numpy(), label="Truth")
-            plt.plot(ret[i].cpu().detach().numpy(), "--")
+        for i,c in zip(range(ys.shape[0]),colors):
+            plt.plot(ys[i].cpu().detach().numpy(), label="Truth",color=c)
+            plt.plot(ret[i].cpu().detach().numpy(), "--",color=c)
         plt.legend()
         plt.savefig('last_res.png',bbox_inches='tight',dpi=100)
         plt.close()
