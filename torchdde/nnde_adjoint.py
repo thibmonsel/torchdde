@@ -171,12 +171,12 @@ class nddeint_ACA(torch.autograd.Function):
                 val = val + ctx.dt * func(
                     current_t,
                     val,
-                    history = torch.hstack([
+                    history =[
                         history_func(current_t - tau)
                         if current_t - tau <= ctx.ts[0]
                         else state_interpolator(current_t - tau)
                         for tau in delays
-                    ]),
+                    ],
                 )
                 state_interpolator.add_point(current_t, val)
                 values.append(val)
@@ -238,7 +238,7 @@ class nddeint_ACA(torch.autograd.Function):
                 h_t = torch.autograd.Variable(state_interpolator(t), requires_grad=True)
 
                 # we are in the case where t > T - tau
-                h_t_minus_tau = torch.hstack([state_interpolator(t - tau) if t - tau >= ctx.ts[0] else ctx.y0 for tau in ctx.func.delays])
+                h_t_minus_tau = [state_interpolator(t - tau) if t - tau >= ctx.ts[0] else ctx.y0 for tau in ctx.func.delays]
                 out = ctx.func(t, h_t, history=h_t_minus_tau)
                 rhs_adjoint_inc_k1 = torch.autograd.grad(
                     out, h_t, -adjoint_state, retain_graph=True
@@ -249,6 +249,8 @@ class nddeint_ACA(torch.autograd.Function):
                 # we need to add the the second term of rhs too in rhs_adjoint computation
                 for idx,tau_i in enumerate(ctx.func.delays):
                     if t < T - tau_i:
+                        index_de_h_t = [tau - tau_i == 0 for tau in ctx.func.delays].index(True)
+                        print("index_de_h_t", index_de_h_t)
                         adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
                         h_t_plus_tau = state_interpolator(t + tau_i)
                         history = [state_interpolator(t + tau_i - tau_j)  if t + tau_i - tau_j >= ctx.ts[0] \
@@ -273,9 +275,6 @@ class nddeint_ACA(torch.autograd.Function):
                 else : 
                     stacked_params = tuple([torch.concat([_1, torch.unsqueeze(_2, dim=-1)], dim=-1) for _1, _2 in zip(stacked_params, param_derivative_inc)])
                 
-                # for p in stacked_params: 
-                #     print("stacked_params", p.shape)
-                # aux.append(param_derivative_inc)
                 adjoint_state = adjoint_state - ctx.dt * rhs_adjoint
         
         cum_sum = tuple([ctx.dt * torch.cumsum(p, dim=-1) for p in stacked_params])
