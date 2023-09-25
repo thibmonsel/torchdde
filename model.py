@@ -16,6 +16,7 @@ class NDDE(nn.Module):
         )
 
     def forward(self, t, z, *, history):
+        
         inp = torch.cat([z, *history], dim=-1)
         return self.mlp(inp)
 
