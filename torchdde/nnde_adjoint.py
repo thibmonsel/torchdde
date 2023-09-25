@@ -240,7 +240,6 @@ class nddeint_ACA(torch.autograd.Function):
                 # we are in the case where t > T - tau
                 h_t_minus_tau = torch.hstack([state_interpolator(t - tau) if t - tau >= ctx.ts[0] else ctx.y0 for tau in ctx.func.delays])
                 out = ctx.func(t, h_t, history=h_t_minus_tau)
-    
                 rhs_adjoint_inc_k1 = torch.autograd.grad(
                     out, h_t, -adjoint_state, retain_graph=True
                 )[0]
@@ -252,9 +251,10 @@ class nddeint_ACA(torch.autograd.Function):
                     if t < T - tau_i:
                         adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
                         h_t_plus_tau = state_interpolator(t + tau_i)
-                        history = torch.cat([state_interpolator(t + tau_i - tau_j)  if t + tau_i - tau_j >= ctx.ts[0] else ctx.y0 for tau_j in ctx.func.delays], dim=-1)
-                        out_other = ctx.func(t + tau_i, h_t_plus_tau, history=history)
-                        # out_other = ctx.func(t + tau_i, h_t_plus_tau, history=h_t)
+                        history = torch.hstack([state_interpolator(t + tau_i - tau_j)  if t + tau_i - tau_j >= ctx.ts[0] else ctx.y0 for tau_j in ctx.func.delays])
+                        # out_other = ctx.func(t + tau_i, h_t_plus_tau, history=torch.hstack([h_t_plus_tau, h_t_plus_tau])) # doesn't work
+                        out_other = ctx.func(t + tau_i, h_t_plus_tau, history=torch.hstack([h_t, h_t])) #  work
+                        # out_other = ctx.func(t + tau_i, h_t_plus_tau, history=h_t_minus_tau) # doesnt works
                         rhs_adjoint_inc_k1 = torch.autograd.grad(
                             out_other, h_t, -adjoint_t_plus_tau, retain_graph=True
                         )[0]
