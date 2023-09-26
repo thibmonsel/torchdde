@@ -8,11 +8,13 @@ class NDDE(nn.Module):
         self.in_dim = dim * (1 + len(list_delays))
         self.delays = list_delays
         self.mlp = nn.Sequential(
-            nn.Linear(self.in_dim, 128),
+            nn.Linear(self.in_dim, width),
             nn.ReLU(),
-            nn.Linear(128, 128),
+            nn.Linear(width, width),
             nn.ReLU(),
-            nn.Linear(128, dim),
+            nn.Linear(width, width),
+            nn.ReLU(),
+            nn.Linear(width, dim),
         )
 
     def forward(self, t, z, *, history):
