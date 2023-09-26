@@ -7,22 +7,20 @@ import torch
 import torch.nn as nn
 from scipy.integrate import solve_ivp
 
-from dataset import brusellator
+from dataset import brusellator, stiff_vdp
 from model import NDDE, SimpleNDDE, SimpleNDDE2
 from torchdde import (RK2, RK4, DDESolver, Euler, Ralston,
                       TorchLinearInterpolator, nddesolve_adjoint)
 
 dataset_size = 32
-device = "cpu" #torch.device("cuda" if torch.cuda.is_available() else "cpu")
-ts = torch.linspace(0, 20, 801)
-y0 = np.random.uniform(0.0, 2.0, (dataset_size, 2))
-y0[:, 1] = 0.0
-# different args = (1.0, 1.7) classic and more stiff (1.0, 3.0)
-ys = brusellator(y0, ts, args=(1.0, 3.0))
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+ts = torch.linspace(0, 20.0, 801)
+y0 = np.random.uniform(0.1, 2.0, (dataset_size, 2))
+y0[:, 0] = 0.0
+
+ys = stiff_vdp(y0, ts)
 ys = ys.to(torch.float32)
-ys = ys[:, :, 0][..., None]
 ys, ts = ys.to(device), ts.to(device)
-print(ys.shape)
 
 for i in range(ys.shape[0]):
     plt.plot(ys[i].cpu().detach().numpy(), label="Truth")
@@ -30,21 +28,20 @@ plt.pause(2)
 plt.close() 
 
 list_delays = [0.5, 1.0]
-model = NDDE(ys.shape[-1], list_delays, width=32)
+model = NDDE(ys.shape[-1], list_delays, width=64)
 
 model = model.to(device)
 lossfunc = nn.MSELoss()
-opt = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=10e-7)
+opt = torch.optim.Adam(model.parameters(), lr=3e-3, weight_decay=0)
 losses = []
 
 # computing history function 
 max_delay = max(list_delays)
 idx = (ts == max_delay).nonzero().flatten()
 ts_history, ts = ts[:idx+1], ts[idx:]
-ys_history, ys = ys[:, :idx+1], ys[:, idx:]   
+ys_history, ys = ys[:, :idx+1], ys[:, idx:]
 history_interpolator = TorchLinearInterpolator(ts_history, ys_history)
 history_function = lambda t: history_interpolator(t)
-
 
 max_epoch = 5000
 for i in range(max_epoch):
