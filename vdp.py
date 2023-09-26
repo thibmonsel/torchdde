@@ -14,7 +14,7 @@ from torchdde import (RK2, RK4, DDESolver, Euler, Ralston,
 
 dataset_size = 32
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-ts = torch.linspace(0, 20.0, 801)
+ts = torch.linspace(0, 30.0, 301)
 y0 = np.random.uniform(0.1, 2.0, (dataset_size, 2))
 y0[:, 0] = 0.0
 
@@ -27,12 +27,13 @@ for i in range(ys.shape[0]):
 plt.pause(2)
 plt.close() 
 
-list_delays = [0.5, 1.0]
-model = NDDE(ys.shape[-1], list_delays, width=64)
+# workable list of delays : [1.4, 2.8], [1.0, 2.0], [3.0]
+list_delays = [2.5]
+model = NDDE(ys.shape[-1], list_delays, width=128)
 
 model = model.to(device)
 lossfunc = nn.MSELoss()
-opt = torch.optim.Adam(model.parameters(), lr=3e-3, weight_decay=0)
+opt = torch.optim.Adam(model.parameters(), lr=10e-3, weight_decay=0)
 losses = []
 
 # computing history function 

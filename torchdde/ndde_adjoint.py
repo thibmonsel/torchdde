@@ -198,18 +198,16 @@ class nddeint_ACA(torch.autograd.Function):
         # integration are re-used by going backwards in the time mesh.
         stacked_params = None
         for j, t in enumerate(reversed(ctx.ts)):
-            # Backward Integrating the adjoint state and the parameters' gradient between time i and i-1
+            # Backward Integrating the adjoint state and the parameters' gradient between time j and j-1
+            # We need to account for the adjoint potential jump by adding it to the gradient of the loss w.r.t. the current time
+            # Here we add it at every time step since our solvers do fix time step increments. However, this needs to be dealts with
+            # if we don't have the same ts in forward and backward methods.
             adjoint_state -= grad_output[:, -j - 1]
             adjoint_interpolator.add_point(t, adjoint_state)
             with torch.enable_grad():
-                # Taking a step with the NODE function to build a graph which will be differentiated
-                # so as to integrate the adjoint state and the parameters' gradient
                 rhs_adjoint = 0.0
-
-                # correspond to h_t
+                # corresponds to the state a time t : y(t)
                 h_t = torch.autograd.Variable(state_interpolator(t), requires_grad=True)
-
-                # we are in the case where t > T - tau
                 h_t_minus_tau = [
                     state_interpolator(t - tau) if t - tau >= ctx.ts[0] else ctx.ys_history_func(t-tau)
                     for tau in ctx.func.delays
