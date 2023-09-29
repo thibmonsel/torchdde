@@ -8,15 +8,8 @@ import torch.nn as nn
 from scipy.integrate import solve_ivp
 
 from model import NDDE, SimpleNDDE, SimpleNDDE2
-from torchdde import (
-    RK2,
-    RK4,
-    DDESolver,
-    Euler,
-    Ralston,
-    TorchLinearInterpolator,
-    nddesolve_adjoint,
-)
+from torchdde import (RK2, RK4, DDESolver, Euler, Ralston,
+                      TorchLinearInterpolator, nddesolve_adjoint)
 
 warnings.filterwarnings("ignore")
 seaborn.set_context(context="paper")
@@ -34,7 +27,6 @@ def simple_dde2(t, y, *, history):
 def simple_dde3(t, y, *, history):
     return 0.25 * (history[0]) / (1.0 + history[0] ** 10) - 0.1 * y
     # return 1/2*y -history[0]
-
 
 device = "cpu"
 history_values = torch.tensor([1.0, 2.0, 3.0, 4.0])
