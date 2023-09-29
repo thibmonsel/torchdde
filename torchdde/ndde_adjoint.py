@@ -144,7 +144,7 @@ class nddeint2_ACA(torch.autograd.Function):
 
 class nddeint_ACA(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, history_func, func, ts, kind, *params):
+    def forward(ctx, history_func, func, ts, *params):
         # Saving parameters for backward()
         ctx.func = func
         # ctx.flat_params = flat_params
@@ -187,7 +187,6 @@ class nddeint_ACA(torch.autograd.Function):
         ctx.alltimes = alltimes
         ctx.history = state_interpolator
         ctx.allstates = torch.hstack(values)[..., None]
-        ctx.kind = kind
         return ctx.allstates
 
     @staticmethod
@@ -278,7 +277,7 @@ class nddeint_ACA(torch.autograd.Function):
             return None, None, None, None, *out
 
 
-def nddesolve_adjoint(history, func, ts, kind):
+def nddesolve_adjoint(history, func, ts):
     # Main function to be called to integrate the NODE
 
     # z0 : (tensor) Initial state of the NODE
@@ -292,7 +291,7 @@ def nddesolve_adjoint(history, func, ts, kind):
 
     # Forward integrating the NODE and returning the state at each evaluation step
     # zs = nddeint2_ACA.apply(history, func, options, *params)
-    zs = nddeint_ACA.apply(history, func, ts, kind, *params)
+    zs = nddeint_ACA.apply(history, func, ts, *params)
     return zs
 
 
