@@ -172,7 +172,16 @@ class nddeint_ACA(torch.autograd.Function):
 
         T = ctx.ts[-1]
         dt = ctx.ts[1] - ctx.ts[0]
-
+        
+        # computing y'(t-tau) for the contribution of delay parameters in the loss w.r.t to the parameters
+        grad_ys = torch.gradient(ctx.ys, dim=1)[0] / dt
+        ts_history = torch.linspace(ctx.ts[0]-max(ctx.func.delays).item(), ctx.ts[0], int(max(ctx.func.delays)/dt))
+        ys_history_eval = torch.hstack([ctx.ys_history_func(t) for t in ts_history])
+        if len(ys_history_eval.shape) == 2:
+            ys_history_eval = ys_history_eval[..., None]
+        grad_ys_history_func = torch.gradient(ys_history_eval, dim=1)[0] / dt
+        grad_ys = torch.cat((grad_ys_history_func, grad_ys), dim=1)
+        
         params = ctx.saved_tensors
         state_interpolator = ctx.ys_interpolator
 
@@ -237,8 +246,14 @@ class nddeint_ACA(torch.autograd.Function):
 
                         rhs_adjoint = rhs_adjoint + rhs_adjoint_inc_k1
 
+                        # contribution of the delay parameters in the loss w.r.t. the parameters
+                        delay_idx = (ctx.ts > tau_i).nonzero()[0].item() - 1
+                        rolled_grad_ys = torch.roll(grad_ys, -delay_idx, dims=1)[:, delay_idx:]
+                        
+                        rhs_adjoint += out_other * rolled_grad_ys[:, -1-j]
+                        
                 param_derivative_inc = torch.autograd.grad(
-                    out, params, -adjoint_state, retain_graph=False
+                    out, params, -adjoint_state, retain_graph=False, allow_unused=True
                 )
 
                 if stacked_params is None:
@@ -248,7 +263,7 @@ class nddeint_ACA(torch.autograd.Function):
                 else:
                     stacked_params = tuple(
                         [
-                            torch.concat([_1, torch.unsqueeze(_2, dim=-1)], dim=-1)
+                            torch.concat([_1, torch.unsqueeze(_2, dim=-1)], dim=-1) if _2 is not None else _1
                             for _1, _2 in zip(stacked_params, param_derivative_inc)
                         ]
                     )

@@ -3,10 +3,10 @@ import torch.nn as nn
 
 
 class NDDE(nn.Module):
-    def __init__(self, dim, list_delays, width=64):
+    def __init__(self, dim, delays, width=64):
         super().__init__()
-        self.in_dim = dim * (1 + len(list_delays))
-        self.delays = list_delays
+        self.in_dim = dim * (1 + len(delays))
+        self.delays = torch.nn.Parameter(delays)
         self.mlp = nn.Sequential(
             nn.Linear(self.in_dim, width),
             nn.ReLU(),

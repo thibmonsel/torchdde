@@ -46,7 +46,8 @@ for i in range(ys.shape[0]):
 plt.pause(2)
 plt.close()
 
-model = NDDE(history_values.shape[-1], list_delays)
+learnable_delays = torch.tensor([0.5])
+model = NDDE(history_values.shape[-1], learnable_delays)
 model = model.to(device)
 lossfunc = nn.MSELoss()
 opt = torch.optim.Adam(model.parameters(), lr=3e-3, weight_decay=0)
@@ -60,14 +61,14 @@ for i in range(max_epoch):
     loss = lossfunc(ret, ys)
     loss.backward()
     opt.step()
-    if i % 50 == 0:
+    if i % 15 == 0:
         for i in range(ys.shape[0]):
             plt.plot(ys[i].cpu().detach().numpy(), label="Truth")
             plt.plot(ret[i].cpu().detach().numpy(), "--")
         plt.legend()
         plt.savefig("last_res.png", bbox_inches="tight", dpi=100)
         plt.close()
-    print("Epoch : {:4d}, Loss : {:.3e}".format(i, loss.item()))
+    print("Epoch : {:4d}, Loss : {:.3e}, tau : {}".format(i, loss.item(), model.delays.item()))
 
     losses.append(loss.item())
 
