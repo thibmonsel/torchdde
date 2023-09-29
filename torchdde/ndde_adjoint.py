@@ -274,7 +274,7 @@ class nddeint_ACA(torch.autograd.Function):
                     stacked_params = tuple([torch.concat([_1, torch.unsqueeze(_2, dim=-1)], dim=-1) for _1, _2 in zip(stacked_params, param_derivative_inc)])
                     
             out = tuple([ctx.dt*p.sum(dim=-1) for p in stacked_params])
-            return None, None, None, None, *out
+            return None, None, None, *out
 
 
 def nddesolve_adjoint(history, func, ts):

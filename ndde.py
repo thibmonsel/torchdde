@@ -35,7 +35,7 @@ history_function = lambda t: history_values
 print("history_values", history_values.shape)
 
 ts = torch.linspace(0, 10, 101)
-list_delays = [0.5, 1.0]
+list_delays = [1.0]
 solver = RK4()
 dde_solver = DDESolver(solver, list_delays)
 ys, _ = dde_solver.integrate(simple_dde, ts, history_function)
@@ -52,9 +52,6 @@ lossfunc = nn.MSELoss()
 opt = torch.optim.Adam(model.parameters(), lr=3e-3, weight_decay=0)
 losses = []
 lens = []
-
-mask = np.logspace(1, 1e-1, ts.shape[0]) / 10
-mask = torch.tensor(mask.reshape(1, mask.shape[0], 1), device=device)
 
 max_epoch = 5000
 for i in range(max_epoch):
