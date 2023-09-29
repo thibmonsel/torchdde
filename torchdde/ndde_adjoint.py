@@ -247,10 +247,8 @@ class nddeint_ACA(torch.autograd.Function):
                         rhs_adjoint = rhs_adjoint + rhs_adjoint_inc_k1
 
                         # contribution of the delay parameters in the loss w.r.t. the parameters
-                        delay_idx = (ctx.ts > tau_i).nonzero()[0].item() - 1
-                        rolled_grad_ys = torch.roll(grad_ys, -delay_idx, dims=1)[:, delay_idx:]
-                        
-                        rhs_adjoint += out_other * rolled_grad_ys[:, -1-j]
+                        # delay_idx = (ctx.ts > tau_i).nonzero()[0].item() - 1
+                        # delays_inc = - rhs_adjoint_inc_k1  * grad_ys[:, -1-j- delay_idx] # shape [4,1]
                         
                 param_derivative_inc = torch.autograd.grad(
                     out, params, -adjoint_state, retain_graph=False, allow_unused=True

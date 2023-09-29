@@ -34,7 +34,7 @@ history_values = history_values.view(history_values.shape[0], 1)
 history_function = lambda t: history_values
 print("history_values", history_values.shape)
 
-ts = torch.linspace(0, 10, 101)
+ts = torch.linspace(0, 10, 201)
 list_delays = [1.0]
 solver = RK4()
 dde_solver = DDESolver(solver, list_delays)
@@ -46,7 +46,7 @@ for i in range(ys.shape[0]):
 plt.pause(2)
 plt.close()
 
-learnable_delays = torch.tensor([0.5])
+learnable_delays = torch.randn((1,))
 model = NDDE(history_values.shape[-1], learnable_delays)
 model = model.to(device)
 lossfunc = nn.MSELoss()
