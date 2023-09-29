@@ -144,7 +144,7 @@ class nddeint2_ACA(torch.autograd.Function):
 
 class nddeint_ACA(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, history_func, func, ts, *params):
+    def forward(ctx, history_func, func, ts, kind, *params):
         # Saving parameters for backward()
         ctx.func = func
         # ctx.flat_params = flat_params
@@ -187,7 +187,7 @@ class nddeint_ACA(torch.autograd.Function):
         ctx.alltimes = alltimes
         ctx.history = state_interpolator
         ctx.allstates = torch.hstack(values)[..., None]
-        # print("tx.ys.grad_fn", ctx.allstates.grad_fn)
+        ctx.kind = kind
         return ctx.allstates
 
     @staticmethod
@@ -203,12 +203,9 @@ class nddeint_ACA(torch.autograd.Function):
         # f_params holds the NDDE parameters for which a gradient will be computed
         params = ctx.saved_tensors
         state_interpolator = ctx.history
-        # aux = []
-        # for t in time_mesh :
-        #     aux.append(state_interpolator(t)[0])
 
         T = time_mesh[-1]
-        # adjoint_state = grad_output[:, -1]
+
         adjoint_state = torch.zeros_like(grad_output[:, -1])
         adjoint_ys_final = -grad_output[:, -1].reshape(
             adjoint_state.shape[0], 1, *adjoint_state.shape[1:]
@@ -225,8 +222,6 @@ class nddeint_ACA(torch.autograd.Function):
             # device=adjoint_ys_final.device,
         )
 
-        # adjoint_history = lambda t : adjoint_state if t==T else torch.zeros_like(adjoint_state)
-        out2 = None
         # The adjoint state as well as the parameters' gradient are integrated backwards in time.
         # Following the Adaptive Checkpoint Adjoint method, the time steps and corresponding states of the forward
         # integration are re-used by going backwards in the time mesh.
@@ -271,44 +266,19 @@ class nddeint_ACA(torch.autograd.Function):
                 param_derivative_inc = torch.autograd.grad(
                     out, params, -adjoint_state, retain_graph=False
                 )
+                
+                adjoint_state = adjoint_state - ctx.dt * rhs_adjoint
 
                 if stacked_params is None:
                     stacked_params = tuple([torch.unsqueeze(p, dim=-1) for p in param_derivative_inc])
                 else : 
                     stacked_params = tuple([torch.concat([_1, torch.unsqueeze(_2, dim=-1)], dim=-1) for _1, _2 in zip(stacked_params, param_derivative_inc)])
-                
-                # for p in stacked_params: 
-                #     print("stacked_params", p.shape)
-                # aux.append(param_derivative_inc)
-                adjoint_state = adjoint_state - ctx.dt * rhs_adjoint
-
-                if out2 is None:
-                    out2 = tuple([+ ctx.dt* p for p in param_derivative_inc])
-                else:
-                    for _1, _2 in zip([*out2], [*param_derivative_inc]):
-                        _1 = _1 + ctx.dt* _2
-        
-        cum_sum = tuple([ctx.dt * torch.cumsum(p, dim=-1) for p in stacked_params])
-        sum_cum_sum = tuple([torch.trapezoid(p, dim=-1) for p in cum_sum])
-        test_out = tuple([ctx.dt*p.sum(dim=-1) for p in stacked_params])
-        # print(*out2, "out2")
-        # values = np.array(aux)
-        # print('values,', values.shape)
-        # sum_cum_values = ctx.dt * torch.from_numpy(np.trapz(np.cumsum(values, axis=1), axis=0))
-        # sum_cum_values = ctx.dt * torch.from_numpy(np.sum(np.cumsum(values, axis=1), axis=0))
-        # print(sum_cum_values, *out2)
-        # print("cum_values", sum_cum_values.shape, sum_cum_values, *out2)
-        # plt.plot(values)
-        # plt.show()
-        # print(aux[-1].shape, values.shape, *out2)
-        
-        print('{:.3e}'.format(max([p.max().item() for p in out2])))
-        print('{:.3e}'.format(max([p.max().item() for p in sum_cum_sum])))
-        #return None, None, None, *sum_cum_sum
-        return None, None, None, *test_out
+                    
+            out = tuple([ctx.dt*p.sum(dim=-1) for p in stacked_params])
+            return None, None, None, None, *out
 
 
-def nddesolve_adjoint(history, func, options):
+def nddesolve_adjoint(history, func, ts, kind):
     # Main function to be called to integrate the NODE
 
     # z0 : (tensor) Initial state of the NODE
@@ -322,7 +292,7 @@ def nddesolve_adjoint(history, func, options):
 
     # Forward integrating the NODE and returning the state at each evaluation step
     # zs = nddeint2_ACA.apply(history, func, options, *params)
-    zs = nddeint_ACA.apply(history, func, options, *params)
+    zs = nddeint_ACA.apply(history, func, ts, kind, *params)
     return zs
 
 

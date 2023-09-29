@@ -4,11 +4,11 @@
 import warnings
 
 import matplotlib.pyplot as plt
-from matplotlib.pyplot import cm
 import numpy as np
 import seaborn
 import torch
 import torch.nn as nn
+from matplotlib.pyplot import cm
 from scipy.integrate import solve_ivp
 
 from model import NDDE, SimpleNDDE, SimpleNDDE2
@@ -31,26 +31,18 @@ def simple_dde3(t, y, *, history):
     return 0.25 * (history[0]) / (1.0 + history[0] ** 10) - 0.1 * y
     # return 1/2*y -history[0]
 
-class DDEModule(nn.Module):
-    def __init__(self,list_delays):
-        super().__init__()
-        self.delays = list_delays
-
-    def forward(self,t,y,*,history):
-
-        return  y * (1 - history[0])
-
+torch.manual_seed(0)
 device = "cpu"
 history_values = torch.tensor([1.0, 2.0, 3.0, 4.0])
 history_values = history_values.view(history_values.shape[0], 1)
 history_function = lambda t: history_values
 print("history_values", history_values.shape)
 
-ts = torch.linspace(0, 10, 101)
-list_delays = [1.0]
+ts = torch.linspace(0, 80, 801)
+list_delays = [10.0]
 solver = RK4()
 dde_solver = DDESolver(solver, list_delays)
-ys, _ = dde_solver.integrate(simple_dde, ts, history_function)
+ys, _ = dde_solver.integrate(simple_dde3, ts, history_function)
 print(ys.shape)
 
 for i in range(ys.shape[0]):
@@ -70,13 +62,14 @@ opt = torch.optim.Adam(model.parameters(), lr=3e-3, weight_decay=0)
 losses = []
 lens = []
 
+kind = "sum_cum_sum" # "sum_cum_sum" "test_out"
 mask = np.logspace(1,1e-1,ts.shape[0])/10
 mask = torch.tensor(mask.reshape(1,mask.shape[0],1),device=device)
 colors = cm.jet(np.linspace(0,1,len(history_values)))
 max_epoch = 5000
 for i in range(max_epoch):
     opt.zero_grad()
-    ret = nddesolve_adjoint(history_function, model, ts)
+    ret = nddesolve_adjoint(history_function, model, ts, kind=kind) 
     loss = lossfunc(ret, ys)
     loss.backward()
     opt.step()
@@ -87,7 +80,7 @@ for i in range(max_epoch):
         plt.legend()
         plt.savefig('last_res.png',bbox_inches='tight',dpi=100)
         plt.close()
-    print("Epoch : {:4d}, Loss : {:.3e}".format(i, loss.item()))
+    print("Epoch : {:4d}, Loss : {:.3e}, {}".format(i, loss.item(), kind))
 
     losses.append(loss.item())
     
