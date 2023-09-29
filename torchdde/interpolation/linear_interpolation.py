@@ -10,7 +10,6 @@ class TorchLinearInterpolator:
 
         self.ts = ts  # [N_t]
         self.ys = ys  # [N, N_t, D]
-        # self.device = device
 
     def __post_init__(self):
         if self.ts.ndim != 1:
@@ -25,6 +24,11 @@ class TorchLinearInterpolator:
         if not torch.all(torch.diff(self.ts) > 0):
             raise ValueError("`ts` must be monotonically increasing.")
 
+    
+    def to(self, device):
+        self.ys = self.ys.to(device)
+        self.ts = self.ts.to(device)
+    
     def _interpret_t(self, t: float, left: bool):
         maxlen = self.ts.shape[0] - 2
         index = torch.searchsorted(self.ts, t, side="left" if left else "right")
@@ -57,10 +61,10 @@ class TorchLinearInterpolator:
                 f"already have new_t={new_t} point in interpolation, overwriting it "
             )
 
-        new_y = new_y.to(self.ts.device)
+        # new_y = new_y.to(self.ts.device)
         new_y = torch.unsqueeze(new_y, dim=1)
         new_t = torch.unsqueeze(new_t.clone(), dim=0)
-        new_t = new_t.to(self.ts.device)
+        # new_t = new_t.to(self.ts.device)
 
         if self.ys.shape[-1] != new_y.shape[-1]:
             raise ValueError(
@@ -84,7 +88,3 @@ class TorchLinearInterpolator:
         self.ys = new_ys
         self.ts = new_ts
 
-        # if not torch.all(torch.diff(self.ts) > 0):
-        #     raise ValueError(
-        #         "`ts` must be monotonically increasing. oups errors in add_point"
-        #     )

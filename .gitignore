@@ -25,6 +25,10 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+<<<<<<< HEAD
+=======
+*.png
+>>>>>>> master
 
 final_DDEM/
 # PyInstaller
