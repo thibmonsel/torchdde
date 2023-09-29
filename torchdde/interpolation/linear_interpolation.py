@@ -43,8 +43,7 @@ class TorchLinearInterpolator:
             raise ValueError(
                 f"Interpolation point is outside data range. ie t={t} > ts[-1]={self.ts[-1]} or t < ts[0]={self.ts[0]}"
             )
-        # t = torch.tensor(t)
-        # t = t.to(self.device)
+
         index, fractional_part = self._interpret_t(t, left)
         prev_ys = self.ys[:, index]
         next_ys = self.ys[:, index + 1]
