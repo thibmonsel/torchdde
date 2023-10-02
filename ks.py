@@ -42,7 +42,6 @@ ts_history, ts = ts[:idx+1], ts[idx:]
 ys_history, ys = ys[:, :idx+1], ys[:, idx:]   
 history_interpolator = TorchLinearInterpolator(ts_history, ys_history)
 history_function = lambda t: history_interpolator(t)
-print("history_interpolator.dtype",history_interpolator.ys.dtype)
 
 
 max_epoch = 10000

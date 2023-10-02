@@ -178,12 +178,12 @@ class nddeint_ACA(torch.autograd.Function):
         # computing y'(t-tau) for the contribution of delay parameters in the loss w.r.t to the parameters
         grad_ys = torch.gradient(ctx.ys, dim=1)[0] / dt
         ts_history = torch.linspace(ctx.ts[0]-max(ctx.func.delays).item(), ctx.ts[0], int(max(ctx.func.delays)/dt))
-        ys_history_eval = torch.hstack([ctx.ys_history_func(t) for t in ts_history])
+        ys_history_eval = torch.concat([torch.unsqueeze(ctx.ys_history_func(t), dim=1) for t in ts_history], dim=1)
         if len(ys_history_eval.shape) == 2:
             ys_history_eval = ys_history_eval[..., None]
         grad_ys_history_func = torch.gradient(ys_history_eval, dim=1)[0] / dt
         grad_ys = torch.cat((grad_ys_history_func, grad_ys), dim=1)
-        
+
         params = ctx.saved_tensors
         state_interpolator = ctx.ys_interpolator
 
@@ -247,7 +247,7 @@ class nddeint_ACA(torch.autograd.Function):
                         rhs_adjoint = rhs_adjoint + rhs_adjoint_inc_k1 
                         
                         # contribution of the delay parameters in the loss w.r.t. the parameters
-                        delay_derivative_inc[idx] += torch.sum(rhs_adjoint_inc_k1  * grad_ys[:, -1-j], dim=0)
+                        delay_derivative_inc[idx] += torch.sum(rhs_adjoint_inc_k1 * grad_ys[:, -1-j], dim=(tuple(range(len(rhs_adjoint_inc_k1.shape)))))
 
                 param_derivative_inc = torch.autograd.grad(
                     out, params, -adjoint_state, retain_graph=False, allow_unused=True
@@ -294,7 +294,8 @@ class nddeint_ACA(torch.autograd.Function):
                         out_other, h_t, -adjoint_t_plus_tau
                     )[0]
                     
-                    delay_derivative_inc[idx] +=  torch.sum(rhs_adjoint_inc  * grad_ys[:, grad_ys_history_func.shape[1] - k], dim=0)
+                    delay_derivative_inc[idx] += torch.sum(rhs_adjoint_inc * grad_ys[:, -1-j], dim=(tuple(range(len(rhs_adjoint_inc_k1.shape)))))
+
                     
             if stacked_delays is None :
                 stacked_delays = torch.unsqueeze(delay_derivative_inc, dim=0) if delay_derivative_inc is not None else None
