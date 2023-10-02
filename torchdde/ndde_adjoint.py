@@ -165,8 +165,10 @@ class nddeint_ACA(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, *grad_y):
-        # https://www.researchgate.net/publication/255686149_Adjoint_Sensitivity_Analysis_of_Neutral_Delay_Differential_Models
-        # This function implements the adjoint gradient estimation method for NODEs
+        # http://www.cs.utoronto.ca/~calver/papers/adjoint_paper.pdf
+        # This function implements the adjoint gradient estimation method for NDDEs with constant delays 
+        # as learnable parameter alongside with the neural network.
+        
         # grad_output holds the gradient of the loss w.r.t. each evaluation step
         grad_output = grad_y[0]
 
@@ -190,24 +192,20 @@ class nddeint_ACA(torch.autograd.Function):
             adjoint_state.shape[0], 1, *adjoint_state.shape[1:]
         )
 
-        # adjoint history shape [N, D]
-        # create an adjoint interpolator that is defined from [T, T+ dt] for initialization purposes
-        # adjoint at T=t is equal to the gradient of the loss w.r.t. the evaluation state at t=T and the t> T is 0
+        # adjoint history shape [N, N_t=1, D]
+        # create an adjoint interpolator that is defined from t >= T
         adjoint_interpolator = TorchLinearInterpolator(
             torch.unsqueeze(ctx.ts[-1], dim=0),
             adjoint_ys_final,
-            # device=adjoint_ys_final.device,
         )
 
         # The adjoint state as well as the parameters' gradient are integrated backwards in time.
-        # Following the Adaptive Checkpoint Adjoint method, the time steps and corresponding states of the forward
-        # integration are re-used by going backwards in the time mesh.
         stacked_params, stacked_delays = None, None
-        delay_derivative_inc = torch.zeros_like(ctx.func.delays)
+        delay_derivative_inc = torch.zeros_like(ctx.func.delays)[..., None]
         for j, t in enumerate(reversed(ctx.ts)):
             # Backward Integrating the adjoint state and the parameters' gradient between time j and j-1
             # We need to account for the adjoint potential jump by adding it to the gradient of the loss w.r.t. the current time
-            # Here we add it at every time step since our solvers do fix time step increments. However, this needs to be dealts with
+            # Here we add it at every time step since our solvers do fix time step increments. However, this needs to be dealt with
             # if we don't have the same ts in forward and backward methods.
             adjoint_state -= grad_output[:, -j - 1]
             adjoint_interpolator.add_point(t, adjoint_state)
@@ -221,12 +219,12 @@ class nddeint_ACA(torch.autograd.Function):
                 ]
                 out = ctx.func(t, h_t, history=h_t_minus_tau)
                 rhs_adjoint_inc_k1 = torch.autograd.grad(
-                    out, h_t, -adjoint_state, retain_graph=True
+                    out, h_t, -adjoint_state, retain_graph=True, 
                 )[0]
 
                 rhs_adjoint += rhs_adjoint_inc_k1
 
-                # we need to add the the second term of rhs too in rhs_adjoint computation
+                # we need to add the second term of rhs too in rhs_adjoint computation
                 for idx, tau_i in enumerate(ctx.func.delays):
                     if t < T - tau_i:
                         adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
@@ -248,10 +246,10 @@ class nddeint_ACA(torch.autograd.Function):
                         rhs_adjoint = rhs_adjoint + rhs_adjoint_inc_k1 
                         
                         # contribution of the delay parameters in the loss w.r.t. the parameters
-                        delay_derivative_inc += - torch.sum(rhs_adjoint_inc_k1  * grad_ys[:, -1-j], dim=0)
-                                                
+                        delay_derivative_inc[idx] += torch.sum(rhs_adjoint_inc_k1  * grad_ys[:, -1-j], dim=0)
+
                 param_derivative_inc = torch.autograd.grad(
-                    out, params, -adjoint_state, retain_graph=False, allow_unused=True
+                    out, params, -adjoint_state, retain_graph=False
                 )
 
                 if stacked_params is None:
@@ -265,43 +263,47 @@ class nddeint_ACA(torch.autograd.Function):
                             for _1, _2 in zip(stacked_params, param_derivative_inc)
                         ]
                     )
+
                 if stacked_delays is None :
-                    stacked_delays = delay_derivative_inc if delay_derivative_inc is not None else None
+                    stacked_delays = torch.unsqueeze(delay_derivative_inc, dim=0) if delay_derivative_inc is not None else None
                 else :
-                    stacked_delays = torch.concat([stacked_delays, delay_derivative_inc]) if delay_derivative_inc is not None else stacked_delays
+                    stacked_delays = torch.concat([stacked_delays, torch.unsqueeze(delay_derivative_inc, dim=0)], dim=0)
 
                 adjoint_state = adjoint_state - dt * rhs_adjoint
-                
-        # adding last contribution of integral for delays 
-        # for t in reversed(ts_history) : 
-        #     for tau_i in ctx.func.delays:
-        #         h_t = torch.autograd.Variable(state_interpolator(t), requires_grad=True)
-        #         adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
-        #         h_t_plus_tau = state_interpolator(t + tau_i)
-        #         history = [
-        #             state_interpolator(t + tau_i - tau_j)
-        #             if t + tau_i - tau_j >= ctx.ts[0]
-        #             else ctx.ys_history_func(t+ tau_i- tau_j)
-        #             for tau_j in ctx.func.delays
-        #         ]
-        #         history[idx] = h_t
-        #         out_other = ctx.func(
-        #             t + tau_i, h_t_plus_tau, history=history
-        #         )  
-        #         rhs_adjoint_inc_k1 = torch.autograd.grad(
-        #             out_other, h_t, -adjoint_t_plus_tau
-        #         )[0]
-        #         delay_derivative_inc += - torch.sum(rhs_adjoint_inc_k1  * grad_ys[:, -1-j])
-        
-        #     if stacked_delays is None :
-        #         stacked_delays = delay_derivative_inc if delay_derivative_inc is not None else None
-        #     else :
-        #         stacked_delays = torch.concat([stacked_delays, delay_derivative_inc]) if delay_derivative_inc is not None else stacked_delays
 
+        # adding the last contribution of the delay parameters in the loss w.r.t. the parameters
+        # ie which is the last part of the integration from t = 0 to t = -tau
+        with torch.enable_grad():
+            for idx, tau_i in enumerate(ctx.func.delays):
+                ts_history_i = torch.linspace(ctx.ts[0]-tau_i.item(), ctx.ts[0], int(tau_i.item()/dt))
+                for k, t in enumerate(reversed(ts_history_i)):
+                    adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
+                    h_t_plus_tau = state_interpolator(t + tau_i)
+                    history = [
+                        state_interpolator(t + tau_i - tau_j)
+                        if t + tau_i - tau_j >= ctx.ts[0]
+                        else ctx.ys_history_func(t+ tau_i- tau_j)
+                        for tau_j in ctx.func.delays
+                    ]
+                    history[idx] = h_t
+                    out_other = ctx.func(
+                        t + tau_i, h_t_plus_tau, history=history
+                    )  
+                    rhs_adjoint_inc = torch.autograd.grad(
+                        out_other, h_t, -adjoint_t_plus_tau
+                    )[0]
+                    
+                    delay_derivative_inc[idx] +=  torch.sum(rhs_adjoint_inc  * grad_ys[:, grad_ys_history_func.shape[1] - k], dim=0)
+                    
+            if stacked_delays is None :
+                stacked_delays = torch.unsqueeze(delay_derivative_inc, dim=0) if delay_derivative_inc is not None else None
+            else :
+                stacked_delays = torch.concat([stacked_delays, torch.unsqueeze(delay_derivative_inc, dim=0)], dim=0)
+                
         addition_contrib_dL_dtau = dt * torch.sum(stacked_delays, dim=0)
         test_out = tuple([dt * torch.sum(p, dim=-1) for p in stacked_params])
         # return None, None, None, *test_out
-        return None, None, None, *(test_out[0] + addition_contrib_dL_dtau, *test_out[1:])
+        return None, None, None, *(test_out[0] + addition_contrib_dL_dtau[:,0], *test_out[1:])
 
 def nddesolve_adjoint(history, func, ts):
     # Main function to be called to integrate the NODE
