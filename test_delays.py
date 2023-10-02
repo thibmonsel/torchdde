@@ -49,8 +49,10 @@ print("history_values", history_values.shape)
 
 ts = torch.linspace(0, 20, 201)
 list_delays = [1.0]
+# list_delays = [1.0, 2.0]
 solver = RK4()
 dde_solver = DDESolver(solver, list_delays)
+# ys, _ = dde_solver.integrate(simple_dde2, ts, history_function)
 ys, _ = dde_solver.integrate(simple_dde, ts, history_function)
 print(ys.shape)
 
@@ -60,7 +62,7 @@ plt.pause(2)
 plt.close()
 
 # 2 delays for brusselator looks like a good choice
-learnable_delays = 10 * torch.abs(torch.randn((len(list_delays),)))
+learnable_delays = 2 * torch.abs(torch.randn((len(list_delays),)))
 model = SimpleNDDE(dim=1, list_delays=learnable_delays)
 model = model.to(device)
 lossfunc = nn.MSELoss()
