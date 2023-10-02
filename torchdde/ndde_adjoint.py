@@ -239,6 +239,7 @@ class nddeint_ACA(torch.autograd.Function):
                         out_other = ctx.func(
                             t + tau_i, h_t_plus_tau, history=history
                         )  
+
                         rhs_adjoint_inc_k1 = torch.autograd.grad(
                             out_other, h_t, -adjoint_t_plus_tau
                         )[0]
@@ -249,12 +250,12 @@ class nddeint_ACA(torch.autograd.Function):
                         delay_derivative_inc[idx] += torch.sum(rhs_adjoint_inc_k1  * grad_ys[:, -1-j], dim=0)
 
                 param_derivative_inc = torch.autograd.grad(
-                    out, params, -adjoint_state, retain_graph=False
+                    out, params, -adjoint_state, retain_graph=False, allow_unused=True
                 )
 
                 if stacked_params is None:
                     stacked_params = tuple(
-                        [torch.unsqueeze(p, dim=-1) for p in param_derivative_inc]
+                        [torch.unsqueeze(p, dim=-1) if p is not None else None for p in param_derivative_inc ]
                     )
                 else:
                     stacked_params = tuple(
@@ -298,12 +299,16 @@ class nddeint_ACA(torch.autograd.Function):
             if stacked_delays is None :
                 stacked_delays = torch.unsqueeze(delay_derivative_inc, dim=0) if delay_derivative_inc is not None else None
             else :
-                stacked_delays = torch.concat([stacked_delays, torch.unsqueeze(delay_derivative_inc, dim=0)], dim=0)
+                if delay_derivative_inc is not None : 
+                    stacked_delays = torch.concat([stacked_delays, torch.unsqueeze(delay_derivative_inc, dim=0)], dim=0)
                 
-        addition_contrib_dL_dtau = dt * torch.sum(stacked_delays, dim=0)
-        test_out = tuple([dt * torch.sum(p, dim=-1) for p in stacked_params])
+        addition_contrib_dL_dtau = - dt * torch.sum(stacked_delays, dim=0)
+        test_out = tuple([dt * torch.sum(p, dim=-1) if p is not None else None for p in stacked_params])
+        dL_dtau = test_out[0] + addition_contrib_dL_dtau[:,0] if test_out[0] is not None else addition_contrib_dL_dtau[:,0]
+        # print(test_out, dL_dtau, addition_contrib_dL_dtau.shape)
         # return None, None, None, *test_out
-        return None, None, None, *(test_out[0] + addition_contrib_dL_dtau[:,0], *test_out[1:])
+        # return None, None, None, *dL_dtau
+        return None, None, None, *(dL_dtau, *test_out[1:])
 
 def nddesolve_adjoint(history, func, ts):
     # Main function to be called to integrate the NODE
