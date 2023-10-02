@@ -21,8 +21,8 @@ ys = ys.to(torch.float32)
 ys, ts = ys.to(device), ts.to(device)
 print(ys.shape)
 
-idx = np.random.randint(0, ys.shape[0])
-plt.imshow(ys[idx].cpu().detach().numpy(), label="Truth")
+j = np.random.randint(0, dataset_size)
+plt.imshow(ys[j].cpu().detach().numpy(), label="Truth")
 plt.pause(2)
 plt.close() 
 
@@ -53,9 +53,10 @@ for i in range(max_epoch):
     loss.backward()
     opt.step()
     if i % 15 == 0:
-        for i in range(ys.shape[0]):
-            plt.plot(ys[i].cpu().detach().numpy(), label="Truth")
-            plt.plot(ret[i].cpu().detach().numpy(), "--")
+        plt.subplot(1, 2, 1)
+        plt.imshow(ys[j].cpu().detach().numpy(), label="Truth")
+        plt.subplot(1, 2, 2)
+        plt.imshow(ret[j].cpu().detach().numpy())
         plt.savefig('last_res.png',bbox_inches='tight',dpi=100)
         plt.close()
     print("Epoch : {:4d}, Loss : {:.3e}, tau : {}".format(i, loss.item(), [d.item() for d in model.delays]))
