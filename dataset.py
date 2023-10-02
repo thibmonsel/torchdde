@@ -48,6 +48,28 @@ def brusellator(y0, ts, args):
     return torch.from_numpy(sol) 
 
 
+def ks(dataset_size, ts, L=22, N=128, nu=0.4):
+    k = 2 * np.pi * np.fft.rfftfreq(N, d=L / N)
+    u0_val = np.zeros((dataset_size, N // 2 + 1,))
+    u0_val[:, :4] = np.random.normal(size=(dataset_size, 4,))
+    u0_val = np.fft.irfft(u0_val, axis=-1)
+
+    def vector_field(t, u):
+        u_hat = np.fft.rfft(u)
+        rhs_freq = (
+            k**2 - nu * k**4
+        ) * u_hat - 1 / 2 * 1j * k * np.fft.rfft(u**2)
+        return np.fft.irfft(rhs_freq)
+    
+    sol = np.empty((dataset_size, len(ts), u0_val.shape[-1]))
+    for i, y0_ in enumerate(u0_val):
+        sol[i] = solve_ivp(vector_field, (ts[0], ts[-1]), y0_, t_eval=ts, method="Radau").y.T
+    return torch.from_numpy(sol) 
+
+
+
+
+
 
 def get_batch(
     ts,
