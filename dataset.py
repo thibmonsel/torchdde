@@ -48,6 +48,64 @@ def brusellator(y0, ts, args):
     return torch.from_numpy(sol) 
 
 
+def ks(dataset_size, ts, L=22, N=128, nu=0.4):
+    k = 2 * np.pi * np.fft.rfftfreq(N, d=L / N)
+    u0_val = np.zeros((dataset_size, N // 2 + 1,))
+    u0_val[:, :4] = np.random.normal(size=(dataset_size, 4,))
+    u0_val = np.fft.irfft(u0_val, axis=-1)
+
+    def vector_field(t, u):
+        u_hat = np.fft.rfft(u)
+        rhs_freq = (
+            k**2 - nu * k**4
+        ) * u_hat - 1 / 2 * 1j * k * np.fft.rfft(u**2)
+        return np.fft.irfft(rhs_freq)
+    
+    sol = np.empty((dataset_size, len(ts), u0_val.shape[-1]))
+    for i, y0_ in enumerate(u0_val):
+        sol[i] = solve_ivp(vector_field, (ts[0], ts[-1]), y0_, t_eval=ts, method="Radau").y.T
+    return torch.from_numpy(sol) 
+
+
+
+
+
+
+def burgers(dataset_size, ts, xs):
+    mu = 1
+    nu = 8 * 10 ** (-4)  # kinematic viscosity coefficient
+    # k0 = 10
+    # A = 2 * k0**(-5) / (3 * np.sqrt(jnp.pi))
+    k = 2 * np.pi * np.fft.fftfreq(xs.shape[0], d=(xs[1] - xs[0]))
+    # E0 = A * k**4 * np.exp(-(k/k0)**2)
+    # u0 = np.sqrt(2 * E0)  * 
+    # ( np.cos( 2 *np.pi * psi_k)- np.sin( 2 *np.pi * psi_k))
+    u0 = np.zeros((dataset_size, xs.shape[0] // 2 + 1,))
+    u0[:, :10] = 5 * np.random.normal(size=(dataset_size, 10,))
+    u0 = np.fft.irfft(u0, axis=-1)
+    # Def of the initial condition
+    
+    def vf_burgers(t, u):
+        # Definition of ODE system (PDE ---(FFT)---> ODE system)
+        # Spatial derivative in the Fourier domain
+        u_hat = np.fft.fft(u)
+        u_hat_x = 1j * k * u_hat
+        u_hat_xx = -(k**2) * u_hat
+
+        # Switching in the spatial domain
+        u_x = np.fft.ifft(u_hat_x)
+        u_xx = np.fft.ifft(u_hat_xx)
+
+        # ODE resolution
+        u_t = -mu * u * u_x + nu * u_xx
+        return u_t.real
+    
+    sol = np.empty((dataset_size, len(ts), u0.shape[-1]))
+
+    for i, y0_ in enumerate(u0):
+        sol[i] = solve_ivp(vf_burgers, (ts[0], ts[-1]), y0_, t_eval=ts, method="Radau").y.T
+    return torch.from_numpy(sol) 
+
 
 def get_batch(
     ts,

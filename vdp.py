@@ -13,7 +13,7 @@ from torchdde import (RK2, RK4, DDESolver, Euler, Ralston,
                       TorchLinearInterpolator, nddesolve_adjoint)
 
 dataset_size = 32
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = "cpu" #torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ts = torch.linspace(0, 30.0, 301)
 y0 = np.random.uniform(0.1, 2.0, (dataset_size, 2))
 y0[:, 0] = 0.0
@@ -28,8 +28,9 @@ plt.pause(2)
 plt.close() 
 
 # workable list of delays : [1.4, 2.8], [1.0, 2.0], [3.0]
-list_delays = [2.5]
-model = NDDE(ys.shape[-1], list_delays, width=128)
+list_delays = torch.abs(torch.randn((3,)))
+print("list_delays init", list_delays)
+model = NDDE(ys.shape[-1], list_delays, width=32)
 
 model = model.to(device)
 lossfunc = nn.MSELoss()
@@ -37,8 +38,8 @@ opt = torch.optim.Adam(model.parameters(), lr=10e-3, weight_decay=0)
 losses = []
 
 # computing history function 
-max_delay = max(list_delays)
-idx = (ts == max_delay).nonzero().flatten()
+max_delay = torch.tensor([5.0])
+idx = (ts >= max_delay).nonzero().flatten()[0]
 ts_history, ts = ts[:idx+1], ts[idx:]
 ys_history, ys = ys[:, :idx+1], ys[:, idx:]
 history_interpolator = TorchLinearInterpolator(ts_history, ys_history)
@@ -58,7 +59,7 @@ for i in range(max_epoch):
             plt.plot(ret[i].cpu().detach().numpy(), "--")
         plt.savefig('last_res.png',bbox_inches='tight',dpi=100)
         plt.close()
-    print("Epoch : {:4d}, Loss : {:.3e}, Time : {:.2e}".format(i, loss.item(), time.time() - t))
+    print("Epoch : {:4d}, Loss : {:.3e}, tau : {}".format(i, loss.item(), [p.item() for p in model.delays]))
 
     losses.append(loss.item())
     

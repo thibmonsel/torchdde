@@ -7,33 +7,29 @@ import torch
 import torch.nn as nn
 from scipy.integrate import solve_ivp
 
-from dataset import brusellator
+from dataset import ks
 from model import NDDE, SimpleNDDE, SimpleNDDE2
 from torchdde import (RK2, RK4, DDESolver, Euler, Ralston,
                       TorchLinearInterpolator, nddesolve_adjoint)
 
 dataset_size = 32
 device = "cpu" #torch.device("cuda" if torch.cuda.is_available() else "cpu")
-ts = torch.linspace(0, 15, 301)
-y0 = np.random.uniform(0.0, 2.0, (dataset_size, 2))
-y0[:, 1] = 0.0
-# different args = (1.0, 1.7) classic and more stiff (1.0, 3.0)
-ys = brusellator(y0, ts, args=(1.0, 3.0))
+ts = torch.linspace(0, 30, 301)
+
+ys = ks(dataset_size, ts)
 ys = ys.to(torch.float32)
-ys = ys[:, :, 0][..., None]
-print("ys.dtype", ys.dtype)
 ys, ts = ys.to(device), ts.to(device)
 print(ys.shape)
 
-for i in range(ys.shape[0]):
-    plt.plot(ys[i].cpu().detach().numpy(), label="Truth")
+j = np.random.randint(0, dataset_size)
+plt.imshow(ys[j].cpu().detach().numpy(), label="Truth")
 plt.pause(2)
 plt.close() 
 
 max_delay = torch.tensor([5.0])
-list_delays = torch.abs(torch.rand((3,)))
+list_delays = torch.abs(torch.rand((1,)))
 list_delays = torch.min(list_delays, max_delay.item() * torch.ones_like(list_delays))
-model = NDDE(ys.shape[-1], list_delays, width=32)
+model = NDDE(ys.shape[-1], list_delays, width=2*258)
 
 model = model.to(device)
 lossfunc = nn.MSELoss()
@@ -43,11 +39,9 @@ losses = []
 # computing history function 
 idx = (ts >= max_delay).nonzero().flatten()[0]
 ts_history, ts = ts[:idx+1], ts[idx:]
-print(ts_history[-1], ts[0])
 ys_history, ys = ys[:, :idx+1], ys[:, idx:]   
 history_interpolator = TorchLinearInterpolator(ts_history, ys_history)
 history_function = lambda t: history_interpolator(t)
-print("history_interpolator.dtype",history_interpolator.ys.dtype)
 
 
 max_epoch = 10000
@@ -59,9 +53,12 @@ for i in range(max_epoch):
     loss.backward()
     opt.step()
     if i % 15 == 0:
-        for i in range(ys.shape[0]):
-            plt.plot(ys[i].cpu().detach().numpy(), label="Truth")
-            plt.plot(ret[i].cpu().detach().numpy(), "--")
+        plt.subplot(1, 2, 1)
+        plt.imshow(ys[j].cpu().detach().numpy(), label="Truth")
+        plt.colorbar()
+        plt.subplot(1, 2, 2)
+        plt.imshow(ret[j].cpu().detach().numpy())
+        plt.colorbar()
         plt.savefig('last_res.png',bbox_inches='tight',dpi=100)
         plt.close()
     print("Epoch : {:4d}, Loss : {:.3e}, tau : {}".format(i, loss.item(), [d.item() for d in model.delays]))
