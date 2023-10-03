@@ -1,8 +1,20 @@
 import numpy as np
 import torch
 from scipy.integrate import solve_ivp
+from torch.utils.data import Dataset
 
 from torchdde.interpolation.linear_interpolation import TorchLinearInterpolator
+
+
+class MyDataset(Dataset):
+    def __init__(self, ys):
+        self.ys = ys
+
+    def __getitem__(self, index):
+        return self.ys[index]
+
+    def __len__(self):
+        return self.ys.shape[0]
 
 
 def stiff_vdp(y0, ts):
@@ -81,7 +93,7 @@ def burgers(dataset_size, ts, xs):
     # u0 = np.sqrt(2 * E0)  * 
     # ( np.cos( 2 *np.pi * psi_k)- np.sin( 2 *np.pi * psi_k))
     u0 = np.zeros((dataset_size, xs.shape[0] // 2 + 1,))
-    u0[:, :10] = 5 * np.random.normal(size=(dataset_size, 10,))
+    u0[:, :20] = 10 * np.random.normal(size=(dataset_size, 20,))
     u0 = np.fft.irfft(u0, axis=-1)
     # Def of the initial condition
     

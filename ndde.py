@@ -1,3 +1,4 @@
+import time
 import warnings
 
 import matplotlib.pyplot as plt
@@ -27,18 +28,21 @@ def simple_dde3(t, y, *, history):
     return 0.25 * (history[0]) / (1.0 + history[0] ** 10) - 0.1 * y
     # return 1/2*y -history[0]
 
-device = "cpu"
+device = "cpu" #torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 history_values = torch.tensor([1.0, 2.0, 3.0, 4.0])
 history_values = history_values.view(history_values.shape[0], 1)
 history_interpolator = TorchLinearInterpolator(
     torch.tensor(([-10.0, 0.0])),
     torch.concat((history_values, history_values), dim=1)[...,None],
 )
+history_interpolator.to(device)
 history_function = lambda t: history_interpolator(t)
 print("history_values", history_values.shape)
 
 ts = torch.linspace(0, 20, 201)
-list_delays = [1.0, 2.0]
+ts = ts.to(device)
+list_delays = torch.tensor([1.0, 2.0])
+list_delays = list_delays.to(device)    
 solver = RK4()
 dde_solver = DDESolver(solver, list_delays)
 ys, _ = dde_solver.integrate(simple_dde2, ts, history_function)
@@ -51,17 +55,19 @@ plt.close()
 
 # 2 delays for brusselator looks like a good choice
 learnable_delays = torch.abs(torch.randn((len(list_delays),)))
-model = NDDE(history_values.shape[-1], learnable_delays, width=64)
+learnable_delays = learnable_delays.to(device)
+model = NDDE(history_values.shape[-1], learnable_delays, width=32)
 model = model.to(device)
 lossfunc = nn.MSELoss()
-opt = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=0)
+opt = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=0)
 losses = []
 lens = []
-
 max_epoch = 10000
 for i in range(max_epoch):
     opt.zero_grad()
-    ret = nddesolve_adjoint(history_function, model, ts)
+    t = time.time()
+    ret, _ = dde_solver.integrate(model, ts, history_function)
+    # ret = nddesolve_adjoint(history_function, model, ts)
     loss = lossfunc(ret, ys)
     loss.backward()
     opt.step()
@@ -73,8 +79,8 @@ for i in range(max_epoch):
         plt.savefig("last_res.png", bbox_inches="tight", dpi=100)
         plt.close()
     print(
-        "Epoch : {:4d}, Loss : {:.3e}, tau : {} & {}".format(
-            i, loss.item(), model.delays[0],  model.delays[1]
+        "Epoch : {:4d}, Loss : {:.3e}, Time {}, tau : {} & {}".format(
+            i, loss.item(), time.time()-t, model.delays[0],  model.delays[1]
         )
     )
 
