@@ -23,6 +23,24 @@ class NDDE(nn.Module):
         return self.mlp(inp)
 
 
+class ConvNDDE(nn.Module):
+    def __init__(self, dim, delays):
+        super().__init__()
+        self.in_dim = dim * (1 + len(delays))
+        self.delays = torch.nn.Parameter(delays)
+        self.net = nn.Sequential(
+            nn.Conv1d(in_channels=self.in_dim, out_channels=32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv1d(in_channels=32, out_channels=1, kernel_size=3, padding=1),
+        )
+
+    def forward(self, t, z, *, history):
+        inp = torch.cat([torch.unsqueeze(z, dim=1), *[torch.unsqueeze(h, dim=1) for h in history]], dim=1)
+        return self.net(inp)[:, 0]
+
+
 class SimpleNDDE(nn.Module):
     def __init__(self, dim, list_delays):
         super().__init__()

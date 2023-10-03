@@ -8,7 +8,7 @@ import torch.nn as nn
 from scipy.integrate import solve_ivp
 
 from dataset import burgers
-from model import NDDE, SimpleNDDE, SimpleNDDE2
+from model import NDDE, ConvNDDE
 from torchdde import (RK2, RK4, DDESolver, Euler, Ralston,
                       TorchLinearInterpolator, nddesolve_adjoint)
 
@@ -31,7 +31,7 @@ plt.close()
 max_delay = torch.tensor([2.0])
 list_delays = torch.abs(torch.rand((1,)))
 list_delays = torch.min(list_delays, max_delay.item() * torch.ones_like(list_delays))
-model = NDDE(ys.shape[-1], list_delays, width=2*258)
+model = ConvNDDE(1, list_delays)
 
 model = model.to(device)
 lossfunc = nn.MSELoss()
