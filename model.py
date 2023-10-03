@@ -35,10 +35,18 @@ class ConvNDDE(nn.Module):
             nn.ReLU(),
             nn.Conv1d(in_channels=32, out_channels=1, kernel_size=3, padding=1),
         )
+        self.net2 = nn.Sequential(
+            nn.Conv1d(in_channels=1, out_channels=32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv1d(in_channels=32, out_channels=1, kernel_size=3, padding=1),
+        )
 
     def forward(self, t, z, *, history):
         inp = torch.cat([torch.unsqueeze(z, dim=1), *[torch.unsqueeze(h, dim=1) for h in history]], dim=1)
-        return self.net(inp)[:, 0]
+        return self.net(inp)[:, 0] +  self.net2(torch.unsqueeze(z, dim=1))[:, 0]
+
 
 
 class SimpleNDDE(nn.Module):

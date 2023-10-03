@@ -14,13 +14,14 @@ from torchdde import (RK2, RK4, DDESolver, Euler, Ralston,
 
 dataset_size = 32
 device = "cpu" #torch.device("cuda" if torch.cuda.is_available() else "cpu")
-ts = torch.linspace(0, 20, 801)
+ts = torch.linspace(0, 15, 301)
 y0 = np.random.uniform(0.0, 2.0, (dataset_size, 2))
 y0[:, 1] = 0.0
 # different args = (1.0, 1.7) classic and more stiff (1.0, 3.0)
 ys = brusellator(y0, ts, args=(1.0, 3.0))
 ys = ys.to(torch.float32)
 ys = ys[:, :, 0][..., None]
+print("ys.dtype", ys.dtype)
 ys, ts = ys.to(device), ts.to(device)
 print(ys.shape)
 
@@ -29,24 +30,27 @@ for i in range(ys.shape[0]):
 plt.pause(2)
 plt.close() 
 
-list_delays = [0.5, 1.0]
+max_delay = torch.tensor([5.0])
+list_delays = torch.abs(torch.rand((3,)))
+list_delays = torch.min(list_delays, max_delay.item() * torch.ones_like(list_delays))
 model = NDDE(ys.shape[-1], list_delays, width=32)
 
 model = model.to(device)
 lossfunc = nn.MSELoss()
-opt = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=10e-7)
+opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0)
 losses = []
 
 # computing history function 
-max_delay = max(list_delays)
-idx = (ts == max_delay).nonzero().flatten()
+idx = (ts >= max_delay).nonzero().flatten()[0]
 ts_history, ts = ts[:idx+1], ts[idx:]
+print(ts_history[-1], ts[0])
 ys_history, ys = ys[:, :idx+1], ys[:, idx:]   
 history_interpolator = TorchLinearInterpolator(ts_history, ys_history)
 history_function = lambda t: history_interpolator(t)
+print("history_interpolator.dtype",history_interpolator.ys.dtype)
 
 
-max_epoch = 5000
+max_epoch = 10000
 for i in range(max_epoch):
     opt.zero_grad()
     t = time.time()
@@ -60,7 +64,7 @@ for i in range(max_epoch):
             plt.plot(ret[i].cpu().detach().numpy(), "--")
         plt.savefig('last_res.png',bbox_inches='tight',dpi=100)
         plt.close()
-    print("Epoch : {:4d}, Loss : {:.3e}, Time : {:.2e}".format(i, loss.item(), time.time() - t))
+    print("Epoch : {:4d}, Loss : {:.3e}, tau : {}".format(i, loss.item(), [d.item() for d in model.delays]))
 
     losses.append(loss.item())
     

@@ -28,13 +28,13 @@ plt.pause(2)
 plt.close() 
 
 # workable list of delays : [1.4, 2.8], [1.0, 2.0], [3.0]
-list_delays = torch.randn((1,))
+list_delays = torch.abs(torch.randn((3,)))
 print("list_delays init", list_delays)
-model = NDDE(ys.shape[-1], list_delays, width=258)
+model = NDDE(ys.shape[-1], list_delays, width=32)
 
 model = model.to(device)
 lossfunc = nn.MSELoss()
-opt = torch.optim.Adam(model.parameters(), lr=10e-4, weight_decay=0)
+opt = torch.optim.Adam(model.parameters(), lr=10e-3, weight_decay=0)
 losses = []
 
 # computing history function 
@@ -59,7 +59,7 @@ for i in range(max_epoch):
             plt.plot(ret[i].cpu().detach().numpy(), "--")
         plt.savefig('last_res.png',bbox_inches='tight',dpi=100)
         plt.close()
-    print("Epoch : {:4d}, Loss : {:.3e}, tau : {}".format(i, loss.item(), model.delays.item()))
+    print("Epoch : {:4d}, Loss : {:.3e}, tau : {}".format(i, loss.item(), [p.item() for p in model.delays]))
 
     losses.append(loss.item())
     
