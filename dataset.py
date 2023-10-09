@@ -78,6 +78,18 @@ def ks(dataset_size, ts, L=22, N=128, nu=0.4):
         sol[i] = solve_ivp(vector_field, (ts[0], ts[-1]), y0_, t_eval=ts, method="Radau").y.T
     return torch.from_numpy(sol) 
 
+def lorenz(y0, ts, args):
+    sigma, rho, beta = args
+    def vector_field(t, x):
+        x_rhs = sigma * (x[1] - x[0])
+        y_rhs = x[0] * (rho - x[2]) - x[1]
+        z_rhs = x[0]*x[1] - beta * x[2]
+        return np.stack([x_rhs, y_rhs, z_rhs], axis=-1)
+
+    sol = np.empty((len(y0), len(ts), 1))
+    for i, y0_ in enumerate(y0):
+        sol[i] = solve_ivp(vector_field, (ts[0], ts[-1]), y0_, t_eval=ts).y[0][..., None]
+    return torch.from_numpy(sol) 
 
 
 

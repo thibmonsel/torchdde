@@ -12,7 +12,7 @@ import torch.nn as nn
 from scipy.integrate import solve_ivp
 from torch.utils.data import DataLoader, Dataset, random_split
 
-from dataset import MyDataset, brusellator, stiff_vdp
+from dataset import MyDataset, lorenz
 from model import NDDE, SimpleNDDE, SimpleNDDE2
 from torchdde import (RK2, RK4, DDESolver, Euler, Ralston,
                       TorchLinearInterpolator, nddesolve_adjoint)
@@ -40,13 +40,14 @@ if __name__ == "__main__":
     os.makedirs(default_dir + "/saved_data")
 
     #### GENERATING DATA #####
-    dataset_size = 1024
+    dataset_size = 3
     device = "cpu" #torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    ts = torch.linspace(0, 30, 301)
-    y0 = np.random.uniform(0.0, 2.0, (dataset_size, 2))
-    y0[:, 1] = 0.0
+    ts = torch.linspace(0, 15, 601)
+    y0 = np.random.uniform(0.0, 2.0, (dataset_size, 3))
+    y0[:, 1:] = 0.0
 
-    ys = stiff_vdp(y0, ts)
+    args = (10, 28, 8/3)
+    ys = lorenz(y0, ts, args)
     ys = ys.to(torch.float32)
     ys, ts = ys.to(device), ts.to(device)
 
@@ -57,10 +58,11 @@ if __name__ == "__main__":
 
     max_delay = torch.tensor([5.0])
     max_delay = max_delay.to(device)
-    list_delays = torch.abs(torch.rand((2,)))
+    list_delays = torch.tensor([1.4, 2.0,  2.8])
+    # list_delays = torch.abs(torch.rand((3,)))
     list_delays = torch.min(list_delays, max_delay.item() * torch.ones_like(list_delays))
     list_delays = list_delays.to(device)
-    model = NDDE(ys.shape[-1], list_delays, width=64)
+    model = NDDE(ys.shape[-1], list_delays, width=128)
 
     model = model.to(device)
     lossfunc = nn.MSELoss()
@@ -75,17 +77,20 @@ if __name__ == "__main__":
 
     max_epoch = 10000
     losses, eval_losses, delay_values = [], [], []
+    # solver = Ralston()
+    # dde_solver = DDESolver(solver, list_delays)
     for i in range(max_epoch):
         model.train()
         for p, data in enumerate(train_loader):
             idx = (ts >= max_delay).nonzero().flatten()[0]
-            ts_history_train, ts_train = ts[:idx+2], ts[idx:]
-            ys_history, ys = data[:, :idx+2], data[:, idx:]   
+            ts_history_train, ts_train = ts[:idx+1], ts[idx:]
+            ys_history, ys = data[:, :idx+1], data[:, idx:]   
             history_interpolator = TorchLinearInterpolator(ts_history_train, ys_history)
             history_function = lambda t: history_interpolator(t)
             opt.zero_grad()
             t = time.time()
             ret = nddesolve_adjoint(history_function, model, ts_train)
+            # ret, _ = dde_solver.integrate(model, ts_train, history_function)
             loss = lossfunc(ret, ys)
             loss.backward()
             opt.step()
