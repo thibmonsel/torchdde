@@ -39,12 +39,16 @@ class TorchLinearInterpolator:
 
     def __call__(self, t, left=True):
         if t > self.ts[-1] or t < self.ts[0]:
-            # print(t, self.ts[-1], self.ts[0])
+            if torch.abs((t -self.ts[0])/self.ts[0]) < 10-5:
+                return self.ys[:, 0]
+            if torch.abs((t -self.ts[-1])/self.ts[-1]) < 10e-5:
+                return self.ys[:, -1]
             raise ValueError(
                 f"Interpolation point is outside data range. ie t={t} > ts[-1]={self.ts[-1]} or t < ts[0]={self.ts[0]}"
             )
 
         index, fractional_part = self._interpret_t(t, left)
+       
         prev_ys = self.ys[:, index]
         next_ys = self.ys[:, index + 1]
         prev_t = self.ts[index]

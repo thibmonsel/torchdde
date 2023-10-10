@@ -24,6 +24,10 @@ class DDESolver:
 
         def ode_func(t, y):
             # applies the function func to the current time t and state y and the history
+            # we have to make sur that t - tau > dt otherwise we are making a prediction with 
+            # an unknown ys_interpolation ...
+            if torch.any(self.delays < dt) :
+                print("Warning : dt > tau")
             history = [
                 ys_interpolation(t - tau) if t - tau >= ts[0] else history_func(t - tau)
                 for tau in self.delays
