@@ -40,7 +40,7 @@ if __name__ == "__main__":
     os.makedirs(default_dir + "/saved_data")
 
     #### GENERATING DATA #####
-    dataset_size = 1024
+    dataset_size = 2
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ts = torch.linspace(0, 40, 401)
     
@@ -85,6 +85,7 @@ if __name__ == "__main__":
     length_init = 40 
     
     json_filename = "hyper_parameters.json"
+   
     dic_data = {
         "id": datestring,
         "metadata": {
@@ -92,12 +93,12 @@ if __name__ == "__main__":
             "dataset_size": dataset_size,
             "nb_delays": nb_delays,
             "max_delay" : max_delay.item(),
-            "delays_init": list_delays,
+            "delays_init": list([l.item() for l in list_delays.cpu()]),
             "features_every": nb_features,
             "length_init" : length_init,
             "max_epoch" : max_epoch,
             "model_name" : model.__class__.__name__,
-            "model_structure" : print(model), 
+            "model_structure" : str(model).split("\n"), 
             "optimizer_state_dict" : opt.state_dict(),
         },
     }
