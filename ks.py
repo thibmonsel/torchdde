@@ -1,6 +1,7 @@
 
 import argparse
 import datetime
+import json
 import os
 import time
 import warnings
@@ -39,8 +40,8 @@ if __name__ == "__main__":
     os.makedirs(default_dir + "/saved_data")
 
     #### GENERATING DATA #####
-    dataset_size = 16
-    device = "cpu" #torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    dataset_size = 1024
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ts = torch.linspace(0, 40, 401)
     
     ys = ks(dataset_size, ts)
@@ -58,19 +59,19 @@ if __name__ == "__main__":
     ## For delays they need to be tau > dt and that max(tau) < max_delays defined in the pb 
     nb_delays = 6
     max_delay = torch.tensor([5.0])
-    list_delays = torch.arange(1, nb_delays+1)/2
+    list_delays = torch.rand((nb_delays,)) #torch.arange(1, nb_delays+1)/2
     list_delays = torch.min(list_delays, max_delay.item() * torch.ones_like(list_delays))
     max_delay = max_delay.to(device)
     list_delays = list_delays.to(device)
     
     nb_features = 4
-    features_idx = np.random.randint(0, ys.shape[-1], size=(nb_features, ))
     ys = ys[:, :, ::nb_features]
         
     model = ConvNDDE(ys.shape[-1], list_delays)
     model = model.to(device)
     lossfunc = nn.MSELoss()
-    opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=10e-8)
+    lr = 0.001
+    opt = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=10e-8)
 
     # computing history function 
     dataset = MyDataset(ys)
@@ -82,6 +83,29 @@ if __name__ == "__main__":
     max_epoch = 10000
     losses, eval_losses, delay_values = [], [], []
     length_init = 40 
+    
+    json_filename = "hyper_parameters.json"
+    dic_data = {
+        "id": datestring,
+        "metadata": {
+            "input_shape" : ys.shape,
+            "dataset_size": dataset_size,
+            "nb_delays": nb_delays,
+            "max_delay" : max_delay.item(),
+            "delays_init": list_delays,
+            "features_every": nb_features,
+            "length_init" : length_init,
+            "max_epoch" : max_epoch,
+            "model_name" : model.__class__.__name__,
+            "model_structure" : print(model), 
+            "optimizer_state_dict" : opt.state_dict(),
+        },
+    }
+
+    with open(default_dir + "/" + json_filename, "w") as file:
+        json.dump([dic_data], file)
+    
+    
     for i in range(max_epoch):
         model.train()
         for p, data in enumerate(train_loader):
@@ -141,7 +165,7 @@ if __name__ == "__main__":
             losses.append(loss.item())
             delay_values.append(model.delays.clone().detach())
             
-            if losses[-1] < 0.002 :
+            if losses[-1] < 0.005 :
                 length_init +=1
             if length_init == ys.shape[1] - idx -5 :
                 break
