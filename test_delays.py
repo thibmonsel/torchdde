@@ -37,11 +37,7 @@ def simple_dde2(t, y, *, history):
 device = "cpu"
 history_values = torch.tensor([1.0, 2.0, 3.0, 4.0])
 history_values = history_values.view(history_values.shape[0], 1)
-history_interpolator = TorchLinearInterpolator(
-    torch.tensor(([-10.0, 0.0])),
-    torch.concat((history_values, history_values), dim=1)[...,None],
-)
-history_function = lambda t: history_interpolator(t)
+history_function = lambda t: history_values 
 print("history_values", history_values.shape)
 
 ts = torch.linspace(0, 20, 201)
@@ -50,7 +46,6 @@ list_delays = [1.0]
 solver = RK4()
 dde_solver = DDESolver(solver, list_delays)
 ys, _ = dde_solver.integrate(simple_dde, ts, history_function)
-# ys, _ = dde_solver.integrate(simple_dde, ts, history_function)
 print(ys.shape)
 
 for i in range(ys.shape[0]):
@@ -63,12 +58,13 @@ learnable_delays =  torch.abs(torch.randn((len(list_delays),)))
 model = SimpleNDDE(dim=1, list_delays=learnable_delays)
 model = model.to(device)
 lossfunc = nn.MSELoss()
-opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0)
+opt = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0)
 losses = []
 lens = []
 
 max_epoch = 10000
 for i in range(max_epoch):
+    model.linear.weight.requires_grad = False
     opt.zero_grad()
     ret = ddesolve_adjoint(history_function, model, ts)
     loss = lossfunc(ret, ys)
