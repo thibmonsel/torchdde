@@ -118,19 +118,19 @@ if __name__ == "__main__":
     
     
     ### ODE fitting
-    for i in range(200):
+    for i in range(max_epoch):
         ode_model.train()
         for p, data in enumerate(train_loader):  
             ode_opt.zero_grad()
             t = time.time()
-            ret = odesolve_adjoint(data[:, 0], ode_model, ts)
-            loss = lossfunc(ret, data)
+            ret = odesolve_adjoint(data[:, 0], ode_model, ts[:length_init])
+            loss = lossfunc(ret, data[:, :length_init])
             loss.backward()
             ode_opt.step()
             
             if i % 50 == 0 or i == max_epoch - 1: 
                 k = np.random.randint(0, data.shape[0])
-                plt.plot(ys[k].cpu().detach().numpy(), label="Truth")
+                plt.plot(ys[k, :length_init].cpu().detach().numpy(), label="Truth")
                 plt.plot(ret[k].cpu().detach().numpy(), '--', label="Pred")
                 plt.savefig(default_dir_ode +  f'/training/step_{i}.png',bbox_inches='tight',dpi=100)
                 plt.close()
@@ -159,7 +159,7 @@ if __name__ == "__main__":
             
             j = np.random.randint(0, ys.shape[0])
             if losses[-1] < 1e-5 or i == max_epoch - 1:
-                plt.plot(ys[j].cpu().detach().numpy(), label="Truth")
+                plt.plot(ys[j, :length_init].cpu().detach().numpy(), label="Truth")
                 plt.plot(ret[j].cpu().detach().numpy(), '--', label="Pred")
                 plt.legend()
                 plt.savefig(default_dir_ode + "/training_example_pred.png",bbox_inches='tight',dpi=100)
