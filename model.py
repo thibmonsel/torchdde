@@ -26,6 +26,27 @@ class NDDE(nn.Module):
         inp = torch.cat([z, *history], dim=-1)
         return self.mlp(inp)
 
+class MLP(nn.Module):
+    def __init__(self, dim, width=64):
+        super().__init__()
+        self.mlp = nn.Sequential(
+            nn.Linear(dim, width),
+            nn.ReLU(),
+            nn.Linear(width, width),
+            nn.ReLU(),
+            nn.Linear(width, width),
+            nn.ReLU(),
+            nn.Linear(width, width),
+            nn.ReLU(),
+            nn.Linear(width, width),
+            nn.ReLU(),
+            nn.Linear(width, dim),
+        )
+
+    def forward(self, t, z):
+        return self.mlp(z)
+
+
 
 class ConvNDDE(nn.Module):
     def __init__(self, dim, delays):
@@ -58,6 +79,29 @@ class ConvNDDE(nn.Module):
         #     print(inp.shape)
         #     inp = self.net[i](inp)
         return self.net(inp) #+  self.net2(torch.unsqueeze(z, dim=1))[:, 0]
+
+
+
+class ConvODE(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Conv1d(in_channels=1, out_channels=64, kernel_size=3, padding="same", padding_mode="circular"),
+            nn.ReLU(),
+            nn.Conv1d(in_channels=64, out_channels=64, kernel_size=2, padding="same", padding_mode="circular"),
+            nn.ReLU(),
+            nn.Conv1d(in_channels=64, out_channels=64, kernel_size=2, padding="same", padding_mode="circular"),
+            nn.Flatten(),
+            nn.Linear(64 * dim, 32*dim),
+            nn.ReLU(),
+            nn.Linear(32*dim, dim)
+            
+        )
+       
+
+    def forward(self, t, z):
+        return self.net(torch.unsqueeze(z, dim=1)) 
+
 
 
 
