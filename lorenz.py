@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader, Dataset, random_split
 from dataset import MyDataset, lorenz
 from model import NDDE, SimpleNDDE, SimpleNDDE2
 from torchdde import (RK2, RK4, DDESolver, Euler, Ralston,
-                      TorchLinearInterpolator, nddesolve_adjoint)
+                      TorchLinearInterpolator, ddesolve_adjoint)
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
@@ -42,7 +42,7 @@ if __name__ == "__main__":
     #### GENERATING DATA #####
     dataset_size = 3
     device = "cpu" #torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    ts = torch.linspace(0, 15, 601)
+    ts = torch.linspace(0, 15, 1501)
     y0 = np.random.uniform(0.0, 2.0, (dataset_size, 3))
     y0[:, 1:] = 0.0
 
@@ -50,19 +50,20 @@ if __name__ == "__main__":
     ys = lorenz(y0, ts, args)
     ys = ys.to(torch.float32)
     ys, ts = ys.to(device), ts.to(device)
-
+    print(ys.shape, ts.shape)
+    
     for i in range(ys.shape[0]):
         plt.plot(ys[i].cpu().detach().numpy(), label="Truth")
     plt.savefig(default_dir + "/training_data.png",bbox_inches='tight',dpi=100)
     plt.close() 
 
-    max_delay = torch.tensor([5.0])
+    max_delay = torch.tensor([4.0])
     max_delay = max_delay.to(device)
-    list_delays = torch.tensor([1.4, 2.0,  2.8])
-    # list_delays = torch.abs(torch.rand((3,)))
+    # list_delays = torch.tensor([1.4, 2.0,  2.8])
+    list_delays = torch.abs(torch.rand((3,)))
     list_delays = torch.min(list_delays, max_delay.item() * torch.ones_like(list_delays))
     list_delays = list_delays.to(device)
-    model = NDDE(ys.shape[-1], list_delays, width=128)
+    model = NDDE(ys.shape[-1], list_delays, width=2*128)
 
     model = model.to(device)
     lossfunc = nn.MSELoss()
@@ -77,36 +78,39 @@ if __name__ == "__main__":
 
     max_epoch = 10000
     losses, eval_losses, delay_values = [], [], []
-    # solver = Ralston()
-    # dde_solver = DDESolver(solver, list_delays)
+    length_init = 100 
     for i in range(max_epoch):
         model.train()
         for p, data in enumerate(train_loader):
-            idx = (ts >= max_delay).nonzero().flatten()[0]
-            ts_history_train, ts_train = ts[:idx+1], ts[idx:]
-            ys_history, ys = data[:, :idx+1], data[:, idx:]   
+            idx = (ts > max_delay).nonzero().flatten()[0]
+            ts_history_train, ts_train = ts[:idx+4], ts[idx:idx + length_init]
+            ys_history, ys = data[:, :idx+4], data[:, idx: idx + length_init]   
             history_interpolator = TorchLinearInterpolator(ts_history_train, ys_history)
             history_function = lambda t: history_interpolator(t)
             opt.zero_grad()
             t = time.time()
-            ret = nddesolve_adjoint(history_function, model, ts_train)
-            # ret, _ = dde_solver.integrate(model, ts_train, history_function)
+            ret = ddesolve_adjoint(history_function, model, ts_train)
             loss = lossfunc(ret, ys)
             loss.backward()
             opt.step()
+            
             if i % 50 == 0:
                 k = np.random.randint(0,ys.shape[0])
                 plt.plot(ts_train.cpu(), ys[k].cpu().detach().numpy(), label="Truth")
                 plt.plot(ts_train.cpu(),ret[k].cpu().detach().numpy(), "--")
                 plt.xlabel("t")
                 plt.ylabel("y(t)")
-                plt.savefig(default_dir +  f'/training/step_{i}.png',bbox_inches='tight',dpi=100)
+                plt.savefig(default_dir +  f'/training/step_{i}_length_init_{length_init}.png',bbox_inches='tight',dpi=100)
                 plt.close()
-            print("Epoch : {}, Step {}/{}, Loss : {:.3e}, tau : {}".format(i, p, int(train_len/train_loader.batch_size), loss.item(), [d.item() for d in model.delays]))
+            print("Epoch : {}, Step {}/{}, Length, {}, Loss : {:.3e}, tau : {}".format(i, p, int(train_len/train_loader.batch_size), length_init, loss.item(), [d.item() for d in model.delays]))
 
             losses.append(loss.item())
             delay_values.append(model.delays.clone().detach())
             
+            if losses[-1] < 10e-2 :
+                length_init +=1
+                if length_init == 500 :
+                    break
             j = np.random.randint(0, ys.shape[0])
             if losses[-1] < 1e-5 or i == max_epoch - 1:
                 plt.plot(ts_train.cpu(),ys[j].cpu().detach().numpy())
@@ -124,7 +128,7 @@ if __name__ == "__main__":
             ys_history, ys = eval_data[:, :idx2+1], eval_data[:, idx2:]   
             history_interpolator = TorchLinearInterpolator(ts_history_eval, ys_history)
             history_function = lambda t: history_interpolator(t)
-            ret = nddesolve_adjoint(history_function, model, ts_eval)
+            ret = ddesolve_adjoint(history_function, model, ts_eval)
             loss = lossfunc(ret, ys)
             eval_losses.append(loss.item())
             
