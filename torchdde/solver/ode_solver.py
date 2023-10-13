@@ -11,12 +11,12 @@ class AbstractOdeSolver(ABC):
 
     def integrate(self, func, ts, y0):
         dt = ts[1] - ts[0]
-        ys = y0.clone()
+        ys = torch.unsqueeze(y0.clone(), dim=1)
         current_y = y0
         for current_t in ts[1:]:
             y = self.step(func, current_t, current_y, dt)
             current_y = y
-            ys = torch.cat((ys, current_y))
+            ys = torch.cat((ys, torch.unsqueeze(current_y, dim=1)), dim=1)
         return ys
 
 

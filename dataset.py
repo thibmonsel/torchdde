@@ -16,7 +16,6 @@ class MyDataset(Dataset):
     def __len__(self):
         return self.ys.shape[0]
 
-
 def stiff_vdp(y0, ts):
     """Generate a VdP dataset :
     d2x/dt2 - eps * w0 (1 - x^2)dx/dt + w0^2*x = 0
@@ -60,7 +59,7 @@ def brusellator(y0, ts, args):
     return torch.from_numpy(sol) 
 
 
-def ks(dataset_size, ts, L=22, N=128, nu=0.4):
+def ks(dataset_size, ts, L=22, N=128, nu=1):
     k = 2 * np.pi * np.fft.rfftfreq(N, d=L / N)
     u0_val = np.zeros((dataset_size, N // 2 + 1,))
     u0_val[:, :4] = np.random.normal(size=(dataset_size, 4,))
