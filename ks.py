@@ -13,9 +13,9 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset, random_split
 
 from dataset import MyDataset, ks
-from model import NDDE, ConvNDDE, SimpleNDDE
-from torchdde import (RK2, RK4, DDESolver, Euler, Ralston,
-                      TorchLinearInterpolator, nddesolve_adjoint)
+from model import MLP, NDDE, ConvNDDE, ConvODE
+from torchdde import (TorchLinearInterpolator, nddesolve_adjoint,
+                      odesolve_adjoint)
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
@@ -34,44 +34,54 @@ if __name__ == "__main__":
 
     datestring = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     default_dir = default_save_dir + "/" + datestring
-    os.makedirs(default_dir)
-    os.makedirs(default_dir + "/training")
-    os.makedirs(default_dir + "/delays_evolution")
-    os.makedirs(default_dir + "/saved_data")
+    default_dir_ode = default_save_dir + "/" + datestring + "/ode"
+    default_dir_dde = default_save_dir + "/" + datestring + "/dde"
+    
+    os.makedirs(default_dir_dde)
+    os.makedirs(default_dir_dde + "/training")
+    os.makedirs(default_dir_dde + "/delays_evolution")
+    os.makedirs(default_dir_dde + "/saved_data")
+    
+    os.makedirs(default_dir_ode)
+    os.makedirs(default_dir_ode + "/training")
+    os.makedirs(default_dir_ode + "/delays_evolution")
+    os.makedirs(default_dir_ode + "/saved_data")
+
 
     #### GENERATING DATA #####
-    dataset_size = 2
+    dataset_size = 16
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ts = torch.linspace(0, 40, 401)
     
     ys = ks(dataset_size, ts)
     ys = ys.to(torch.float32)
     ys, ts = ys.to(device), ts.to(device)
-    ys, ts = ys[:, 50:], ts[:-50]
+    ys, ts = ys[:, 200:], ts[:-200]
     print(ys.shape)
 
     j = np.random.randint(0, dataset_size)
-    plt.imshow(ys[j].cpu().detach().numpy(), label="Truth")
+    plt.plot(ys[j].cpu().detach().numpy(), label="Truth")
     plt.savefig(default_dir + "/training_data.png",bbox_inches='tight',dpi=100)
     plt.close() 
 
     
     ## For delays they need to be tau > dt and that max(tau) < max_delays defined in the pb 
     nb_delays = 6
-    max_delay = torch.tensor([5.0])
-    list_delays = torch.rand((nb_delays,)) #torch.arange(1, nb_delays+1)/2
-    list_delays = torch.min(list_delays, max_delay.item() * torch.ones_like(list_delays))
-    max_delay = max_delay.to(device)
+    list_delays = torch.rand((nb_delays,))
     list_delays = list_delays.to(device)
     
-    nb_features = 4
-    ys = ys[:, :, ::nb_features]
+    nb_features = 32
+    ys = ys[:, :, ::nb_features] # 4 features
         
     model = ConvNDDE(ys.shape[-1], list_delays)
     model = model.to(device)
+    ode_model = MLP(ys.shape[-1]) #ConvODE(ys.shape[-1])
+    ode_model = ode_model.to(device)
+    
     lossfunc = nn.MSELoss()
     lr = 0.001
-    opt = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=10e-8)
+    ode_opt = torch.optim.Adam(ode_model.parameters(), lr=lr, weight_decay=0)
+    opt = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0)
 
     # computing history function 
     dataset = MyDataset(ys)
@@ -80,9 +90,9 @@ if __name__ == "__main__":
     train_loader = DataLoader(train_set, batch_size=128, shuffle=True)
     test_loader = DataLoader(test_set, batch_size=128, shuffle=False)
 
-    max_epoch = 10000
-    losses, eval_losses, delay_values = [], [], []
     length_init = 40 
+    max_epoch = 5000
+    losses, eval_losses, delay_values = [], [], []
     
     json_filename = "hyper_parameters.json"
    
@@ -92,27 +102,95 @@ if __name__ == "__main__":
             "input_shape" : ys.shape,
             "dataset_size": dataset_size,
             "nb_delays": nb_delays,
-            "max_delay" : max_delay.item(),
             "delays_init": list([l.item() for l in list_delays.cpu()]),
             "features_every": nb_features,
             "length_init" : length_init,
             "max_epoch" : max_epoch,
             "model_name" : model.__class__.__name__,
-            "model_structure" : str(model).split("\n"), 
+            "model_structure" : str(ode_model).split("\n"), 
             "optimizer_state_dict" : opt.state_dict(),
         },
     }
 
-    with open(default_dir + "/" + json_filename, "w") as file:
+    with open(default_dir_ode + "/" + json_filename, "w") as file:
         json.dump([dic_data], file)
     
     
+    ### ODE fitting
+    for i in range(1000):
+        ode_model.train()
+        for p, data in enumerate(train_loader):  
+            ode_opt.zero_grad()
+            t = time.time()
+            ret = odesolve_adjoint(data[:, 0], ode_model, ts)
+            loss = lossfunc(ret, data)
+            loss.backward()
+            ode_opt.step()
+            
+            if i % 50 == 0 or i == max_epoch - 1: 
+                k = np.random.randint(0, data.shape[0])
+                plt.plot(ys[k].cpu().detach().numpy(), label="Truth")
+                plt.plot(ret[k].cpu().detach().numpy(), '--', label="Pred")
+                plt.savefig(default_dir_ode +  f'/training/step_{i}.png',bbox_inches='tight',dpi=100)
+                plt.close()
+                
+                plt.plot(range(len(losses)), losses)
+                plt.xlabel("steps")
+                plt.savefig( default_dir_ode + '/loss.png',bbox_inches='tight',dpi=100)
+                plt.close()
+                
+                plt.plot(range(len(eval_losses)), eval_losses)
+                plt.xlabel("steps")
+                plt.savefig( default_dir_ode + '/eval_loss.png',bbox_inches='tight',dpi=100)
+                plt.close()
+    
+                torch.save(losses, default_dir_ode + "/saved_data/training_loss.pt")
+                torch.save(ode_model.state_dict(), default_dir_ode + "/saved_data/model.pt")
+                
+            print("Epoch : {}, Step {}/{}, Length {}, Loss : {:.3e}".format(i, p, int(train_len/train_loader.batch_size),length_init, loss.item()))
+
+            losses.append(loss.item())
+            
+            if losses[-1] < 0.005 :
+                length_init +=1
+            if length_init == ys.shape[1] :
+                break
+            
+            j = np.random.randint(0, ys.shape[0])
+            if losses[-1] < 1e-5 or i == max_epoch - 1:
+                plt.plot(ys[j].cpu().detach().numpy(), label="Truth")
+                plt.plot(ret[j].cpu().detach().numpy(), '--', label="Pred")
+                plt.legend()
+                plt.savefig(default_dir_ode + "/training_example_pred.png",bbox_inches='tight',dpi=100)
+                plt.close()
+                break
+        
+        ode_model.eval()
+        for r, eval_data in enumerate(test_loader):
+            ret = odesolve_adjoint(eval_data[:, 0], ode_model, ts)
+            loss = lossfunc(ret, eval_data)
+            eval_losses.append(loss.item())
+    
+    
+    # computing history function 
+    dataset = MyDataset(ys)
+    train_len = int(len(dataset)*0.7)      
+    train_set, test_set = random_split(dataset, [train_len, len(dataset)-train_len])
+    train_loader = DataLoader(train_set, batch_size=128, shuffle=True)
+    test_loader = DataLoader(test_set, batch_size=128, shuffle=False)
+
+    length_init = 40 
+    max_epoch = 5000
+    losses, eval_losses, delay_values = [], [], []
+    
+                
+    ### DDE fitting 
     for i in range(max_epoch):
         model.train()
         for p, data in enumerate(train_loader):
-            idx = (ts >= max_delay).nonzero().flatten()[0]
-            ts_history_train, ts_train = ts[:idx+2], ts[idx:idx+length_init]
-            ys_history, ys = data[:, :idx+2], data[:, idx:idx+length_init]   
+            idx = (ts >= max(list_delays)).nonzero().flatten()[0]
+            ts_history_train, ts_train = ts[:idx+1], ts[idx:idx+length_init]
+            ys_history, ys = data[:, :idx+1], data[:, idx:idx+length_init]   
             history_interpolator = TorchLinearInterpolator(ts_history_train, ys_history)
             history_function = lambda t: history_interpolator(t)
             opt.zero_grad()
@@ -126,15 +204,9 @@ if __name__ == "__main__":
                 model.delays = torch.nn.Parameter(torch.where(tmp_delays, max_delay, model.delays))
                 
             if i % 50 == 0 or i == max_epoch - 1: 
-                k = np.random.randint(0,ys.shape[0])
-                plt.subplot(1,2,1)
-                plt.imshow(ys[k].cpu().detach().numpy())
-                plt.gca().set_title('Truth')
-                plt.colorbar()
-                plt.subplot(1,2,2)
-                plt.imshow(ret[k].cpu().detach().numpy())
-                plt.colorbar()
-                plt.gca().set_title("Prediction")
+                k = np.random.randint(0,data.shape[0])
+                plt.plot(ys[k].cpu().detach().numpy(), label= "Truth")
+                plt.plot(ret[k].cpu().detach().numpy(), '--', label="Pred")
                 plt.savefig(default_dir +  f'/training/step_{i}.png',bbox_inches='tight',dpi=100)
                 plt.close()
                 
@@ -171,13 +243,10 @@ if __name__ == "__main__":
             if length_init == ys.shape[1] - idx -5 :
                 break
             
-            j = np.random.randint(0, ys.shape[0])
+            j = np.random.randint(0, data.shape[0])
             if losses[-1] < 1e-5 or i == max_epoch - 1:
-                plt.subplot(1,2,1)
-                plt.imshow(ys[j].cpu().detach().numpy())
-                plt.colorbar()
-                plt.subplot(1,2,2)
-                plt.imshow(ret[j].cpu().detach().numpy())
+                plt.plot(ys[j].cpu().detach().numpy(), label= "Truth")
+                plt.plot(ret[j].cpu().detach().numpy(), '--', label="Pred")
                 plt.colorbar()
                 plt.legend()
                 plt.savefig(default_dir + "/training_example_pred.png",bbox_inches='tight',dpi=100)
