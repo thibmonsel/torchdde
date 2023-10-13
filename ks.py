@@ -6,6 +6,7 @@ import os
 import time
 import warnings
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -47,7 +48,7 @@ if __name__ == "__main__":
     os.makedirs(default_dir_ode + "/delays_evolution")
     os.makedirs(default_dir_ode + "/saved_data")
 
-
+    matplotlib.use('Agg')
     #### GENERATING DATA #####
     dataset_size = 16
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -117,7 +118,7 @@ if __name__ == "__main__":
     
     
     ### ODE fitting
-    for i in range(1000):
+    for i in range(200):
         ode_model.train()
         for p, data in enumerate(train_loader):  
             ode_opt.zero_grad()
@@ -199,25 +200,25 @@ if __name__ == "__main__":
             loss = lossfunc(ret, ys)
             loss.backward()
             opt.step()
-            tmp_delays = model.delays.clone().detach() > max_delay 
+            tmp_delays = model.delays.clone().detach() > torch.max(model.delays) 
             if torch.any(tmp_delays) :
-                model.delays = torch.nn.Parameter(torch.where(tmp_delays, max_delay, model.delays))
+                model.delays = torch.nn.Parameter(torch.where(tmp_delays, torch.max(model.delays), model.delays))
                 
             if i % 50 == 0 or i == max_epoch - 1: 
                 k = np.random.randint(0,data.shape[0])
                 plt.plot(ys[k].cpu().detach().numpy(), label= "Truth")
                 plt.plot(ret[k].cpu().detach().numpy(), '--', label="Pred")
-                plt.savefig(default_dir +  f'/training/step_{i}.png',bbox_inches='tight',dpi=100)
+                plt.savefig(default_dir_dde +  f'/training/step_{i}.png',bbox_inches='tight',dpi=100)
                 plt.close()
                 
                 plt.plot(range(len(losses)), losses)
                 plt.xlabel("steps")
-                plt.savefig( default_dir + '/loss.png',bbox_inches='tight',dpi=100)
+                plt.savefig( default_dir_dde + '/loss.png',bbox_inches='tight',dpi=100)
                 plt.close()
                 
                 plt.plot(range(len(eval_losses)), eval_losses)
                 plt.xlabel("steps")
-                plt.savefig( default_dir + '/eval_loss.png',bbox_inches='tight',dpi=100)
+                plt.savefig( default_dir_dde + '/eval_loss.png',bbox_inches='tight',dpi=100)
                 plt.close()
                 
                 if delay_values != []:
@@ -226,12 +227,12 @@ if __name__ == "__main__":
                         plt.plot(range(len(losses)), delay_values2[:, i].cpu().detach().numpy())
                         plt.xlabel("steps")
                         plt.ylabel(f"Delay #{i} : $\tau$")
-                        plt.savefig(default_dir + f'/delays_evolution/delays_{i}.png',bbox_inches='tight',dpi=100)
+                        plt.savefig(default_dir_dde + f'/delays_evolution/delays_{i}.png',bbox_inches='tight',dpi=100)
                         plt.close()
-                    torch.save(delay_values2, default_dir + "/saved_data/delay_values.pt")
+                    torch.save(delay_values2, default_dir_dde + "/saved_data/delay_values.pt")
                 
-                torch.save(losses, default_dir + "/saved_data/training_loss.pt")
-                torch.save(model.state_dict(), default_dir + "/saved_data/model.pt")
+                torch.save(losses, default_dir_dde + "/saved_data/training_loss.pt")
+                torch.save(model.state_dict(), default_dir_dde + "/saved_data/model.pt")
                 
             print("Epoch : {}, Step {}/{}, Length {}, Loss : {:.3e}, tau : {}".format(i, p, int(train_len/train_loader.batch_size),length_init, loss.item(), [d.item() for d in model.delays]))
 
@@ -249,13 +250,13 @@ if __name__ == "__main__":
                 plt.plot(ret[j].cpu().detach().numpy(), '--', label="Pred")
                 plt.colorbar()
                 plt.legend()
-                plt.savefig(default_dir + "/training_example_pred.png",bbox_inches='tight',dpi=100)
+                plt.savefig(default_dir_dde + "/training_example_pred.png",bbox_inches='tight',dpi=100)
                 plt.close()
                 break
         
         model.eval()
         for r, eval_data in enumerate(test_loader):
-            idx2 = (ts >= max_delay).nonzero().flatten()[0]
+            idx2 = (ts >= torch.max(model.delays)).nonzero().flatten()[0]
             ts_history_eval, ts_eval = ts[:idx2+1], ts[idx2:]
             ys_history, ys = eval_data[:, :idx2+1], eval_data[:, idx2:]   
             history_interpolator = TorchLinearInterpolator(ts_history_eval, ys_history)
