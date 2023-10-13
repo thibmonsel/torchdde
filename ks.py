@@ -61,7 +61,7 @@ if __name__ == "__main__":
     print(ys.shape)
 
     j = np.random.randint(0, dataset_size)
-    plt.plot(ys[j].cpu().detach().numpy(), label="Truth")
+    plt.imshow(ys[j].cpu().detach().numpy(), label="Truth")
     plt.savefig(default_dir + "/training_data.png",bbox_inches='tight',dpi=100)
     plt.close() 
 
