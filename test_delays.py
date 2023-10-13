@@ -24,6 +24,22 @@ class SimpleNDDE(nn.Module):
         inp = torch.cat([z, z__history], dim=-1)
         return self.linear(inp)
 
+class SimpleNDDE2(nn.Module):
+    def __init__(self, dim, list_delays):
+        super().__init__()
+        self.in_dim = dim * (1 + len(list_delays))
+        self.delays =  nn.Parameter(list_delays)
+        self.linear = torch.nn.Linear(self.in_dim, 1, bias=False)
+        self.init_weight()
+        
+    def init_weight(self):
+        with torch.no_grad():
+            self.linear.weight = nn.Parameter(torch.tensor([[0, 1/2, -1.0]]))
+
+    def forward(self, t, z, *, history):
+        inp = torch.cat([z, *history], dim=-1)
+        return self.linear(inp)
+
 
 
 def simple_dde(t, y, *, history):
@@ -36,48 +52,53 @@ def simple_dde2(t, y, *, history):
 
 device = "cpu"
 history_values = torch.tensor([1.0, 2.0, 3.0, 4.0])
-history_values = history_values.view(history_values.shape[0], 1)
+history_values = history_values.view(history_values.shape[0], -1)
 history_function = lambda t: history_values 
 print("history_values", history_values.shape)
 
 ts = torch.linspace(0, 20, 201)
-list_delays = [1.0]
-# list_delays = [1.0, 2.0]
+# list_delays = [1.0]
+list_delays = [1.0, 2.0]
 dde_solver = DDESolver(Euler(), list_delays)
-ys, _ = dde_solver.integrate(simple_dde, ts, history_function)
+ys, _ = dde_solver.integrate(simple_dde2, ts, history_function)
 print(ys.shape)
 
-reference_delays = np.linspace(0.2, 2.0, 50)
-loss_list = []
-for delay in reference_delays:
-    dde_solver = DDESolver(Euler(), [delay])
-    ys_other, _ = dde_solver.integrate(simple_dde, ts, history_function)
-    loss = torch.mean((ys -ys_other)**2)
-    loss_list.append(loss.item())
-    
-plt.plot(reference_delays, loss_list)
-plt.xlabel("Delay")
-plt.ylabel("Loss")
-plt.title("Loss wtr to the delay value")
-plt.pause(2)
-plt.close()
+# x,y = np.meshgrid(np.linspace(0.2, 2.0, 15),np.linspace(0.2, 2.0, 15))
+# possible_delays = torch.from_numpy(np.concatenate([x.reshape(1,-1),y.reshape(1,-1)],axis=0).T)
+# loss_list = []
+# for delay in possible_delays:
+#     dde_solver = DDESolver(Euler(), delay)
+#     ys_other, _ = dde_solver.integrate(simple_dde2, ts, history_function)
+#     loss = torch.mean((ys -ys_other)**2)
+#     loss_list.append(loss.item())
 
-for i in range(ys.shape[0]):
-    plt.plot(ys[i].cpu().detach().numpy(), label="Truth")
-plt.pause(2)
-plt.close()
+# loss_list = torch.log(torch.tensor(loss_list).reshape(x.shape[0],x.shape[0]))
+# plt.imshow(loss_list)
+# plt.colorbar()
+# plt.xlabel("Delay")
+# plt.ylabel("Loss")
+# plt.title("Loss wtr to the delay value")
+# plt.pause(10)
+# plt.close()
+
+# for i in range(ys.shape[0]):
+#     plt.plot(ys[i].cpu().detach().numpy(), label="Truth")
+# plt.pause(2)
+# plt.close()
 
 # 2 delays for brusselator looks like a good choice
 learnable_delays =  torch.abs(torch.randn((len(list_delays),)))
-model = SimpleNDDE(dim=1, list_delays=learnable_delays)
+model = SimpleNDDE2(dim=1, list_delays=learnable_delays)
 model = model.to(device)
 lossfunc = nn.MSELoss()
-opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0)
+opt = torch.optim.Adam(model.parameters(), lr=0.1, weight_decay=0)
 losses = []
 lens = []
 
 max_epoch = 10000
 for i in range(max_epoch):
+    if i > 70 : 
+        opt = torch.optim.Adam(model.parameters(), lr=0.1, weight_decay=0)
     # print(model.linear.weight)
     model.linear.weight.requires_grad = False
     opt.zero_grad()

@@ -43,16 +43,31 @@ print("history_values", history_values.shape)
 ts = torch.linspace(0, 20, 201)
 list_delays = [1.0]
 # list_delays = [1.0, 2.0]
-solver = Euler()
-dde_solver = DDESolver(solver, list_delays)
+dde_solver = DDESolver(Euler(), list_delays)
 ys_true, _ = dde_solver.integrate(simple_dde, ts, history_function)
-print(ys_true.shape)
 
-idx = (ts >= max(list_delays)).nonzero().flatten()[0]
-ts_history_train, ts_train = ts[:idx+2], ts[idx:]
-ys_history, ys = ys_true[:, :idx+2], ys_true[:, idx:]   
+idx = (ts > 2.1).nonzero().flatten()[0] 
+ts_history_train, ts_train = ts[:idx+1], ts[idx:]
+ys_history, ys = ys_true[:, :idx+1], ys_true[:, idx:]   
 history_interpolator = TorchLinearInterpolator(ts_history_train, ys_history)
 history_function = lambda t: history_interpolator(t)
+
+reference_delays = np.linspace(0.2, 2.0, 50)
+loss_list = []
+print(ts_train[0], ts_train[-1])
+for delay in reference_delays:
+    dde_solver = DDESolver(Euler(), [delay])
+    ys_other, _ = dde_solver.integrate(simple_dde, ts_train, history_function)
+    loss = torch.mean((ys -ys_other)**2)
+    loss_list.append(loss.item())
+    
+plt.plot(reference_delays, loss_list)
+plt.yscale("log")
+plt.xlabel("Delay")
+plt.ylabel("Loss")
+plt.title("Loss wtr to the delay value")
+plt.pause(2)
+plt.close()
 
 for i in range(ys.shape[0]):
     plt.plot(ys[i].cpu().detach().numpy(), label="Truth")
@@ -60,7 +75,7 @@ plt.pause(2)
 plt.close()
 
 # 2 delays for brusselator looks like a good choice
-learnable_delays = torch.abs(torch.randn((len(list_delays),))) + 0.1
+learnable_delays =  torch.abs(torch.randn((len(list_delays),)))
 model = SimpleNDDE(dim=1, list_delays=learnable_delays)
 model = model.to(device)
 lossfunc = nn.MSELoss()
@@ -92,7 +107,7 @@ for i in range(max_epoch):
 
     losses.append(loss.item())
     idx = np.random.randint(0, ys.shape[0])
-    if losses[-1] < 1e-8 or i == max_epoch - 1:
+    if losses[-1] < 1e-5 or i == max_epoch - 1:
         plt.plot(ys[idx].cpu().detach().numpy())
         plt.plot(ret[idx].cpu().detach().numpy(), "--")
         plt.show()
