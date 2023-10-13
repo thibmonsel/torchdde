@@ -43,10 +43,24 @@ print("history_values", history_values.shape)
 ts = torch.linspace(0, 20, 201)
 list_delays = [1.0]
 # list_delays = [1.0, 2.0]
-solver = RK4()
-dde_solver = DDESolver(solver, list_delays)
+dde_solver = DDESolver(Euler(), list_delays)
 ys, _ = dde_solver.integrate(simple_dde, ts, history_function)
 print(ys.shape)
+
+reference_delays = np.linspace(0.2, 2.0, 50)
+loss_list = []
+for delay in reference_delays:
+    dde_solver = DDESolver(Euler(), [delay])
+    ys_other, _ = dde_solver.integrate(simple_dde, ts, history_function)
+    loss = torch.mean((ys -ys_other)**2)
+    loss_list.append(loss.item())
+    
+plt.plot(reference_delays, loss_list)
+plt.xlabel("Delay")
+plt.ylabel("Loss")
+plt.title("Loss wtr to the delay value")
+plt.pause(2)
+plt.close()
 
 for i in range(ys.shape[0]):
     plt.plot(ys[i].cpu().detach().numpy(), label="Truth")
@@ -58,12 +72,13 @@ learnable_delays =  torch.abs(torch.randn((len(list_delays),)))
 model = SimpleNDDE(dim=1, list_delays=learnable_delays)
 model = model.to(device)
 lossfunc = nn.MSELoss()
-opt = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0)
+opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0)
 losses = []
 lens = []
 
 max_epoch = 10000
 for i in range(max_epoch):
+    # print(model.linear.weight)
     model.linear.weight.requires_grad = False
     opt.zero_grad()
     ret = ddesolve_adjoint(history_function, model, ts)
