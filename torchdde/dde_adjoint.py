@@ -154,7 +154,7 @@ class nddeint_ACA(torch.autograd.Function):
             ctx.save_for_backward(*params)
 
             # Simulation
-            solver = Ralston()
+            solver = Euler()
             dde_solver = DDESolver(solver, func.delays)
             ys, ys_interpolator = dde_solver.integrate(func, ts, history_func)
 
