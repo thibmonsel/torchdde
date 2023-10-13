@@ -57,7 +57,7 @@ if __name__ == "__main__":
     ys = ks(dataset_size, ts)
     ys = ys.to(torch.float32)
     ys, ts = ys.to(device), ts.to(device)
-    ys, ts = ys[:, 200:], ts[:-200]
+    ys, ts = ys[:, 100:], ts[:-100]
     print(ys.shape)
 
     j = np.random.randint(0, dataset_size)
@@ -152,7 +152,7 @@ if __name__ == "__main__":
 
             losses.append(loss.item())
             
-            if losses[-1] < 0.005 :
+            if losses[-1] < 0.001 :
                 length_init +=1
             if length_init == ys.shape[1] :
                 break
@@ -239,7 +239,7 @@ if __name__ == "__main__":
             losses.append(loss.item())
             delay_values.append(model.delays.clone().detach())
             
-            if losses[-1] < 0.005 :
+            if losses[-1] < 0.001 :
                 length_init +=1
             if length_init == ys.shape[1] - idx -5 :
                 break

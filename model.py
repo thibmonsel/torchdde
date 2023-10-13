@@ -54,11 +54,11 @@ class ConvNDDE(nn.Module):
         self.in_dim = dim * (1 + len(delays))
         self.delays = torch.nn.Parameter(delays)
         self.net = nn.Sequential(
-            nn.Conv1d(in_channels=1 + len(delays), out_channels=64, kernel_size=11, padding="same", padding_mode="circular"),
+            nn.Conv1d(in_channels=1 + len(delays), out_channels=64, kernel_size=2, padding="same", padding_mode="circular"),
             nn.ReLU(),
-            nn.Conv1d(in_channels=64, out_channels=64, kernel_size=5, padding="same", padding_mode="circular"),
+            nn.Conv1d(in_channels=64, out_channels=64, kernel_size=2, padding="same", padding_mode="circular"),
             nn.ReLU(),
-            nn.Conv1d(in_channels=64, out_channels=64, kernel_size=5, padding="same", padding_mode="circular"),
+            nn.Conv1d(in_channels=64, out_channels=64, kernel_size=2, padding="same", padding_mode="circular"),
             nn.Flatten(),
             nn.Linear(64 * dim, 518),
             nn.ReLU(),
