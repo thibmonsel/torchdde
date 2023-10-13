@@ -1,4 +1,4 @@
+from .dde_adjoint import ddesolve_adjoint
 from .interpolation import TorchLinearInterpolator
-from .ndde_adjoint import nddesolve_adjoint
 from .ode_adjoint import odesolve_adjoint
 from .solver import RK2, RK4, DDESolver, Euler, Ralston

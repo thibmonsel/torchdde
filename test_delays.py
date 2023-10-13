@@ -1,13 +1,10 @@
-import warnings
-
 import matplotlib.pyplot as plt
 import numpy as np
-import seaborn
 import torch
 import torch.nn as nn
 
 from torchdde import (RK2, RK4, DDESolver, Euler, Ralston,
-                      TorchLinearInterpolator, nddesolve_adjoint)
+                      TorchLinearInterpolator, ddesolve_adjoint)
 
 
 class SimpleNDDE(nn.Module):
@@ -48,11 +45,11 @@ history_function = lambda t: history_interpolator(t)
 print("history_values", history_values.shape)
 
 ts = torch.linspace(0, 20, 201)
-# list_delays = [1.0]
-list_delays = [1.0, 2.0]
+list_delays = [1.0]
+# list_delays = [1.0, 2.0]
 solver = RK4()
 dde_solver = DDESolver(solver, list_delays)
-ys, _ = dde_solver.integrate(simple_dde2, ts, history_function)
+ys, _ = dde_solver.integrate(simple_dde, ts, history_function)
 # ys, _ = dde_solver.integrate(simple_dde, ts, history_function)
 print(ys.shape)
 
@@ -73,7 +70,7 @@ lens = []
 max_epoch = 10000
 for i in range(max_epoch):
     opt.zero_grad()
-    ret = nddesolve_adjoint(history_function, model, ts)
+    ret = ddesolve_adjoint(history_function, model, ts)
     loss = lossfunc(ret, ys)
     loss.backward()
     opt.step()

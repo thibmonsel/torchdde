@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader, Dataset, random_split
 
 from dataset import MyDataset, ks
 from model import MLP, NDDE, ConvNDDE, ConvODE
-from torchdde import (TorchLinearInterpolator, nddesolve_adjoint,
+from torchdde import (TorchLinearInterpolator, ddesolve_adjoint,
                       odesolve_adjoint)
 
 if __name__ == "__main__":
@@ -196,7 +196,7 @@ if __name__ == "__main__":
             history_function = lambda t: history_interpolator(t)
             opt.zero_grad()
             t = time.time()
-            ret = nddesolve_adjoint(history_function, model, ts_train)
+            ret = ddesolve_adjoint(history_function, model, ts_train)
             loss = lossfunc(ret, ys)
             loss.backward()
             opt.step()
@@ -261,7 +261,7 @@ if __name__ == "__main__":
             ys_history, ys = eval_data[:, :idx2+1], eval_data[:, idx2:]   
             history_interpolator = TorchLinearInterpolator(ts_history_eval, ys_history)
             history_function = lambda t: history_interpolator(t)
-            ret = nddesolve_adjoint(history_function, model, ts_eval)
+            ret = ddesolve_adjoint(history_function, model, ts_eval)
             loss = lossfunc(ret, ys)
             eval_losses.append(loss.item())
                    

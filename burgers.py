@@ -10,7 +10,7 @@ from scipy.integrate import solve_ivp
 from dataset import burgers
 from model import NDDE, SimpleNDDE, SimpleNDDE2
 from torchdde import (RK2, RK4, DDESolver, Euler, Ralston,
-                      TorchLinearInterpolator, nddesolve_adjoint)
+                      TorchLinearInterpolator, ddesolve_adjoint)
 
 dataset_size = 16
 device = "cpu" #torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -55,7 +55,7 @@ for i in range(max_epoch):
     opt.zero_grad()
     t = time.time()
     # ret, _ = dde_solver.integrate(model, ts, history_function)
-    ret = nddesolve_adjoint(history_function, model, ts)
+    ret = ddesolve_adjoint(history_function, model, ts)
     loss = lossfunc(ret, ys)
     loss.backward()
     opt.step()

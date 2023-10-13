@@ -312,7 +312,7 @@ class nddeint_ACA(torch.autograd.Function):
         # return None, None, None, *dL_dtau
         return None, None, None, *(dL_dtau, *test_out[1:])
 
-def nddesolve_adjoint(history, func, ts):
+def ddesolve_adjoint(history, func, ts):
     # Main function to be called to integrate the NODE
 
     # z0 : (tensor) Initial state of the NODE
