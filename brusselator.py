@@ -31,12 +31,13 @@ if __name__ == "__main__":
         default_save_dir = "meta_data"
     else:
         default_save_dir = "meta_data/" + args.exp_path
-        
+    
     os.makedirs(default_save_dir, exist_ok=True)
 
     datestring = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     default_dir = default_save_dir + "/" + datestring
     default_dir_dde = default_save_dir + "/" + datestring + "/dde"
+    print("default_dir_dde", default_dir_dde)
     
     #### GENERATING DATA #####
     dataset_size = 1024
@@ -69,8 +70,8 @@ if __name__ == "__main__":
     train_loader = DataLoader(train_set, batch_size=512, shuffle=True)
     test_loader = DataLoader(test_set, batch_size=512, shuffle=False)
 
-    lr, init_ts_length, max_epochs, validate_every, patience = 0.001, 40, 3000, 1, 10
-    trainer = DDETrainer(model, lr=lr, saving_path=default_dir_dde)
+    lr, init_ts_length, max_epochs, validate_every, patience = 0.001, 40, 10000, 1, 10
+    trainer = DDETrainer(model, lr_init=lr, lr_final=lr/100, saving_path=default_dir_dde)
 
     dic_data = {
         "id": datestring,
