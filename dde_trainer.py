@@ -12,12 +12,13 @@ from torchdde import TorchLinearInterpolator, ddesolve_adjoint
 
 
 class DDETrainer:
-    def __init__(self, model, lr, saving_path):
+    def __init__(self, model, lr_init, lr_final, saving_path):
         self.model = model
-        self.lr = lr
+        self.lr_init = lr_init
+        self.lr_final = lr_final
         self.saving_path = saving_path
         self.optimizers = torch.optim.Adam(
-            self.model.parameters(), lr=lr, weight_decay=0
+            self.model.parameters(), lr=lr_init, weight_decay=0
         )
         self.create_directories()
 
@@ -134,14 +135,14 @@ class DDETrainer:
                     )
                 else:
                     best_val_counter += 1
-                print("best_val_counter", best_val_counter)
 
             if best_val_counter > patience:
                 if init_ts_length <= ts_train.shape[0]:
                     init_ts_length += 1
                     best_val_counter = 0 
                     for g in self.optimizers.param_groups:
-                        g['lr'] = 0.98*g['lr']
+                            ## lr descreases from lr_init to lr_final from 0 to max_epochs / step function
+                            g["lr"] = (self.lr_final - g["lr"]) / max_epochs * epoch + self.lr_init
                 else : 
                     print("Training done and saving models, data ...")
                     torch.save(
@@ -155,6 +156,8 @@ class DDETrainer:
                         delay_values, self.saving_path + "/saved_data/last_delay_values.pt"
                     )
 
+        print("Finished {} epochs of training".format(max_epochs))
+        
     def validate(self, ts, val_loader, init_ts_length, loss_func=nn.MSELoss()):
         eval_losses = []
         self.model.eval()
