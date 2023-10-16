@@ -84,8 +84,9 @@ if __name__ == "__main__":
             "init_ts_length": init_ts_length,
             "validate_every" : validate_every,
             "patience" : patience,
-            "lr": lr,
-            "max_epoch": max_epochs,
+            "lr_init": trainer.lr_init,
+            "lr_final" : trainer.lr_final
+            "max_epochs": max_epochs,
             "dde_model_name": model.__class__.__name__,
             "dde_model_structure": str(model).split("\n"),
             "optimizer_state_dict": trainer.optimizers.state_dict(),
