@@ -61,7 +61,7 @@ class odeint_ACA(torch.autograd.Function):
         i_ev=-2
         
         out2 = None
-        solver = Euler()
+        solver = Ralston()
         # The adjoint state as well as the parameters' gradient are integrated backwards in time.
         # Following the Adaptive Checkpoint Adjoint method, the time steps and corresponding states of the forward
         # integration are re-used by going backwards in the time mesh.

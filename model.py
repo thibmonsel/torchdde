@@ -16,13 +16,10 @@ class NDDE(nn.Module):
             nn.ReLU(),
             nn.Linear(width, width),
             nn.ReLU(),
-            nn.Linear(width, width),
-            nn.ReLU(),
             nn.Linear(width, dim),
         )
 
     def forward(self, t, z, *, history):
-        
         inp = torch.cat([z, *history], dim=-1)
         return self.mlp(inp)
 
@@ -31,8 +28,6 @@ class MLP(nn.Module):
         super().__init__()
         self.mlp = nn.Sequential(
             nn.Linear(dim, width),
-            nn.ReLU(),
-            nn.Linear(width, width),
             nn.ReLU(),
             nn.Linear(width, width),
             nn.ReLU(),
