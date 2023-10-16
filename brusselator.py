@@ -37,7 +37,7 @@ if __name__ == "__main__":
     datestring = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     default_dir = default_save_dir + "/" + datestring
     default_dir_dde = default_save_dir + "/" + datestring + "/dde"
-
+    
     #### GENERATING DATA #####
     dataset_size = 1024
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
