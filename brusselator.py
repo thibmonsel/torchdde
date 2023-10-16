@@ -31,8 +31,8 @@ if __name__ == "__main__":
         default_save_dir = "meta_data"
     else:
         default_save_dir = "meta_data/" + args.exp_path
-    if not os.path.exists(default_save_dir):
-        os.makedirs(default_save_dir)
+        
+    os.makedirs(default_save_dir, exist_ok=True)
 
     datestring = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     default_dir = default_save_dir + "/" + datestring
@@ -66,8 +66,8 @@ if __name__ == "__main__":
     dataset = MyDataset(ys)
     train_len = int(len(dataset) * 0.7)
     train_set, test_set = random_split(dataset, [train_len, len(dataset) - train_len])
-    train_loader = DataLoader(train_set, batch_size=2, shuffle=True)
-    test_loader = DataLoader(test_set, batch_size=2, shuffle=False)
+    train_loader = DataLoader(train_set, batch_size=512, shuffle=True)
+    test_loader = DataLoader(test_set, batch_size=512, shuffle=False)
 
     lr, init_ts_length, max_epochs, validate_every, patience = 0.001, 40, 3000, 1, 10
     trainer = DDETrainer(model, lr=lr, saving_path=default_dir_dde)
@@ -77,6 +77,7 @@ if __name__ == "__main__":
         "metadata": {
             "input_shape": ys.shape,
             "dataset_size": dataset_size,
+            "batch_size " : train_loader.batch_size,
             "nb_delays": args.delays,
             "delays_init": list([l.item() for l in list_delays.cpu()]),
             "init_ts_length": init_ts_length,

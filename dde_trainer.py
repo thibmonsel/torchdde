@@ -140,9 +140,8 @@ class DDETrainer:
                 if init_ts_length <= ts_train.shape[0]:
                     init_ts_length += 1
                     best_val_counter = 0 
-                    for opt in self.optimizers:
-                        for g in opt.param_groups:
-                            g['lr'] = 0.98*g['lr']
+                    for g in self.optimizers.param_groups:
+                        g['lr'] = 0.98*g['lr']
                 else : 
                     print("Training done and saving models, data ...")
                     torch.save(
