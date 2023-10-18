@@ -63,14 +63,13 @@ if __name__ == "__main__":
     model = NDDE(ys.shape[-1], list_delays, width=32)
     model = model.to(device)
 
-    # computing history function
     dataset = MyDataset(ys)
     train_len = int(len(dataset) * 0.7)
     train_set, test_set = random_split(dataset, [train_len, len(dataset) - train_len])
     train_loader = DataLoader(train_set, batch_size=512, shuffle=True)
     test_loader = DataLoader(test_set, batch_size=512, shuffle=False)
 
-    lr, init_ts_length, max_epochs, validate_every, patience = 0.001, 40, 10000, 1, 10
+    lr, init_ts_length, max_epochs, validate_every, patience = 0.001, 40, 10000, 1, 20
     trainer = DDETrainer(model, lr_init=lr, lr_final=lr/100, saving_path=default_dir_dde)
 
     dic_data = {

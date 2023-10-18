@@ -39,7 +39,7 @@ class TorchLinearInterpolator:
 
     def __call__(self, t, left=True):
         if t > self.ts[-1] or t < self.ts[0]:
-            if torch.abs((t -self.ts[0])/self.ts[0]) < 10-3:
+            if torch.abs((t -self.ts[0])/self.ts[0]) < 10e-3:
                 return self.ys[:, 0]
             if torch.abs((t -self.ts[-1])/self.ts[-1]) < 10e-3:
                 return self.ys[:, -1]
