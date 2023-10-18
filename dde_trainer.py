@@ -188,10 +188,21 @@ class DDETrainer:
 
     @staticmethod
     def plot_training_prediction_example(y_truth, y_pred, saving_path):
-        plt.plot(y_truth.cpu().detach().numpy(), label="Truth")
-        plt.plot(y_pred.cpu().detach().numpy(), "--", label="Pred")
-        plt.savefig(saving_path, bbox_inches="tight", dpi=100)
-        plt.close()
+        if y_truth.shape[-1] == 1 : 
+            plt.plot(y_truth.cpu().detach().numpy(), label="Truth")
+            plt.plot(y_pred.cpu().detach().numpy(), "--", label="Pred")
+            plt.savefig(saving_path, bbox_inches="tight", dpi=100)
+            plt.close()
+        else : 
+            plt.subplot(211)
+            plt.title("Truth")
+            plt.imshow(y_truth.cpu().detach().numpy())
+            plt.colorbar()
+            plt.subplot(212)
+            plt.title("Pred")
+            plt.imshow(y_pred.cpu().detach().numpy())
+            plt.savefig(saving_path, bbox_inches="tight", dpi=100)
+            plt.close()
 
     @staticmethod
     def plot_loss(losses, saving_path):

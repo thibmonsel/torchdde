@@ -40,7 +40,7 @@ if __name__ == "__main__":
     print("default_dir_dde", default_dir_dde)
     
     #### GENERATING DATA #####
-    dataset_size = 1024
+    dataset_size = 2
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ts = torch.linspace(0, 25, 501)
     y0 = np.random.uniform(0.0, 2.0, (dataset_size, 2))
@@ -85,7 +85,7 @@ if __name__ == "__main__":
             "validate_every" : validate_every,
             "patience" : patience,
             "lr_init": trainer.lr_init,
-            "lr_final" : trainer.lr_final
+            "lr_final" : trainer.lr_final,
             "max_epochs": max_epochs,
             "dde_model_name": model.__class__.__name__,
             "dde_model_structure": str(model).split("\n"),
