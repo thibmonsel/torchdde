@@ -68,8 +68,8 @@ class DDETrainer:
                 if torch.any(exceeded_delays) :
                     self.model.delays = torch.nn.Parameter(
                         torch.where(
-                            ts[-2],
-                            torch.max(self.model.delays),
+                           exceeded_delays,
+                             ts[-2],
                             self.model.delays,
                         )
                     )
@@ -82,7 +82,7 @@ class DDETrainer:
                     self.model.delays = torch.nn.Parameter(
                         torch.where(
                             exceeded_delays2,
-                            ts[1] - ts[0],
+                            2*(ts[1] - ts[0]),
                             self.model.delays,
                         )
                     )
