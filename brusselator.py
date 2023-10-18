@@ -27,7 +27,7 @@ if __name__ == "__main__":
     parser.add_argument("--delays", type=int, required=True)
     args = parser.parse_args()
 
-    default_dir_dde = os.environ["default_dir_dde"]
+    default_dir_dde = os.environ["default_dir"]
     print("default_dir_dde", default_dir_dde)
     
     #### GENERATING DATA #####

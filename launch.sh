@@ -18,19 +18,20 @@ echo "Will execute file : $python_filename"
 
 if [ -z "$1" ]
 then
-    default_dir_dde=meta_data/$directory_name_py/$now
+    default_dir=meta_data/$directory_name_py/$now
 else
-    default_dir_dde=meta_data/$directory_name_py/$1/$now
+    default_dir=meta_data/$directory_name_py/$1/$now
 fi 
 
-echo "Creating directory for experiment $default_dir_dde"
+echo "Creating directory for experiment $default_dir"
 
-mkdir -p $default_dir_dde
+mkdir -p $default_dir
 
 
 export python_filename
 export directory_name_py
-export default_dir_dde
+export default_dir
+
 #srun python optimal_delays.py --exp_path=sinus
 #srun python ks.py --exp_path=ks_4_features_only
 python brusselator.py --delays=5
