@@ -1,6 +1,6 @@
-import json
 import os
 import time
+import warnings
 from statistics import mean
 
 import matplotlib.pyplot as plt
@@ -64,18 +64,19 @@ class DDETrainer:
                 loss = loss_func(ret, ys)
                 loss.backward()
                 self.optimizers.step()
-                exceeded_delays = self.model.delays.clone().detach() > torch.max(
-                    self.model.delays
-                )
-                
+                exceeded_delays = self.model.delays.clone().detach() >= ts[-1]
                 if torch.any(exceeded_delays) :
                     self.model.delays = torch.nn.Parameter(
                         torch.where(
-                            exceeded_delays,
+                            ts[-2],
                             torch.max(self.model.delays),
                             self.model.delays,
                         )
                     )
+                    warnings.warn(
+                        "Gradient descent wants to increase the delay to the value ts[-1] which is impossible, exiting training"
+                    )
+                    exit()
                 exceeded_delays2 = self.model.delays.clone().detach() < ts[1] - ts[0]
                 if torch.any(exceeded_delays2):
                     self.model.delays = torch.nn.Parameter(
@@ -85,8 +86,8 @@ class DDETrainer:
                             self.model.delays,
                         )
                     )
-                    raise Warning(
-                        "Gradient descent wants to increase the delay, we set it to the maximum delay"
+                    warnings.warn(
+                        "Gradient descent wants to descrease the delay to its min limit ie dt, we set it to dt"
                     )
 
                 print(
