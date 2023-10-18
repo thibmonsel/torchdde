@@ -93,15 +93,6 @@ class odeint_ACA(torch.autograd.Function):
                 for _1, _2 in zip([*out2], [*param_inc]):
                     _1 += h * _2
 
-
-            # When reaching an evaluation step, the adjoint state is incremented with the gradient of the corresponding
-            # evaluation step 
-            # next_i=i-1
-            # if next_i in ctx.options['eval_idx'] and i!=len(time_mesh):
-            #     adjoint_state += grad_output[i_ev]
-            #     i_ev = i_ev - 1
-        # Returning the gradient value for each forward() input
-        # out = tuple([adjoint_state] + [None,  None])+out2
         return adjoint_state, None, None, *out2
 
 

@@ -9,13 +9,11 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import torch.nn as nn
-from scipy.integrate import solve_ivp
-from torch.utils.data import DataLoader, Dataset, random_split
+from torch.utils.data import DataLoader, random_split
 
 from dataset import MyDataset, brusellator
-from dde_trainer import DDETrainer
-from model import MLP, NDDE, SimpleNDDE, SimpleNDDE2
+from model import MLP
+from ode_trainer import ODETrainer
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
@@ -24,11 +22,19 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Running node experiments")
     parser.add_argument("--seed", type=int, default=np.random.randint(0, 1000))
     parser.add_argument("--exp_path", default="")
-    parser.add_argument("--delays", type=int, required=True)
     args = parser.parse_args()
 
-    default_dir_dde = os.environ["default_dir_dde"]
-    print("default_dir_dde", default_dir_dde)
+    if args.exp_path == "":
+        default_save_dir = "meta_data"
+    else:
+        default_save_dir = "meta_data/" + args.exp_path
+    
+    os.makedirs(default_save_dir, exist_ok=True)
+
+    datestring = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    default_dir = default_save_dir + "/" + datestring
+    default_dir_ode = default_save_dir + "/" + datestring + "/ode"
+    print("default_dir_dde", default_dir_ode)
     
     #### GENERATING DATA #####
     dataset_size = 2
@@ -43,15 +49,7 @@ if __name__ == "__main__":
     ys, ts = ys.to(device), ts.to(device)
     print(ys.shape)
 
-    nb_delay = args.delays
-    max_delay = torch.tensor([5.0])
-    max_delay = max_delay.to(device)
-    list_delays = torch.abs(torch.rand((nb_delay,)))
-    list_delays = torch.min(
-        list_delays, max_delay.item() * torch.ones_like(list_delays)
-    )
-    list_delays = list_delays.to(device)
-    model = NDDE(ys.shape[-1], list_delays, width=32)
+    model = MLP(ys.shape[-1], width=32)
     model = model.to(device)
 
     dataset = MyDataset(ys)
@@ -61,32 +59,32 @@ if __name__ == "__main__":
     test_loader = DataLoader(test_set, batch_size=512, shuffle=False)
 
     lr, init_ts_length, max_epochs, validate_every, patience = 0.001, 40, 10000, 1, 20
-    trainer = DDETrainer(model, lr_init=lr, lr_final=lr/100, saving_path=default_dir_dde)
+    trainer = ODETrainer(model, lr_init=lr, lr_final=lr/100, saving_path=default_dir_ode)
 
     dic_data = {
+        "id": datestring,
         "metadata": {
             "input_shape": ys.shape,
             "dataset_size": dataset_size,
             "batch_size " : train_loader.batch_size,
-            "nb_delays": args.delays,
-            "delays_init": list([l.item() for l in list_delays.cpu()]),
             "init_ts_length": init_ts_length,
             "validate_every" : validate_every,
             "patience" : patience,
             "lr_init": trainer.lr_init,
             "lr_final" : trainer.lr_final,
             "max_epochs": max_epochs,
-            "dde_model_name": model.__class__.__name__,
-            "dde_model_structure": str(model).split("\n"),
+            "ode_model_name": model.__class__.__name__,
+            "ode_model_structure": str(model).split("\n"),
             "optimizer_state_dict": trainer.optimizers.state_dict(),
-        }}
+        },
+    }
 
-    with open(default_dir_dde + "/hyper_parameters.json", "w") as file:
+    with open(default_dir_ode + "/hyper_parameters.json", "w") as file:
         json.dump([dic_data], file)
 
     for i in range(ys.shape[0]):
         plt.plot(ys[i].cpu().detach().numpy(), label="Truth")
-    plt.savefig(default_dir_dde + "/training_data.png", bbox_inches="tight", dpi=100)
+    plt.savefig(default_dir + "/training_data.png", bbox_inches="tight", dpi=100)
     plt.close()
 
     trainer.train(

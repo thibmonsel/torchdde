@@ -30,7 +30,6 @@ titanic/
 margaret/
 meta_data/
 final_DDEM/
-*.sh 
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
