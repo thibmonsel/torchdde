@@ -12,7 +12,7 @@ nvidia-smi
 
 python_filename="ks.py"
 directory_name_py="$(cut -d'.' -f1 <<< $python_filename)"
-now=$(date +"%m_%d_%Y_%M:%S")
+now=$(date +"%m_%d_%Y_%H:%M:%S")
 
 echo "Will execute file : $python_filename"
 

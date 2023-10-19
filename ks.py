@@ -48,8 +48,8 @@ if __name__ == "__main__":
     plt.savefig(default_dir_dde + "/data_example.png",bbox_inches='tight',dpi=100)
     plt.close() 
     
-    feat_idx = torch.randint(0, 10, (args.nb_features,))
-    feat_idx = torch.arange(0, ys.shape[-1], step = ys.shape[-1]  // args.nb_features ) + feat_idx
+    feat_idx = torch.arange(args.nb_features)*(ys.shape[-1]//args.nb_features) + torch.randint(0, 10, (args.nb_features,))
+    feat_idx = feat_idx % ys.shape[-1]
     ys = ys[:, :, feat_idx]
     
     plt.plot(ys[j].cpu().detach().numpy(), label="Truth")
