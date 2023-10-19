@@ -10,8 +10,8 @@ set -x
 
 nvidia-smi
 
-python_filename="brusselator.py"
-directory_name_py="$(cut -d'.' -f1 <<<'brusselator')"
+python_filename="ks.py"
+directory_name_py="$(cut -d'.' -f1 <<< $python_filename)"
 now=$(date +"%m_%d_%Y_%M:%S")
 
 echo "Will execute file : $python_filename"
@@ -29,10 +29,12 @@ mkdir -p $default_dir
 
 
 export python_filename
-export directory_name_py
 export default_dir
 
 #srun python optimal_delays.py --exp_path=sinus
 #srun python ks.py --exp_path=ks_4_features_only
-python brusselator.py --delays=5
+python $python_filename --delays=3 --nb_features=4
 #srun python vdp.py --exp_path=vdp
+
+mv *.out $default_dir
+mv *.err $default_dir

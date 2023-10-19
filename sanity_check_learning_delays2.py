@@ -130,7 +130,7 @@ ys_history, ys = ys_true[:, :idx+1], ys_true[:, idx:]
 history_interpolator = TorchLinearInterpolator(ts_history_train, ys_history)
 history_function = lambda t: history_interpolator(t)
 
-x, y = np.meshgrid(np.linspace(0.2, 2.0, 50),np.linspace(0.2, 2.0, 50))
+x, y = np.meshgrid(np.linspace(0.2, 2.0, 10),np.linspace(0.2, 2.0, 10))
 possible_delays = torch.from_numpy(np.concatenate([x.reshape(1,-1),y.reshape(1,-1)],axis=0).T)
 loss_list = []
 for delay in possible_delays:
@@ -161,7 +161,7 @@ learnable_delays = torch.abs(torch.randn((len(list_delays),)))
 model = SimpleNDDE2(dim=1, list_delays=learnable_delays)
 model = model.to(device)
 lossfunc = nn.MSELoss()
-opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0)
+opt = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0)
 losses = []
 lens = []
 

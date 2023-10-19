@@ -188,7 +188,7 @@ class DDETrainer:
 
     @staticmethod
     def plot_training_prediction_example(y_truth, y_pred, saving_path):
-        if y_truth.shape[-1] == 1 : 
+        if y_truth.shape[-1] <= 7 : 
             plt.plot(y_truth.cpu().detach().numpy(), label="Truth")
             plt.plot(y_pred.cpu().detach().numpy(), "--", label="Pred")
             plt.savefig(saving_path, bbox_inches="tight", dpi=100)
