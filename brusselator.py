@@ -55,7 +55,7 @@ if __name__ == "__main__":
     train_loader = DataLoader(train_set, batch_size=512, shuffle=True)
     test_loader = DataLoader(test_set, batch_size=512, shuffle=False)
 
-    lr, init_ts_length, max_epochs, validate_every, patience = 0.001, 40, 10000, 1, 5
+    lr, init_ts_length, max_epochs, validate_every, patience = 0.001, 80, 10000, 1, 20
     trainer = DDETrainer(model, lr_init=lr, lr_final=lr/100, saving_path=default_dir_dde)
 
     dic_data = {
