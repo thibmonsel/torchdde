@@ -57,10 +57,11 @@ for delay in possible_delays:
     loss = torch.mean((ys -ys_other)**2)
     loss_list.append(loss.item())
 
-loss_list = torch.log(torch.tensor(loss_list))
+loss_list = torch.tensor(loss_list)
 plt.plot(possible_delays, loss_list)
 plt.xlabel("Delay")
 plt.ylabel("Loss")
+plt.yscale("log")
 plt.title("Loss wrt to the delay value")
 plt.pause(2)
 plt.close()
@@ -77,10 +78,9 @@ lens = []
 
 max_epoch = 10000
 for i in range(max_epoch):
-    # print(model.linear.weight)
     model.linear.weight.requires_grad = False
     opt.zero_grad()
-    ret = ddesolve_adjoint(history_function, model, ts)
+    ret = ddesolve_adjoint(history_function, model, ts,Euler())
     loss = lossfunc(ret, ys)
     loss.backward()
     opt.step()
@@ -153,7 +153,7 @@ for i in range(max_epoch):
     # print(model.linear.weight)
     model.linear.weight.requires_grad = False
     opt.zero_grad()
-    ret = ddesolve_adjoint(history_function, model, ts_train)
+    ret = ddesolve_adjoint(history_function, model, ts_train, Euler())
     loss = lossfunc(ret, ys)
     loss.backward()
     opt.step()

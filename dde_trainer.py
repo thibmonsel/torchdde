@@ -8,7 +8,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from torchdde import TorchLinearInterpolator, ddesolve_adjoint
+from torchdde import Euler, TorchLinearInterpolator, ddesolve_adjoint
 
 
 class DDETrainer:
@@ -33,6 +33,7 @@ class DDETrainer:
         ts,
         train_loader,
         val_loader,
+        solver=Euler(),
         init_ts_length=5,
         loss_func=nn.MSELoss(),
         max_epochs=5000,
@@ -60,7 +61,7 @@ class DDETrainer:
                     ts_history_train, ys_history
                 )
                 history_function = lambda t: history_interpolator(t)
-                ret = ddesolve_adjoint(history_function, self.model, ts_train)
+                ret = ddesolve_adjoint(history_function, self.model, ts_train, solver)
                 loss = loss_func(ret, ys)
                 loss.backward()
                 self.optimizers.step()

@@ -36,5 +36,5 @@ export default_dir
 python $python_filename --delays=3 --nb_features=4
 #srun python vdp.py --exp_path=vdp
 
-mv *.out $default_dir
-mv *.err $default_dir
+# mv *.out $default_dir
+# mv *.err $default_dir
