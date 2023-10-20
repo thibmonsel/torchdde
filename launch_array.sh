@@ -40,7 +40,5 @@ export default_dir
 python brusselator.py --delays=2
 
 # Moving out files into meta_data folder
-mv *.out $default_dir
-mv *.err $default_dir
-
-#srun python vdp.py --exp_path=vdp
+mv out_$SLURM_JOB_ID_$SLURM_ARRAY_TASK_ID.out $default_dir
+mv out_$SLURM_JOB_ID_$SLURM_ARRAY_TASK_ID.err $default_dir
