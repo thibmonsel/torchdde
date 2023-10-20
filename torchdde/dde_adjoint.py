@@ -159,6 +159,7 @@ class nddeint_ACA(torch.autograd.Function):
         # we are using the rectangle method to integrate and get the loss w.t.r to the parameters
         # we could probably get a better gradient with trapezoid rule but this would need to change the code
         # a bit, not too much though
+        # trapezoid is h/2 * (f(a) + f(b) +2 (f(x1) + ... + f(xn-1)))
         return None, None, None, None,  *(out3[0] + out2[0], *out2[1:])
 class nddeint_ACA_archive(torch.autograd.Function):
     @staticmethod
