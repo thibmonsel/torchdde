@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
-from scipy.integrate import solve_ivp
 from torch.utils.data import DataLoader, Dataset, random_split
 
 from dataset import MyDataset, brusellator
@@ -31,7 +30,7 @@ if __name__ == "__main__":
     print("default_dir_dde", default_dir_dde)
     
     #### GENERATING DATA #####
-    dataset_size = 2
+    dataset_size = 1024
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ts = torch.linspace(0, 25, 501)
     y0 = np.random.uniform(0.0, 2.0, (dataset_size, 2))
@@ -44,13 +43,9 @@ if __name__ == "__main__":
     print(ys.shape)
 
     nb_delay = args.delays
-    max_delay = torch.tensor([5.0])
-    max_delay = max_delay.to(device)
     list_delays = torch.abs(torch.rand((nb_delay,)))
-    list_delays = torch.min(
-        list_delays, max_delay.item() * torch.ones_like(list_delays)
-    )
     list_delays = list_delays.to(device)
+    
     model = NDDE(ys.shape[-1], list_delays, width=32)
     model = model.to(device)
 

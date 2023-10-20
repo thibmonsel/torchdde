@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
+tiny = 10e-3
 
 class TorchLinearInterpolator:
     def __init__(self, ts, ys):
@@ -39,9 +40,9 @@ class TorchLinearInterpolator:
 
     def __call__(self, t, left=True):
         if t > self.ts[-1] or t < self.ts[0]:
-            if torch.abs((t -self.ts[0])/self.ts[0]) < 10e-3:
+            if torch.abs((t -self.ts[0])) < tiny:
                 return self.ys[:, 0]
-            if torch.abs((t -self.ts[-1])/self.ts[-1]) < 10e-3:
+            if torch.abs((t -self.ts[-1])) < tiny:
                 return self.ys[:, -1]
             raise ValueError(
                 f"Interpolation point is outside data range. ie t={t} > ts[-1]={self.ts[-1]} or t < ts[0]={self.ts[0]}"
