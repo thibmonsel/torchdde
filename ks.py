@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader, Dataset, random_split
 
 from dataset import MyDataset, brusellator, ks
 from dde_trainer import DDETrainer
-from model import NDDE
+from model import NDDE, ConvNDDE
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
@@ -60,7 +60,8 @@ if __name__ == "__main__":
     list_delays = torch.abs(torch.rand((nb_delay,)))
     list_delays = list_delays.to(device)
     
-    model = NDDE(ys.shape[-1], list_delays, width=64)
+    # model = NDDE(ys.shape[-1], list_delays, width=64)
+    model = ConvNDDE(ys.shape[-1], list_delays)
     model = model.to(device)
 
     dataset = MyDataset(ys)
@@ -69,7 +70,7 @@ if __name__ == "__main__":
     train_loader = DataLoader(train_set, batch_size=512, shuffle=True)
     test_loader = DataLoader(test_set, batch_size=512, shuffle=False)
 
-    lr, init_ts_length, max_epochs, validate_every, patience = 0.001, 50, 10000, 1, 30
+    lr, init_ts_length, max_epochs, validate_every, patience = 0.001, 100, 10000, 1, 30
     trainer = DDETrainer(model, lr_init=lr, lr_final=lr/100, saving_path=default_dir_dde)
 
     dic_data = {
