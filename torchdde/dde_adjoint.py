@@ -62,8 +62,6 @@ class nddeint_ACA(torch.autograd.Function):
             adjoint_ys_final,
         )
 
-        # The adjoint state as well as the parameters' gradient are integrated backwards in time.
-        stacked_params, stacked_delays = None, None
         def adjoint_dyn(t, adjoint_y, has_aux=False):
             h_t = torch.autograd.Variable(state_interpolator(t) if t >= ctx.ts[0] else ctx.ys_history_func(t), requires_grad=True)
             h_t_minus_tau = [
@@ -109,29 +107,25 @@ class nddeint_ACA(torch.autograd.Function):
                 return rhs_adjoint_1
         
         # computing the adjoint dynamics
+        out2, out3 = None, None
         for j, current_t in enumerate(reversed(ctx.ts)):
             with torch.enable_grad():
                 adjoint_state -= grad_output[:, -j - 1]
                 adjoint_interpolator.add_point(current_t, adjoint_state)
                 adj, (param_derivative_inc, delay_derivative_inc) = solver.step(adjoint_dyn, current_t, adjoint_state, -dt, has_aux=True)
                 adjoint_state = adj
-                
-            if stacked_params is None:
-                stacked_params = tuple(
-                    [torch.unsqueeze(p, dim=-1) if p is not None else None for p in param_derivative_inc ]
-                )
-            else:
-                stacked_params = tuple(
-                    [
-                        torch.concat([_1, torch.unsqueeze(_2, dim=-1)], dim=-1) if _2 is not None else _1
-                        for _1, _2 in zip(stacked_params, param_derivative_inc)
-                    ]
-                )
             
-            if stacked_delays is None :
-                stacked_delays = torch.unsqueeze(delay_derivative_inc, dim=0) if delay_derivative_inc is not None else None
-            else :
-                stacked_delays = torch.concat([stacked_delays, torch.unsqueeze(delay_derivative_inc, dim=0)], dim=0)
+                if out2 is None:
+                    out2 = tuple([dt*p for p in param_derivative_inc])
+                else:
+                    for _1, _2 in zip([*out2], [*param_derivative_inc]):
+                        _1 += dt * _2 if _2 is not None else 0.0
+
+                if out3 is None:
+                    out3 = tuple([-dt*p for p in delay_derivative_inc])
+                else:
+                    for _1, _2 in zip([*out3], [*delay_derivative_inc]):
+                        _1 += -dt * _2  if _2 is not None else 0.0
         
         # adding the last contribution of the delay parameters in the loss w.r.t. the parameters
         # ie which is the last part of the integration from t = 0 to t = -tau
@@ -159,18 +153,13 @@ class nddeint_ACA(torch.autograd.Function):
                     # remaining contribution of the delay in the gradient's loss ie int_{-\tau}^{0} \pdv{f(x_{t+\tau}, x_{t})}{x_t} x'(t) dt 
                     delay_derivative_inc[idx] += torch.sum(rhs_adjoint_inc * grad_ys[:, k], dim=(tuple(range(len(rhs_adjoint_inc.shape)))))
 
-                
-        if stacked_delays is None :
-            stacked_delays = torch.unsqueeze(delay_derivative_inc, dim=0) if delay_derivative_inc is not None else None
-        else :
-            if delay_derivative_inc is not None : 
-                stacked_delays = torch.concat([stacked_delays, torch.unsqueeze(delay_derivative_inc, dim=0)], dim=0)
-                
-        addition_contrib_dL_dtau = - dt * torch.trapz(stacked_delays, dim=0)
-        test_out = tuple([dt * torch.trapz(p, dim=-1) if p is not None else None for p in stacked_params])
-        dL_dtau = test_out[0] + addition_contrib_dL_dtau[:,0] if test_out[0] is not None else addition_contrib_dL_dtau[:,0]
-        return None, None, None, None, *(dL_dtau, *test_out[1:])      
-
+        for _1, _2 in zip([*out3], [*delay_derivative_inc]):
+            _1 += - dt * _2  if _2 is not None else 0.0   
+        
+        # we are using the rectangle method to integrate and get the loss w.t.r to the parameters
+        # we could probably get a better gradient with trapezoid rule but this would need to change the code
+        # a bit, not too much though
+        return None, None, None, None,  *(out3[0] + out2[0], *out2[1:])
 class nddeint_ACA_archive(torch.autograd.Function):
     @staticmethod
     def forward(ctx, history_func, func, ts, *params):

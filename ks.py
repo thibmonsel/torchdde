@@ -17,6 +17,7 @@ from torch.utils.data import DataLoader, Dataset, random_split
 from dataset import MyDataset, brusellator, ks
 from dde_trainer import DDETrainer
 from model import NDDE, ConvNDDE
+from torchdde import Ralston
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
@@ -71,7 +72,7 @@ if __name__ == "__main__":
     test_loader = DataLoader(test_set, batch_size=512, shuffle=False)
 
     lr, init_ts_length, max_epochs, validate_every, patience = 0.001, 100, 10000, 1, 30
-    trainer = DDETrainer(model, lr_init=lr, lr_final=lr/100, saving_path=default_dir_dde)
+    trainer = DDETrainer(model, lr_init=lr, lr_final=lr/100, saving_path=default_dir_dde, solver=Ralston())
 
     dic_data = {
         "metadata": {
