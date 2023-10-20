@@ -49,70 +49,70 @@ We note the user that the adjoint method is needs to have the same solver for th
 Else there might be some discrepencies between the optimal delay and the one learned by the adjoint method.
 """
 
-# x, y = np.meshgrid(np.linspace(0.2, 2.0, 20),np.linspace(0.2, 2.0, 20))
-# possible_delays = torch.from_numpy(np.concatenate([x.reshape(1,-1),y.reshape(1,-1)],axis=0).T)
-# loss_list = []
-# for delay in possible_delays:
-#     dde_solver = DDESolver(Euler(), delay)
-#     ys_other, _ = dde_solver.integrate(simple_dde2, ts, history_function)
-#     loss = torch.mean((ys -ys_other)**2)
-#     loss_list.append(loss.item())
+x, y = np.meshgrid(np.linspace(0.2, 2.0, 20),np.linspace(0.2, 2.0, 20))
+possible_delays = torch.from_numpy(np.concatenate([x.reshape(1,-1),y.reshape(1,-1)],axis=0).T)
+loss_list = []
+for delay in possible_delays:
+    dde_solver = DDESolver(Euler(), delay)
+    ys_other, _ = dde_solver.integrate(simple_dde2, ts, history_function)
+    loss = torch.mean((ys -ys_other)**2)
+    loss_list.append(loss.item())
 
-# loss_list = torch.log(torch.tensor(loss_list).reshape(x.shape[0],x.shape[0]))
-# plt.imshow(loss_list,extent=[0.2,2.0,0.2,2])
-# plt.colorbar()
-# plt.xlabel("tau0")
-# plt.ylabel("tau1")
-# plt.title("log(Loss) wtr to delay values")
-# plt.pause(2)
-# plt.close()
+loss_list = torch.log(torch.tensor(loss_list).reshape(x.shape[0],x.shape[0]))
+plt.imshow(loss_list,extent=[0.2,2.0,0.2,2])
+plt.colorbar()
+plt.xlabel("tau0")
+plt.ylabel("tau1")
+plt.title("log(Loss) wtr to delay values")
+plt.pause(2)
+plt.close()
 
-# fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-# surf = ax.plot_surface(x, y, loss_list, lw=0.1, cmap='coolwarm', edgecolor='k')
-# fig.colorbar(surf)
-# ax.contour(x, y, loss_list, zdir='z', cmap='coolwarm')
-# plt.tight_layout()
-# plt.pause(2)
-# plt.close()
+fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+surf = ax.plot_surface(x, y, loss_list, lw=0.1, cmap='coolwarm', edgecolor='k')
+fig.colorbar(surf)
+ax.contour(x, y, loss_list, zdir='z', cmap='coolwarm')
+plt.tight_layout()
+plt.pause(2)
+plt.close()
 
-# learnable_delays =  torch.abs(torch.randn((len(list_delays),)))
-# model = SimpleNDDE2(dim=1, list_delays=learnable_delays)
-# model = model.to(device)
-# lossfunc = nn.MSELoss()
-# opt = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0)
-# losses = []
-# lens = []
+learnable_delays =  torch.abs(torch.randn((len(list_delays),)))
+model = SimpleNDDE2(dim=1, list_delays=learnable_delays)
+model = model.to(device)
+lossfunc = nn.MSELoss()
+opt = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0)
+losses = []
+lens = []
 
-# max_epoch = 10000
-# for i in range(max_epoch):
-#     # print(model.linear.weight)
-#     model.linear.weight.requires_grad = False
-#     opt.zero_grad()
-#     ret = ddesolve_adjoint(history_function, model, ts)
-#     loss = lossfunc(ret, ys)
-#     loss.backward()
-#     opt.step()
-#     if i % 15 == 0:
-#         for i in range(ys.shape[0]):
-#             plt.plot(ys[i].cpu().detach().numpy(), label="Truth")
-#             plt.plot(ret[i].cpu().detach().numpy(), "--")
-#         plt.legend()
-#         plt.savefig("last_res.png", bbox_inches="tight", dpi=100)
-#         plt.close()
-#     print(
-#         "Epoch : {:4d}, Loss : {:.3e}, tau : {}".format(
-#             i, loss.item(), [p.item() for p in model.delays]
-#         )
-#     )
+max_epoch = 10000
+for i in range(max_epoch):
+    # print(model.linear.weight)
+    model.linear.weight.requires_grad = False
+    opt.zero_grad()
+    ret = ddesolve_adjoint(history_function, model, ts, Euler())
+    loss = lossfunc(ret, ys)
+    loss.backward()
+    opt.step()
+    if i % 15 == 0:
+        for i in range(ys.shape[0]):
+            plt.plot(ys[i].cpu().detach().numpy(), label="Truth")
+            plt.plot(ret[i].cpu().detach().numpy(), "--")
+        plt.legend()
+        plt.savefig("last_res.png", bbox_inches="tight", dpi=100)
+        plt.close()
+    print(
+        "Epoch : {:4d}, Loss : {:.3e}, tau : {}".format(
+            i, loss.item(), [p.item() for p in model.delays]
+        )
+    )
 
-#     losses.append(loss.item())
-#     idx = np.random.randint(0, ys.shape[0])
-#     if losses[-1] < 1e-5 or i == max_epoch - 1:
-#         plt.plot(ys[idx].cpu().detach().numpy())
-#         plt.plot(ret[idx].cpu().detach().numpy(), "--")
-#         plt.pause(2)
-#         plt.close()
-#         break
+    losses.append(loss.item())
+    idx = np.random.randint(0, ys.shape[0])
+    if losses[-1] < 1e-5 or i == max_epoch - 1:
+        plt.plot(ys[idx].cpu().detach().numpy())
+        plt.plot(ret[idx].cpu().detach().numpy(), "--")
+        plt.pause(2)
+        plt.close()
+        break
 
 
 """ 
@@ -130,7 +130,7 @@ ys_history, ys = ys_true[:, :idx+1], ys_true[:, idx:]
 history_interpolator = TorchLinearInterpolator(ts_history_train, ys_history)
 history_function = lambda t: history_interpolator(t)
 
-x, y = np.meshgrid(np.linspace(0.2, 2.0, 10),np.linspace(0.2, 2.0, 10))
+x, y = np.meshgrid(np.linspace(0.2, 2.0, 20),np.linspace(0.2, 2.0, 20))
 possible_delays = torch.from_numpy(np.concatenate([x.reshape(1,-1),y.reshape(1,-1)],axis=0).T)
 loss_list = []
 for delay in possible_delays:
@@ -170,7 +170,7 @@ for i in range(max_epoch):
     # print(model.linear.weight)
     model.linear.weight.requires_grad = False
     opt.zero_grad()
-    ret = ddesolve_adjoint(history_function, model, ts_train)
+    ret = ddesolve_adjoint(history_function, model, ts_train, Euler())
     loss = lossfunc(ret, ys)
     loss.backward()
     opt.step()

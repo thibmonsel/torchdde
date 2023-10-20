@@ -33,8 +33,8 @@ export default_dir
 
 #srun python optimal_delays.py --exp_path=sinus
 #srun python ks.py --exp_path=ks_4_features_only
-python $python_filename --delays=3 --nb_features=4
+python $python_filename --delays=5 --nb_features=4
 #srun python vdp.py --exp_path=vdp
 
-mv *.out $default_dir
-mv *.err $default_dir
+# mv *.out $default_dir
+# mv *.err $default_dir

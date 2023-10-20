@@ -60,20 +60,10 @@ class ConvNDDE(nn.Module):
             nn.Linear(518, dim)
             
         )
-        # self.net2 = nn.Sequential(
-        #     nn.Conv1d(in_channels=1, out_channels=32, kernel_size=5, padding=1, , padding_mode="circular"),
-        #     nn.ReLU(),
-        #     nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, padding=1, , padding_mode="circular"),
-        #     nn.ReLU(),
-        #     nn.Conv1d(in_channels=32, out_channels=1, kernel_size=3, padding=1, , padding_mode="circular"),
-        # )
-
+       
     def forward(self, t, z, *, history):
         inp = torch.cat([torch.unsqueeze(z, dim=1), *[torch.unsqueeze(h, dim=1) for h in history]], dim=1)
-        # for i in range(len(self.net)+1):
-        #     print(inp.shape)
-        #     inp = self.net[i](inp)
-        return self.net(inp) #+  self.net2(torch.unsqueeze(z, dim=1))[:, 0]
+        return self.net(inp) 
 
 
 

@@ -8,11 +8,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from torchdde import TorchLinearInterpolator, ddesolve_adjoint
+from torchdde import Euler, TorchLinearInterpolator, ddesolve_adjoint
 
 
 class DDETrainer:
-    def __init__(self, model, lr_init, lr_final, saving_path):
+    def __init__(self, model, lr_init, lr_final, saving_path, solver=Euler()):
         self.model = model
         self.lr_init = lr_init
         self.lr_final = lr_final
@@ -20,6 +20,7 @@ class DDETrainer:
         self.optimizers = torch.optim.Adam(
             self.model.parameters(), lr=lr_init, weight_decay=0
         )
+        self.solver = solver
         self.create_directories()
 
     def create_directories(self):
@@ -60,7 +61,7 @@ class DDETrainer:
                     ts_history_train, ys_history
                 )
                 history_function = lambda t: history_interpolator(t)
-                ret = ddesolve_adjoint(history_function, self.model, ts_train)
+                ret = ddesolve_adjoint(history_function, self.model, ts_train, self.solver)
                 loss = loss_func(ret, ys)
                 loss.backward()
                 self.optimizers.step()
@@ -181,7 +182,7 @@ class DDETrainer:
             )
             history_interpolator = TorchLinearInterpolator(ts_history_train, ys_history)
             history_function = lambda t: history_interpolator(t)
-            ret = ddesolve_adjoint(history_function, self.model, ts_train)
+            ret = ddesolve_adjoint(history_function, self.model, ts_train, self.solver)
             loss = loss_func(ret, ys)
             eval_losses.append(loss.item())
         return torch.tensor(eval_losses)
