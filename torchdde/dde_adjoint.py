@@ -137,7 +137,7 @@ class nddeint_ACA(torch.autograd.Function):
         # adding the last contribution of the delay parameters in the loss w.r.t. the parameters
         # ie which is the last part of the integration from t = 0 to t = -tau
         for idx, tau_i in enumerate(ctx.func.delays):
-            ts_history_i = torch.linspace(ctx.ts[0]-tau_i.item(), ctx.ts[0], int(tau_i.item()/dt))
+            ts_history_i = torch.linspace(ctx.ts[0]-tau_i.item(), ctx.ts[0], int(tau_i.item()/dt)).to(ctx.ts.device)
             with torch.enable_grad():
                 for k, t in enumerate(reversed(ts_history_i)):
                     h_t = torch.autograd.Variable(state_interpolator(t) if t >= ctx.ts[0] else ctx.history_func(t), requires_grad=True)
