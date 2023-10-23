@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 from matplotlib import pyplot as plt
-
 from torchdde.interpolation.linear_interpolation import TorchLinearInterpolator
 from torchdde.solver.dde_solver import DDESolver
 from torchdde.solver.ode_solver import *
@@ -107,7 +106,7 @@ class nddeint_ACA(torch.autograd.Function):
                 return rhs_adjoint_1
         
         # computing the adjoint dynamics
-        out2, out3 = None, None
+        out2, out3, last_out2, last_out3 = None, None, None, None
         for j, current_t in enumerate(reversed(ctx.ts)):
             with torch.enable_grad():
                 adjoint_state -= grad_output[:, -j - 1]
@@ -116,17 +115,20 @@ class nddeint_ACA(torch.autograd.Function):
                 adjoint_state = adj
             
                 if out2 is None:
-                    out2 = tuple([dt*p for p in param_derivative_inc])
+                    out2 = tuple([dt/2*p for p in param_derivative_inc])
                 else:
                     for _1, _2 in zip([*out2], [*param_derivative_inc]):
                         _1 += dt * _2 if _2 is not None else 0.0
 
                 if out3 is None:
-                    out3 = tuple([-dt*p for p in delay_derivative_inc])
+                    out3 = tuple([-dt/2*p for p in delay_derivative_inc])
                 else:
                     for _1, _2 in zip([*out3], [*delay_derivative_inc]):
                         _1 += -dt * _2  if _2 is not None else 0.0
-        
+
+                if current_t == T :
+                    last_out2 =  tuple([p for p in param_derivative_inc])
+
         # adding the last contribution of the delay parameters in the loss w.r.t. the parameters
         # ie which is the last part of the integration from t = 0 to t = -tau
         for idx, tau_i in enumerate(ctx.func.delays):
@@ -153,13 +155,21 @@ class nddeint_ACA(torch.autograd.Function):
                     # remaining contribution of the delay in the gradient's loss ie int_{-\tau}^{0} \pdv{f(x_{t+\tau}, x_{t})}{x_t} x'(t) dt 
                     delay_derivative_inc[idx] += torch.sum(rhs_adjoint_inc * grad_ys[:, k], dim=(tuple(range(len(rhs_adjoint_inc.shape)))))
 
+                    if k == len(ts_history_i) - 1 :
+                        last_out3 = delay_derivative_inc
+                    
         for _1, _2 in zip([*out3], [*delay_derivative_inc]):
             _1 += - dt * _2  if _2 is not None else 0.0   
         
-        # we are using the rectangle method to integrate and get the loss w.t.r to the parameters
-        # we could probably get a better gradient with trapezoid rule but this would need to change the code
-        # a bit, not too much though
+        # Adding last term in order to get a trapz rule estimate of the grad wtr to the parameters
         # trapezoid is h/2 * (f(a) + f(b) +2 (f(x1) + ... + f(xn-1)))
+        # compared to rectangle rule is h * (f(a) + f(b) + f(x1) + ... + f(xn-1))
+        for _1, _2 in zip([*out2], [*last_out2]):
+            _1 -= dt/2 * _2 if _2 is not None else 0.0
+
+        for _1, _2 in zip([*out3], [*last_out3]):
+            _1 -= -dt/2 * _2  if _2 is not None else 0.0
+
         return None, None, None, None,  *(out3[0] + out2[0], *out2[1:])
 class nddeint_ACA_archive(torch.autograd.Function):
     @staticmethod
