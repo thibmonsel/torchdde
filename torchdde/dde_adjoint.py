@@ -107,7 +107,7 @@ class nddeint_ACA(torch.autograd.Function):
                 return rhs_adjoint_1
         
         # computing the adjoint dynamics
-        out2, out3 = None, None
+        out2, out3, first_out2, last_out2, first_out3, last_out3 = None, None, None, None, None, None
         for j, current_t in enumerate(reversed(ctx.ts)):
             with torch.enable_grad():
                 adjoint_state -= grad_output[:, -j - 1]
@@ -117,16 +117,21 @@ class nddeint_ACA(torch.autograd.Function):
             
                 if out2 is None:
                     out2 = tuple([dt*p for p in param_derivative_inc])
+                    first_out2 = out2
                 else:
                     for _1, _2 in zip([*out2], [*param_derivative_inc]):
                         _1 += dt * _2 if _2 is not None else 0.0
 
                 if out3 is None:
                     out3 = tuple([-dt*p for p in delay_derivative_inc])
+                    first_out3 = out3
                 else:
                     for _1, _2 in zip([*out3], [*delay_derivative_inc]):
                         _1 += -dt * _2  if _2 is not None else 0.0
-        
+                    
+                if current_t == T :
+                    last_out2 = tuple([dt*p for p in param_derivative_inc])
+                    last_out3 = tuple([-dt*p for p in delay_derivative_inc])
         # adding the last contribution of the delay parameters in the loss w.r.t. the parameters
         # ie which is the last part of the integration from t = 0 to t = -tau
         for idx, tau_i in enumerate(ctx.func.delays):
@@ -156,10 +161,14 @@ class nddeint_ACA(torch.autograd.Function):
         for _1, _2 in zip([*out3], [*delay_derivative_inc]):
             _1 += - dt * _2  if _2 is not None else 0.0   
         
-        # we are using the rectangle method to integrate and get the loss w.t.r to the parameters
-        # we could probably get a better gradient with trapezoid rule but this would need to change the code
-        # a bit, not too much though
-        # trapezoid is h/2 * (f(a) + f(b) +2 (f(x1) + ... + f(xn-1)))
+        # Substracting extra terms since we want to use the trapezoid for the gradient update
+        # trapz rule is h/2 * (f(a) + f(b) +2 (f(x1) + ... + f(xn-1)))
+        # compared to rectangle rule which is h * (f(a) + f(b) + f(x1) + ... + f(xn-1))
+        for _1, _2, _3 in zip([*out2], [*first_out2], [*last_out2]):
+            _1 -= dt/2 * (_2 + _3) 
+        for _1, _2, _3 in zip([*out3], [*first_out3], [*last_out3]):
+            _1 -= - dt/2 * (_2 + _3)  
+        
         return None, None, None, None,  *(out3[0] + out2[0], *out2[1:])
 class nddeint_ACA_archive(torch.autograd.Function):
     @staticmethod
