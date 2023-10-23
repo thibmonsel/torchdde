@@ -63,7 +63,7 @@ class nddeint_ACA(torch.autograd.Function):
         )
 
         def adjoint_dyn(t, adjoint_y, has_aux=False):
-            h_t = torch.autograd.Variable(state_interpolator(t) if t >= ctx.ts[0] else ctx.ys_history_func(t), requires_grad=True)
+            h_t = torch.autograd.Variable(state_interpolator(t) if t >= ctx.ts[0] else ctx.history_func(t), requires_grad=True)
             h_t_minus_tau = [
                 state_interpolator(t - tau) if t - tau >= ctx.ts[0] else ctx.history_func(t-tau)
                 for tau in ctx.func.delays
