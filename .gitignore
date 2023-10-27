@@ -7,7 +7,7 @@ __pycache__/
 ndde.py
 test1.py
 test2.py
-
+brusselator.py
 # C extensions
 *.so
 
