@@ -3,8 +3,8 @@ import scipy
 import scipy.integrate as sciinteg
 import torch
 import torch.nn as nn
-
 from torchdde.solver.ode_solver import *
+
 
 #
 # Implements a version of the NeuralODE adjoint optimisation algorithm, with the Adaptive Checkpoint Adjoint method
@@ -26,15 +26,15 @@ from torchdde.solver.ode_solver import *
 class odeint_ACA(torch.autograd.Function):
 
     @staticmethod
-    def forward(ctx, y0, func, ts, *params):
+    def forward(ctx, y0, func, ts, solver, *params):
         # Saving parameters for backward()
         ctx.func = func
         ctx.ts = ts
         ctx.y0 = y0
+        ctx.solver = solver
         with torch.no_grad():
             ctx.save_for_backward(*params)
             # Simulation
-            solver = Ralston()
             ys = solver.integrate(func, ts, y0)
         ctx.ys = ys
         return ctx.ys
@@ -52,7 +52,7 @@ class odeint_ACA(torch.autograd.Function):
         ts = ctx.ts
 
         params = ctx.saved_tensors
-        
+        solver = ctx.solver
         # The last step of the time mesh is an evaluation step, thus the adjoint state which corresponds to the
         # gradient of the loss w.r.t. the evaluation states is initialised with the gradient corresponding to
         # the last evaluation time.
@@ -97,7 +97,7 @@ class odeint_ACA(torch.autograd.Function):
 
 
         
-def odesolve_adjoint(z0, func, ts):
+def odesolve_adjoint(z0, func, ts, solver):
     # Main function to be called to integrate the NODE
 
     # z0 : (tensor) Initial state of the NODE
@@ -110,7 +110,7 @@ def odesolve_adjoint(z0, func, ts):
     params = find_parameters(func)
 
     # Forward integrating the NODE and returning the state at each evaluation step
-    zs = odeint_ACA.apply(z0, func, ts, *params)
+    zs = odeint_ACA.apply(z0, func, ts, solver, *params)
     return zs
 
 
