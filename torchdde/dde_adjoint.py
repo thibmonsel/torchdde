@@ -115,7 +115,7 @@ class nddeint_ACA(torch.autograd.Function):
                 adjoint_state = adj
             
                 if out2 is None:
-                    out2 = tuple([dt/2*p for p in param_derivative_inc])
+                    out2 = tuple([dt/2*p for p in param_derivative_inc if param_derivative_inc is not None else 0.0])
                 else:
                     for _1, _2 in zip([*out2], [*param_derivative_inc]):
                         _1 += dt * _2 if _2 is not None else 0.0
