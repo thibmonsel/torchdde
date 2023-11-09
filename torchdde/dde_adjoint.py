@@ -70,9 +70,7 @@ class nddeint_ACA(torch.autograd.Function):
 
         def adjoint_dyn(t, adjoint_y, has_aux=False):
             h_t = torch.autograd.Variable(
-                state_interpolator(t)
-                if t >= ctx.ts[0]
-                else ctx.history_func(t),
+                state_interpolator(t) if t >= ctx.ts[0] else ctx.history_func(t),
                 requires_grad=True,
             )
             h_t_minus_tau = [
@@ -103,9 +101,7 @@ class nddeint_ACA(torch.autograd.Function):
                         for tau_j in ctx.func.delays
                     ]
                     history[idx] = h_t
-                    out_other = ctx.func(
-                        t + tau_i, h_t_plus_tau, history=history
-                    )
+                    out_other = ctx.func(t + tau_i, h_t_plus_tau, history=history)
 
                     # This correspond to the term adjoint(t+tau) df(t+tau, y(t+tau), y(t))_dy(t)
                     rhs_adjoint_2 = torch.autograd.grad(
@@ -183,9 +179,7 @@ class nddeint_ACA(torch.autograd.Function):
                         for tau_j in ctx.func.delays
                     ]
                     history[idx] = h_t
-                    out_other = ctx.func(
-                        t + tau_i, h_t_plus_tau, history=history
-                    )
+                    out_other = ctx.func(t + tau_i, h_t_plus_tau, history=history)
                     rhs_adjoint_inc = torch.autograd.grad(
                         out_other, h_t, -adjoint_t_plus_tau
                     )[0]
@@ -208,7 +202,7 @@ class nddeint_ACA(torch.autograd.Function):
         for _1, _2 in zip([*out2], [*last_out2]):
             _1 -= dt / 2 * _2 if _2 is not None else 0.0
 
-        for _1, _2 in zip([*out3], [*last_out3]):
+        for _1, _2 in zip([*out3], [*(last_out3 or [])]):
             _1 -= -dt / 2 * _2 if _2 is not None else 0.0
 
         return None, None, None, None, *(out3[0] + out2[0], *out2[1:])
