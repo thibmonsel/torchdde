@@ -27,30 +27,34 @@ class odeint_ACA(torch.autograd.Function):
         # grad_output holds the gradient of the loss w.r.t. each evaluation step
         grad_output = grad_y[0]
 
-        h = -(ctx.ts[1] - ctx.ts[0])
+        dt = ctx.ts[1] - ctx.ts[0]
         ys = ctx.ys
         ts = ctx.ts
 
+        solver = ctx.solver
         params = ctx.saved_tensors
-        adjoint_state = torch.zeros_like(grad_output[:, -1])
+        adjoint_state = grad_output[:, -1]
 
         out2 = None
-        for i in range(len(ts), 0, -1):
-            adjoint_state -= grad_output[:, i - 1]
-            z_var = torch.autograd.Variable(ys[:, i - 1], requires_grad=True)
+        for i, current_t in enumerate(reversed(ts)):
+            y_t = torch.autograd.Variable(ys[:, -i - 1], requires_grad=True)
 
             with torch.enable_grad():
-                out = ctx.func(ts[i - 1], z_var)
+                out = ctx.func(current_t, y_t)
+                adj_dyn = lambda t, adj_y: torch.autograd.grad(
+                    out, y_t, -adj_y, retain_graph=True
+                )[0]
+                adjoint_state = solver.step(adj_dyn, current_t, adjoint_state, -dt)
+                adjoint_state -= grad_output[:, -i - 1]
+
                 param_inc = torch.autograd.grad(
                     out, params, -adjoint_state, retain_graph=True
                 )
-                adjoint_state = torch.autograd.grad(out, z_var, -adjoint_state)[0]
-
             if out2 is None:
-                out2 = tuple([h * p for p in param_inc])
+                out2 = tuple([dt * p for p in param_inc])
             else:
                 for _1, _2 in zip([*out2], [*param_inc]):
-                    _1 += h * _2
+                    _1 += dt * _2
 
         out = adjoint_state, None, None, None, *out2
 
