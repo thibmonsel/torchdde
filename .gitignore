@@ -8,6 +8,7 @@ ndde.py
 test1.py
 test2.py
 brusselator.py
+node.py
 # C extensions
 *.so
 
