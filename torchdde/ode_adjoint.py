@@ -36,7 +36,7 @@ class odeint_ACA(torch.autograd.Function):
 
         out2 = None
         for i in range(len(ts), 0, -1):
-            adjoint_state -= grad_output[:, i]
+            adjoint_state -= grad_output[:, i - 1]
             z_var = torch.autograd.Variable(ys[:, i - 1], requires_grad=True)
 
             with torch.enable_grad():
