@@ -1,10 +1,12 @@
+import functools
+
 import numpy as np
 import scipy
 import scipy.integrate as sciinteg
 import torch
 import torch.nn as nn
-from torchdde.solver.ode_solver import *
 
+from torchdde.solver.ode_solver import *
 
 #
 # Implements a version of the NeuralODE adjoint optimisation algorithm, with the Adaptive Checkpoint Adjoint method
@@ -34,10 +36,9 @@ class odeint_ACA(torch.autograd.Function):
         ctx.solver = solver
         with torch.no_grad():
             ctx.save_for_backward(*params)
-            # Simulation
             ys = solver.integrate(func, ts, y0)
         ctx.ys = ys
-        return ctx.ys
+        return ys
 
     @staticmethod
     def backward(ctx, *grad_y):
@@ -57,37 +58,37 @@ class odeint_ACA(torch.autograd.Function):
         # gradient of the loss w.r.t. the evaluation states is initialised with the gradient corresponding to
         # the last evaluation time.
 
-        adjoint_state = grad_output[:, -1]
-        i_ev = -2
-
-        out2 = None
-        solver = Ralston()
+        adjoint_state = torch.zeros_like(grad_output[:, -1])
         # The adjoint state as well as the parameters' gradient are integrated backwards in time.
         # Following the Adaptive Checkpoint Adjoint method, the time steps and corresponding states of the forward
         # integration are re-used by going backwards in the time mesh.
+
+        out2 = None
         for i, t in enumerate(reversed(ts)):
+            # adjoint_state -= grad_output[:, -j - 1]
             # Backward Integrating the adjoint state and the parameters' gradient between time i and i-1
-            z_var = torch.autograd.Variable(ys[:, i - 1], requires_grad=True)
+            y_t = torch.autograd.Variable(ys[:, i - 1], requires_grad=True)
 
             with torch.enable_grad():
-                # Taking a step with the NODE function to build a graph which will be differentiated
-                # so as to integrate the adjoint state and the parameters' gradient
-                # y = ctx.func.step(t, z_var, h)
-                y = solver.step(ctx.func, t, z_var, h)
+                out = ctx.func(t, y_t)
+                adj_fn = lambda t, adj_y: torch.autograd.grad(
+                    out, y_t, -adj_y, retain_graph=True
+                )[0]
+                adjoint_state = solver.step(adj_fn, t, adjoint_state, h)
+
                 # Computing the increment to the parameters' gradient corresponding to the current time step
                 param_inc = torch.autograd.grad(
-                    y, params, adjoint_state, retain_graph=True
+                    out, params, -adjoint_state, retain_graph=True
                 )
 
                 # The following line corresponds to an integration step of the adjoint state
-                adjoint_state = torch.autograd.grad(y, z_var, adjoint_state)[0]
 
             # incrementing the parameters' grad
             if out2 is None:
-                out2 = tuple([h * p for p in param_inc])
+                out2 = tuple([-h * p for p in param_inc])
             else:
                 for _1, _2 in zip([*out2], [*param_inc]):
-                    _1 += h * _2
+                    _1 -= h * _2
 
         return adjoint_state, None, None, None, *out2
 
@@ -107,36 +108,6 @@ def odesolve_adjoint(z0, func, ts, solver):
     # Forward integrating the NODE and returning the state at each evaluation step
     zs = odeint_ACA.apply(z0, func, ts, solver, *params)
     return zs
-
-
-def flatten_grad_params(params):
-    # Parameters for which a grad is required are flattened and returned as a list
-    flat_params = []
-    for p in params:
-        if p.requires_grad:
-            flat_params.append(p.contiguous().view(-1))
-
-    return torch.cat(flat_params) if len(flat_params) > 0 else torch.tensor([])
-
-
-def flatten_params(params):
-    # values in the params tuple are flattened and returned as a list
-    flat_params = [p.contiguous().view(-1) for p in params]
-    return torch.cat(flat_params) if len(flat_params) > 0 else torch.tensor([])
-
-
-def get_integration_options(n0, n1, dt, substeps):
-    sub_dt = float(dt / substeps)
-    nSteps = substeps * (n1 - n0)
-
-    integration_options = {
-        "t0": n0 * dt,
-        "dt": sub_dt,
-        "nSteps": nSteps,
-        "eval_idx": np.arange(0, nSteps + 1, substeps),
-    }
-
-    return integration_options
 
 
 def find_parameters(module):
