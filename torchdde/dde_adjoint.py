@@ -65,8 +65,8 @@ class nddeint_ACA(torch.autograd.Function):
             adjoint_state.shape[0], 1, *adjoint_state.shape[1:]
         )
         adjoint_interpolator = TorchLinearInterpolator(
-            torch.unsqueeze(ctx.ts[-1], dim=0),
-            adjoint_ys_final,
+            torch.tensor([ctx.ts[-1], ctx.ts[-1] + dt]),
+            torch.concat([adjoint_ys_final, adjoint_ys_final], dim=1),
         )
 
         def adjoint_dyn(t, adjoint_y, has_aux=False):
@@ -171,6 +171,7 @@ class nddeint_ACA(torch.autograd.Function):
                         else ctx.history_func(t),
                         requires_grad=True,
                     )
+                    # print("adjoint_interpolator.ts", adjoint_interpolator.ts, t, tau_i)
                     adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
                     h_t_plus_tau = state_interpolator(t + tau_i)
                     history = [
@@ -203,7 +204,7 @@ class nddeint_ACA(torch.autograd.Function):
         for _1, _2 in zip([*out2], [*last_out2]):
             _1 -= dt / 2 * _2 if _2 is not None else 0.0
 
-        for _1, _2 in zip([*out3], [*last_out3]):
+        for _1, _2 in zip([*out3], [*(last_out3 or [])]):
             _1 -= -dt / 2 * _2 if _2 is not None else 0.0
 
         return None, None, None, None, *(out3[0] + out2[0], *out2[1:])
