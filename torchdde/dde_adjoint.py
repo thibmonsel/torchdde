@@ -64,8 +64,12 @@ class nddeint_ACA(torch.autograd.Function):
         adjoint_ys_final = -grad_output[:, -1].reshape(
             adjoint_state.shape[0], 1, *adjoint_state.shape[1:]
         )
+        adjoint_ys_final = adjoint_ys_final.to(ctx.ts.device)
+        add_t = torch.tensor([ctx.ts[-1], ctx.ts[-1] + dt])
+        add_t = add_t.to(ctx.ts.device)
+
         adjoint_interpolator = TorchLinearInterpolator(
-            torch.tensor([ctx.ts[-1], ctx.ts[-1] + dt]),
+            add_t,
             torch.concat([adjoint_ys_final, adjoint_ys_final], dim=1),
         )
 
