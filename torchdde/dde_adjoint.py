@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 from matplotlib import pyplot as plt
-
 from torchdde.interpolation.linear_interpolation import TorchLinearInterpolator
 from torchdde.solver.dde_solver import DDESolver
 from torchdde.solver.ode_solver import *
@@ -208,8 +207,9 @@ class nddeint_ACA(torch.autograd.Function):
         for _1, _2 in zip([*out2], [*last_out2]):
             _1 -= dt / 2 * _2 if _2 is not None else 0.0
 
-        for _1, _2 in zip([*out3], [*last_out3]):
-            _1 -= -dt / 2 * _2 if _2 is not None else 0.0
+        if last_out3 is not None:
+            for _1, _2 in zip([*out3], [*last_out3]):
+                _1 -= -dt / 2 * _2 if _2 is not None else 0.0
 
         return None, None, None, None, *(out3[0] + out2[0], *out2[1:])
 
