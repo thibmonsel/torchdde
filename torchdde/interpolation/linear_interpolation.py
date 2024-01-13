@@ -6,9 +6,9 @@ import torch
 
 tiny = 10e-3
 
+
 class TorchLinearInterpolator:
     def __init__(self, ts, ys):
-
         self.ts = ts  # [N_t]
         self.ys = ys  # [N, N_t, D]
 
@@ -25,11 +25,10 @@ class TorchLinearInterpolator:
         if not torch.all(torch.diff(self.ts) > 0):
             raise ValueError("`ts` must be monotonically increasing.")
 
-    
     def to(self, device):
         self.ys = self.ys.to(device)
         self.ts = self.ts.to(device)
-    
+
     def _interpret_t(self, t: float, left: bool):
         maxlen = self.ts.shape[0] - 2
         index = torch.searchsorted(self.ts, t, side="left" if left else "right")
@@ -40,16 +39,18 @@ class TorchLinearInterpolator:
 
     def __call__(self, t, left=True):
         if t > self.ts[-1] or t < self.ts[0]:
-            if torch.abs((t -self.ts[0])) < tiny:
+            if self.ys.shape[1] == 1:
                 return self.ys[:, 0]
-            if torch.abs((t -self.ts[-1])) < tiny:
+            if torch.abs((t - self.ts[0])) < tiny:
+                return self.ys[:, 0]
+            if torch.abs((t - self.ts[-1])) < tiny:
                 return self.ys[:, -1]
             raise ValueError(
                 f"Interpolation point is outside data range. ie t={t} > ts[-1]={self.ts[-1]} or t < ts[0]={self.ts[0]}"
             )
 
         index, fractional_part = self._interpret_t(t, left)
-       
+
         prev_ys = self.ys[:, index]
         next_ys = self.ys[:, index + 1]
         prev_t = self.ts[index]
@@ -91,4 +92,3 @@ class TorchLinearInterpolator:
 
         self.ys = new_ys
         self.ts = new_ts
-
