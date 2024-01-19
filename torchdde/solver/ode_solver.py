@@ -4,6 +4,9 @@ import torch
 
 
 class AbstractOdeSolver(ABC):
+    """Base class for creating ODE solvers. All solvers should inherit from it.
+    User must implement the step method."""
+
     @abstractmethod
     def step(self, func, t, y, dt, has_aux=False):
         """ODE's stepping definition

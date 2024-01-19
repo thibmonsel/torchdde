@@ -7,9 +7,15 @@
 This examples trains a Neural DDE to reproduce a simple dataset of a delay logistic equation. The backward pass is compute with the adjoint method i.e `ddesolve_adjoint`.
 
 ```python
+import time
+
+import matplotlib.pyplot as plt
 import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader, Dataset
+from torchdde import ddesolve_adjoint, DDESolver, Euler
 from torchvision.ops import MLP
-from torchdde import DDESolver, Euler
+
 
 device =  torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ```
@@ -17,7 +23,7 @@ device =  torch.device("cuda" if torch.cuda.is_available() else "cpu")
 Recalling that a neural DDE is defined as
 
 $$ \frac{dy}{dt} = f_{\theta}(t, y(t), y(t-\tau_1), \dots, y(t-\tau_{n})), \quad
-\\ x(t<0) = \psi(t)$$
+\\ y(t<0) = \psi(t)$$
 
 then here we're now about to define $f_{\theta}$ that appears on that right hand side
 
@@ -54,25 +60,16 @@ def get_data(y0, ts, tau=torch.tensor([1.0])):
     ys, _ = solver.integrate(f, ts, lambda t: torch.unsqueeze(y0, dim=1))
     return ts, ys
 
-dataset_size = 256
-state_dim = 1
-ts = torch.linspace(0, 10, 101)
-r1, r2 = 2.0, 3.0
-y0 = (r1 - r2) * torch.rand((dataset_size, state_dim)) + r2
-ys = get_data(y0, ts)
 
-value = torch.abs(torch.rand((1,)))
-list_delays = torch.tensor([value])
-list_delays = list_delays.to(device)
+class MyDataset(Dataset):
+    def __init__(self, ys):
+        self.ys = ys
 
-model = NDDE(list_delays, state_dim, state_dim, 32, 2)
-model = model.to(device)
+    def __getitem__(self, index):
+        return self.ys[index]
 
-dataset = MyDataset(ys)
-train_len = int(len(dataset) * 0.7)
-train_set, test_set = random_split(dataset, [train_len, len(dataset) - train_len])
-train_loader = DataLoader(train_set, batch_size=128, shuffle=True)
-test_loader = DataLoader(test_set, batch_size=128, shuffle=False)
+    def __len__(self):
+        return self.ys.shape[0]
 ```
 
 Main entry point. Try running `main()`.
