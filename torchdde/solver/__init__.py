@@ -1,2 +1,2 @@
 from .dde_solver import DDESolver
-from .ode_solver import RK2, RK4, Euler, Ralston
+from .ode_solver import AbstractOdeSolver, Euler, Ralston, RK2, RK4
