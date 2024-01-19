@@ -2,7 +2,15 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+**/__pycache__
+**/.ipynb_checkpoints
+*.egg-info/
+build/
+dist/
+site/
+.all_objects.cache
+.pymon
+.idea/
 
 ndde.py
 test1.py
