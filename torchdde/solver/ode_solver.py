@@ -16,8 +16,7 @@ class AbstractOdeSolver(ABC):
             t (float): current time t
             y (torch.Tensor): current state y
             dt (float): stepsize dt
-            has_aux (bool, optional): whether the model has an
-            auxiliary output. Defaults to False.
+            has_aux (bool, optional): whether the model has an auxiliary output. Defaults to False.
 
         Returns:
             torch.Tensor: integration result a time t+dt
@@ -31,8 +30,7 @@ class AbstractOdeSolver(ABC):
             func (torch.nn.Module): vector field
             ts (torch.tensor): integration span
             y0 (torch.tensor): initial condition
-            has_aux (bool, optional): whether the model has an
-            auxiliary output. Defaults to False.
+            has_aux (bool, optional): whether the model has an auxiliary output. Defaults to False.
 
 
         Returns:
@@ -80,7 +78,7 @@ class RK2(AbstractOdeSolver):
 
 
 class Ralston(AbstractOdeSolver):
-    """Ralston ODE Solver (2nd order)"""
+    """Ralston method (2nd order)"""
 
     def __init__(self):
         super().__init__()
