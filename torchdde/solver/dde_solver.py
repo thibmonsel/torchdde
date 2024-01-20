@@ -1,6 +1,5 @@
 from typing import Callable, Tuple
 
-import matplotlib.pyplot as plt
 import torch
 from torchcubicspline import natural_cubic_spline_coeffs, NaturalCubicSpline
 from torchdde.interpolation.linear_interpolation import TorchLinearInterpolator
@@ -8,7 +7,7 @@ from torchdde.solver.ode_solver import AbstractOdeSolver
 
 
 class DDESolver:
-    """DDE solver class used to integrate a DDE with a given ODE solver.
+    """Solver class used to integrate a DDE with a given ODE solver.
     See [`torchdde.AbstractOdeSolver`][] for more details on which solvers are available.
     """
 

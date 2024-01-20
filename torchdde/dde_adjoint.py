@@ -1,9 +1,7 @@
-from typing import Callable, Tuple
+from typing import Callable
 
-import numpy as np
 import torch
 import torch.nn as nn
-from matplotlib import pyplot as plt
 from torchdde.interpolation.linear_interpolation import TorchLinearInterpolator
 from torchdde.solver.dde_solver import DDESolver
 from torchdde.solver.ode_solver import *
