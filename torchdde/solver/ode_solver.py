@@ -5,7 +5,7 @@ import torch
 
 class AbstractOdeSolver(ABC):
     """Base class for creating ODE solvers. All solvers should inherit from it.
-    User must implement the step method.
+    To create new solvers users must implement the step method.
     """
 
     @abstractmethod

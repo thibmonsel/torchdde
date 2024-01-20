@@ -2,7 +2,7 @@
 
 !!! warning
 
-    This library only supports constant lag DDEs. Therefore we are unable to model state dependent delays.
+    This library only supports constant lag DDEs. Therefore we are unable to model state dependent DDEs.
 
 This examples trains a Neural DDE to reproduce a simple dataset of a delay logistic equation. The backward pass is compute with the adjoint method i.e `ddesolve_adjoint`.
 

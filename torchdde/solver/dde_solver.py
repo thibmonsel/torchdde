@@ -1,12 +1,18 @@
+from typing import Callable, Tuple
+
 import matplotlib.pyplot as plt
 import torch
-from torchcubicspline import NaturalCubicSpline, natural_cubic_spline_coeffs
-
+from torchcubicspline import natural_cubic_spline_coeffs, NaturalCubicSpline
 from torchdde.interpolation.linear_interpolation import TorchLinearInterpolator
+from torchdde.solver.ode_solver import AbstractOdeSolver
 
 
 class DDESolver:
-    def __init__(self, solver, delays):
+    """DDE solver class used to integrate a DDE with a given ODE solver.
+    See [`torchdde.AbstractOdeSolver`][] for more details on which solvers are available.
+    """
+
+    def __init__(self, solver: AbstractOdeSolver, delays: torch.Tensor):
         self.solver = solver
         self.delays = delays
 
@@ -14,14 +20,28 @@ class DDESolver:
         if max(self.delays) <= 0:
             raise "delays must be positive"
 
-    def integrate(self, func, ts, history_func):
+    def integrate(
+        self, func: torch.nn.Module, ts: torch.Tensor, history_func: Callable
+    ) -> Tuple[torch.Tensor, Callable]:
+        r"""Integrate a system of DDEs.
+
+        **Arguments:**
+
+        - `func`: Pytorch model, i.e vector field
+        - `ts`: Integration span
+        - `history_func`: DDE's history function
+
+        **Returns:**
+
+        Integration result over `ts` and a `TorchLinearInterpolator` object of the result integration
+        """
         dt = ts[1] - ts[0]
         # y0 should have the shape [batch, N_t=1, features] in order to properly instantiate the
         # interpolator class
         y0 = torch.unsqueeze(history_func(ts[0]).clone(), dim=1)
         ys_interpolation = TorchLinearInterpolator(ts[0].view(1), y0)
 
-        def ode_func(t, y):
+        def ode_func(t: torch.Tensor, y: torch.Tensor):
             # applies the function func to the current time t and state y and the history
             # we have to make sur that t - tau > dt otherwise we are making a prediction with
             # an unknown ys_interpolation ...
@@ -43,7 +63,21 @@ class DDESolver:
 
         return ys, ys_interpolation
 
-    def integrate_with_cubic_interpolator(self, func, ts, history_func):
+    def integrate_with_cubic_interpolator(
+        self, func: torch.nn.Module, ts: torch.Tensor, history_func: Callable
+    ) -> Tuple[torch.Tensor, Callable]:
+        r"""Integrate a system of DDEs. Please note that this method is not not efficient since `NaturalCubicSpline` needs to recompute its coefficients after each integration step. Please use [`torchdde.AbstractOdeSolver.integrate`]
+
+        **Arguments:**
+
+        - `func`: Pytorch model, i.e vector field
+        - `ts`: Integration span
+        - `history_func`: DDE's history function
+
+        **Returns:**
+
+        Integration result over `ts` and a `NaturalCubicSpline` object of the result integration
+        """
         dt = ts[1] - ts[0]
         # y0 should have the shape [batch, N_t=1, features] in order to properly instantiate the
         # TorchLinearInterpolator interpolator class
@@ -70,4 +104,12 @@ class DDESolver:
             coeffs = natural_cubic_spline_coeffs(ts[: i + 2], ys)
             ys_interpolation = lambda t: NaturalCubicSpline(coeffs).evaluate(t)
 
-        return ys
+        return ys, ys_interpolation
+
+
+DDESolver.__init__.__doc__ = """**Arguments:**
+
+- `solver`: Solver to integrate the DDE
+- `delays`: Delays tensors used in DDE
+
+"""

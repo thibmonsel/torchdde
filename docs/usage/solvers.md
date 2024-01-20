@@ -1,6 +1,12 @@
-# Solvers
+# Numerical Solvers
+
+## ODE Solvers
 
 Only a few explicit solvers are available to use :
+
+!!! warning
+
+    The following solver are constant step size solvers. This is indeed less flexible than adaptive stepsize method but such an incorporation isn't available at the time.
 
 ::: torchdde.AbstractOdeSolver
     selection:
@@ -17,9 +23,17 @@ Only a few explicit solvers are available to use :
 ::: torchdde.RK2
     selection:
         members: false
+
 ::: torchdde.RK4
     selection:
         members: false
-!!! warning
 
-    The following solver are constant step size solvers. This is indeed less flexible than adaptive stepsize method but such an incorporation isn't available at the time.
+## DDE Solvers
+
+::: torchdde.DDESolver
+    selection:
+        members:
+            - __init__
+            - step
+            - integrate
+            - integrate_with_cubic_interpolator

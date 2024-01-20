@@ -1,8 +1,3 @@
-import functools
-
-import numpy as np
-import scipy
-import scipy.integrate as sciinteg
 import torch
 import torch.nn as nn
 from torchdde.solver.ode_solver import *

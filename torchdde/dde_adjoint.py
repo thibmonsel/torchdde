@@ -1,3 +1,5 @@
+from typing import Callable, Tuple
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -214,20 +216,27 @@ class nddeint_ACA(torch.autograd.Function):
         return None, None, None, None, *(out3[0] + out2[0], *out2[1:])
 
 
-def ddesolve_adjoint(history, func, ts, solver):
-    """Main function to integrate a constant time delay DDE with the adjoint method
+def ddesolve_adjoint(
+    history_func: Callable,
+    func: torch.nn.Module,
+    ts: torch.Tensor,
+    solver: AbstractOdeSolver,
+) -> torch.Tensor:
+    r"""Main function to integrate a constant time delay DDE with the adjoint method
 
-    Args:
-        history (callable): correspond to the history function of the DDE
-        func (nn.Module): neural network
-        ts (torch.tensor): time mesh
-        solver (AbstractOdeSolver): ODE solver used for integration
+    **Arguments:**
 
-    Returns:
-        torch.tensor : trajectory from the integrated DDE
+    - `history_func`: DDE's history function
+    - `func`: Pytorch model, i.e vector field
+    - `ts`: Integration span
+    - `solver`: ODE solver use
+
+    **Returns:**
+
+    Integration result over `ts`.
     """
     params = find_parameters(func)
-    ys = nddeint_ACA.apply(history, func, ts, solver, *params)
+    ys = nddeint_ACA.apply(history_func, func, ts, solver, *params)
     return ys
 
 
