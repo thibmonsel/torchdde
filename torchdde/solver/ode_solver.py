@@ -5,37 +5,50 @@ import torch
 
 class AbstractOdeSolver(ABC):
     """Base class for creating ODE solvers. All solvers should inherit from it.
-    User must implement the step method."""
+    User must implement the step method.
+    """
 
     @abstractmethod
-    def step(self, func, t, y, dt, has_aux=False):
-        """ODE's stepping definition
+    def step(
+        self,
+        func: torch.nn.Module,
+        t: torch.Tensor,
+        y: torch.Tensor,
+        dt: torch.Tensor,
+        has_aux=False,
+    ) -> torch.Tensor:
+        r"""ODE's stepping definition
 
-        Args:
-            func (torch.nn.Module): model
-            t (float): current time t
-            y (torch.Tensor): current state y
-            dt (float): stepsize dt
-            has_aux (bool, optional): whether the model has an auxiliary output. Defaults to False.
+        **Arguments:**
 
-        Returns:
-            torch.Tensor: integration result a time t+dt
+        - `func`: Pytorch model, i.e vector field
+        - `t`: Current time step t
+        - `y`: Current state y
+        - `dt`: Stepsize dt
+        - `has_aux`: Whether the model has an auxiliary output.
+
+        **Returns:**
+
+        Integration result at time `t+dt`
         """
         pass
 
-    def integrate(self, func, ts, y0, has_aux=False):
-        """Integrate a system of ordinary differential equations.
+    def integrate(
+        self, func: torch.nn.Module, ts: torch.Tensor, y0: torch.Tensor, has_aux=False
+    ) -> torch.Tensor:
+        r"""Integrate a system of ODEs.
+        **Arguments:**
 
-        Args:
-            func (torch.nn.Module): vector field
-            ts (torch.tensor): integration span
-            y0 (torch.tensor): initial condition
-            has_aux (bool, optional): whether the model has an auxiliary output. Defaults to False.
+        - `func`: Pytorch model, i.e vector field
+        - `ts`: Integration span
+        - `y0`: Initial condition
+        - `has_aux`: Whether the model has an auxiliary output.
 
+        **Returns:**
 
-        Returns:
-            torch.Tensor: integration result over ts
+        Integration result over `ts`
         """
+
         dt = ts[1] - ts[0]
         ys = torch.unsqueeze(y0.clone(), dim=1)
         current_y = y0
@@ -47,7 +60,7 @@ class AbstractOdeSolver(ABC):
 
 
 class Euler(AbstractOdeSolver):
-    """Euler method"""
+    """Euler's method"""
 
     def __init__(self):
         super().__init__()
@@ -78,7 +91,7 @@ class RK2(AbstractOdeSolver):
 
 
 class Ralston(AbstractOdeSolver):
-    """Ralston method (2nd order)"""
+    """Ralston's method (2nd order)"""
 
     def __init__(self):
         super().__init__()
