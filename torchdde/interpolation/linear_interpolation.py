@@ -1,6 +1,7 @@
 import warnings
 
 import torch
+from jaxtyping import Float
 
 
 tiny = 10e-3
@@ -9,7 +10,11 @@ tiny = 10e-3
 class TorchLinearInterpolator:
     r"""Linear interpolator class that is compatible with batching."""
 
-    def __init__(self, ts, ys):
+    def __init__(
+        self,
+        ts: Float[torch.Tensor, "time"],
+        ys: Float[torch.Tensor, "batch time ..."],
+    ):
         self.ts = ts  # [N_t]
         self.ys = ys  # [N, N_t, D]
 
@@ -38,7 +43,7 @@ class TorchLinearInterpolator:
         fractional_part = t - self.ts[index]
         return index, fractional_part
 
-    def __call__(self, t: torch.Tensor, left=True):
+    def __call__(self, t: Float[torch.Tensor, "1"], left=True):
         if t > self.ts[-1] or t < self.ts[0]:
             if self.ys.shape[1] == 1:
                 return self.ys[:, 0]
@@ -59,9 +64,11 @@ class TorchLinearInterpolator:
         diff_t = next_t - prev_t
         return prev_ys + (next_ys - prev_ys) * (fractional_part / diff_t)
 
-    def add_point(self, new_t: torch.Tensor, new_y: torch.Tensor):
-        # new_t : float
-        # new_y : torch.tensor size [N, D]
+    def add_point(
+        self,
+        new_t: Float[torch.Tensor, "1"],
+        new_y: Float[torch.Tensor, "batch ..."],
+    ):
         if new_t in self.ts:
             warnings.warn(
                 f"already have new_t={new_t} point in interpolation, overwriting it "

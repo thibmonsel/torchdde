@@ -11,4 +11,4 @@ repos:
     rev: v1.1.316
     hooks:
     - id: pyright
-      additional_dependencies: [torch, pytest, typing_extensions]
+      additional_dependencies: [torch, pytest, typing_extensions, jaxtyping]

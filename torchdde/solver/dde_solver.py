@@ -1,6 +1,7 @@
 from typing import Callable, Tuple
 
 import torch
+from jaxtyping import Float
 from torchcubicspline import natural_cubic_spline_coeffs, NaturalCubicSpline
 from torchdde.interpolation.linear_interpolation import TorchLinearInterpolator
 from torchdde.solver.ode_solver import AbstractOdeSolver
@@ -11,7 +12,9 @@ class DDESolver:
     See [`torchdde.AbstractOdeSolver`][] for more details on which solvers are available.
     """
 
-    def __init__(self, solver: AbstractOdeSolver, delays: torch.Tensor):
+    def __init__(
+        self, solver: AbstractOdeSolver, delays: Float[torch.Tensor, "delays"]
+    ):
         self.solver = solver
         self.delays = delays
 
@@ -20,8 +23,11 @@ class DDESolver:
             raise "delays must be positive"
 
     def integrate(
-        self, func: torch.nn.Module, ts: torch.Tensor, history_func: Callable
-    ) -> Tuple[torch.Tensor, Callable]:
+        self,
+        func: torch.nn.Module,
+        ts: Float[torch.Tensor, "time"],
+        history_func: Callable,
+    ) -> Tuple[Float[torch.Tensor, "batch time ..."], Callable]:
         r"""Integrate a system of DDEs.
 
         **Arguments:**
@@ -40,7 +46,9 @@ class DDESolver:
         y0 = torch.unsqueeze(history_func(ts[0]).clone(), dim=1)
         ys_interpolation = TorchLinearInterpolator(ts[0].view(1), y0)
 
-        def ode_func(t: torch.Tensor, y: torch.Tensor):
+        def ode_func(
+            t: Float[torch.Tensor, "1"], y: Float[torch.Tensor, "batch features"]
+        ):
             # applies the function func to the current time t and state y and the history
             # we have to make sur that t - tau > dt otherwise we are making a prediction with
             # an unknown ys_interpolation ...
@@ -63,8 +71,11 @@ class DDESolver:
         return ys, ys_interpolation
 
     def integrate_with_cubic_interpolator(
-        self, func: torch.nn.Module, ts: torch.Tensor, history_func: Callable
-    ) -> Tuple[torch.Tensor, Callable]:
+        self,
+        func: torch.nn.Module,
+        ts: Float[torch.Tensor, "time"],
+        history_func: Callable,
+    ) -> Tuple[Float[torch.Tensor, "batch time ..."], Callable]:
         r"""Integrate a system of DDEs. Please note that this method is not not efficient since `NaturalCubicSpline` needs to recompute its coefficients after each integration step. Please use [`torchdde.AbstractOdeSolver.integrate`]
 
         **Arguments:**

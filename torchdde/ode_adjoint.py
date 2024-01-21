@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from jaxtyping import Float
 from torchdde.solver.ode_solver import *
 
 
@@ -56,7 +57,12 @@ class odeint_ACA(torch.autograd.Function):
         return out
 
 
-def odesolve_adjoint(z0, func, ts, solver):
+def odesolve_adjoint(
+    z0: Float[torch.Tensor, "batch ..."],
+    func: torch.nn.Module,
+    ts: Float[torch.Tensor, "time ..."],
+    solver: AbstractOdeSolver,
+) -> Float[torch.Tensor, "batch time ..."]:
     # Main function to be called to integrate the NODE
 
     # z0 : (tensor) Initial state of the NODE

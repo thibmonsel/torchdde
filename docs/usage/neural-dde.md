@@ -22,10 +22,9 @@ device =  torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 Recalling that a neural DDE is defined as
 
-$$ \frac{dy}{dt} = f_{\theta}(t, y(t), y(t-\tau_1), \dots, y(t-\tau_{n})), \quad
-\\ y(t<0) = \psi(t)$$
+$$\frac{dy}{dt} = f_{\theta}(t, y(t), y(t-\tau_1), \dots, y(t-\tau_{n})), \quad y(t<0) = \psi(t)$$
 
-then here we're now about to define $f_{\theta}$ that appears on that right hand side
+then here we're now about to define $f_{\theta}$ that appears on that right hand side on the equation above
 
 ```python
 class NDDE(nn.Module):

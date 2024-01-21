@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
 import torch
+from jaxtyping import Float
 
 
 class AbstractOdeSolver(ABC):
@@ -12,9 +13,9 @@ class AbstractOdeSolver(ABC):
     def step(
         self,
         func: torch.nn.Module,
-        t: torch.Tensor,
-        y: torch.Tensor,
-        dt: torch.Tensor,
+        t: Float[torch.Tensor, "1"],
+        y: Float[torch.Tensor, "batch ..."],
+        dt: Float[torch.Tensor, "1"],
         has_aux=False,
     ) -> torch.Tensor:
         r"""ODE's stepping definition
@@ -34,7 +35,11 @@ class AbstractOdeSolver(ABC):
         pass
 
     def integrate(
-        self, func: torch.nn.Module, ts: torch.Tensor, y0: torch.Tensor, has_aux=False
+        self,
+        func: torch.nn.Module,
+        ts: Float[torch.Tensor, "time"],
+        y0: Float[torch.Tensor, "batch ..."],
+        has_aux=False,
     ) -> torch.Tensor:
         r"""Integrate a system of ODEs.
         **Arguments:**

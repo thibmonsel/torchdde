@@ -2,6 +2,7 @@ from typing import Callable
 
 import torch
 import torch.nn as nn
+from jaxtyping import Float
 from torchdde.interpolation.linear_interpolation import TorchLinearInterpolator
 from torchdde.solver.dde_solver import DDESolver
 from torchdde.solver.ode_solver import *
@@ -217,9 +218,9 @@ class nddeint_ACA(torch.autograd.Function):
 def ddesolve_adjoint(
     history_func: Callable,
     func: torch.nn.Module,
-    ts: torch.Tensor,
+    ts: Float[torch.Tensor, "time"],
     solver: AbstractOdeSolver,
-) -> torch.Tensor:
+) -> Float[torch.Tensor, "batch time ..."]:
     r"""Main function to integrate a constant time delay DDE with the adjoint method
 
     **Arguments:**
