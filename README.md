@@ -12,55 +12,42 @@ pip install git@github.com:thibmonsel/torchdde.git
 or local installation
 
 ```bash
-git clone https://github.com/patrick-kidger/diffrax.git
+git clone https://github.com/thibmonsel/torchdde.git
 cd torchdde/
 pip install .
 ```
 
 ## Documentation
 
-## Getting started
+To generate the documentation :
 
-This example trains a Neural DDE to reproduce a toy dataset from a simple DDE.
-
-### Integrating a simple DDE
-
-```py
-
+```bash
+mkdocs serve 
 ```
 
-### Defining
+To open the url please, use on of the following command depending on your OS :
 
-```py
+```bash
+open http://127.0.0.1:8000/usage/solvers/
+firefox http://127.0.0.1:8000/usage/solvers/
+xdg-open http://127.0.0.1:8000/usage/solvers/
+```
 
+## Quick example
+
+```python
 import torch
-import torch.nn as nn
-from torchvision.ops import MLP
+from torchdde import DDESolver, RK2
 
-class NDDE(nn.Module):
-    def __init__(
-        self,
-        delays,
-        in_size,
-        out_size,
-        width_size,
-        depth,
-        activation=nn.ReLU,
-        dropout=0,
-    ):
-        super().__init__()
-        self.in_dim = in_size * (1 + len(delays))
-        self.delays = torch.nn.Parameter(delays)
-        self.mlp = MLP(
-            self.in_dim,
-            hidden_channels=depth * [width_size] + [out_size],
-            activation_layer=activation,
-            dropout=dropout,
-        )
+def f(t, y, history):
+    return y * (1 - history[0])
 
-    def forward(self, t, z, *, history):
-        inp = torch.cat([z, *history], dim=-1)
-        return self.mlp(inp)
-
+delays = torch.tensor([1.0])
+solver = DDESolver(RK2(), delays)
+history_values = torch.arange(1, 5).reshape(-1, 1)
+history_function = lambda t: history_values
+solution, _ = solver.integrate(f, torch.linspace(0, 20, 201), history_function)
 
 ```
+
+Please note that this library is fairly new so bugs might arise, if so please raise an issue !
