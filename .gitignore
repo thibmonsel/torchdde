@@ -39,7 +39,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-*.png
+neural_dde.png
 titanic/
 margaret/
 meta_data/
