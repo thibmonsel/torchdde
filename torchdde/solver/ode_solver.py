@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Optional
 
 import torch
 from jaxtyping import Float
@@ -16,6 +17,7 @@ class AbstractOdeSolver(ABC):
         t: Float[torch.Tensor, "1"],
         y: Float[torch.Tensor, "batch ..."],
         dt: Float[torch.Tensor, "1"],
+        args=None,
         has_aux=False,
     ) -> torch.Tensor:
         r"""ODE's stepping definition
@@ -39,6 +41,7 @@ class AbstractOdeSolver(ABC):
         func: torch.nn.Module,
         ts: Float[torch.Tensor, "time"],
         y0: Float[torch.Tensor, "batch ..."],
+        args=None,
         has_aux=False,
     ) -> torch.Tensor:
         r"""Integrate a system of ODEs.
@@ -58,7 +61,7 @@ class AbstractOdeSolver(ABC):
         ys = torch.unsqueeze(y0.clone(), dim=1)
         current_y = y0
         for current_t in ts[1:]:
-            y = self.step(func, current_t, current_y, dt, has_aux=has_aux)
+            y = self.step(func, current_t, current_y, dt, args=args, has_aux=has_aux)
             current_y = y
             ys = torch.cat((ys, torch.unsqueeze(current_y, dim=1)), dim=1)
         return ys
@@ -70,12 +73,12 @@ class Euler(AbstractOdeSolver):
     def __init__(self):
         super().__init__()
 
-    def step(self, func, t, y, dt, has_aux=False):
+    def step(self, func, t, y, dt, args, has_aux=False):
         if has_aux:
-            k1, aux = func(t, y, has_aux)
+            k1, aux = func(t, y, args, has_aux)
             return y + dt * k1, aux
         else:
-            return y + dt * func(t, y)
+            return y + dt * func(t, y, args)
 
 
 class RK2(AbstractOdeSolver):
@@ -84,14 +87,14 @@ class RK2(AbstractOdeSolver):
     def __init__(self):
         super().__init__()
 
-    def step(self, func, t, y, dt, has_aux=False):
+    def step(self, func, t, y, dt, args, has_aux=False):
         if has_aux:
-            k1, aux = func(t, y, has_aux)
-            k2 = func(t + dt, y + dt * k1)
+            k1, aux = func(t, y, args, has_aux)
+            k2 = func(t + dt, y + dt * k1, args)
             return y + dt / 2 * (k1 + k2), aux
         else:
-            k1 = func(t, y)
-            k2 = func(t + dt, y + dt * k1)
+            k1 = func(t, y, args)
+            k2 = func(t + dt, y + dt * k1, args)
             return y + dt / 2 * (k1 + k2)
 
 
@@ -101,14 +104,14 @@ class Ralston(AbstractOdeSolver):
     def __init__(self):
         super().__init__()
 
-    def step(self, func, t, y, dt, has_aux=False):
+    def step(self, func, t, y, dt, args, has_aux=False):
         if has_aux:
-            k1, aux = func(t, y, has_aux)
-            k2 = func(t + 2 / 3 * dt, y + 2 / 3 * dt * k1)
+            k1, aux = func(t, y, args, has_aux)
+            k2 = func(t + 2 / 3 * dt, y + 2 / 3 * dt * k1, args)
             return y + dt * (1 / 4 * k1 + 3 / 4 * k2), aux
         else:
-            k1 = func(t, y)
-            k2 = func(t + 2 / 3 * dt, y + 2 / 3 * dt * k1)
+            k1 = func(t, y, args)
+            k2 = func(t + 2 / 3 * dt, y + 2 / 3 * dt * k1, args)
             return y + dt * (1 / 4 * k1 + 3 / 4 * k2)
 
 
@@ -118,16 +121,16 @@ class RK4(AbstractOdeSolver):
     def __init__(self):
         super().__init__()
 
-    def step(self, func, t, y, dt, has_aux=False):
+    def step(self, func, t, y, dt, args, has_aux=False):
         if has_aux:
-            k1, aux = func(t, y, has_aux)
-            k2 = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k1)
-            k3 = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k2)
-            k4 = func(t + dt, y + dt * k3)
+            k1, aux = func(t, y, args, has_aux)
+            k2 = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k1, args)
+            k3 = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k2, args)
+            k4 = func(t + dt, y + dt * k3, args)
             return y + 1 / 6 * dt * (k1 + 2 * k2 + 2 * k3 + k4), aux
         else:
-            k1 = func(t, y)
-            k2 = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k1)
-            k3 = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k2)
-            k4 = func(t + dt, y + dt * k3)
+            k1 = func(t, y, args)
+            k2 = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k1, args)
+            k3 = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k2, args)
+            k4 = func(t + dt, y + dt * k3, args)
             return y + 1 / 6 * dt * (k1 + 2 * k2 + 2 * k3 + k4)

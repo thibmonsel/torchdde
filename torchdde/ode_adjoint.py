@@ -1,12 +1,13 @@
 import torch
 import torch.nn as nn
 from jaxtyping import Float
+
 from torchdde.solver.ode_solver import *
 
 
 class odeint_ACA(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, y0, func, ts, solver, *params):
+    def forward(ctx, y0, func, ts, args, solver, *params):
         # Saving parameters for backward()
         ctx.func = func
         ctx.ts = ts
@@ -14,8 +15,9 @@ class odeint_ACA(torch.autograd.Function):
         ctx.solver = solver
         with torch.no_grad():
             ctx.save_for_backward(*params)
-            ys = solver.integrate(func, ts, y0)
+            ys = solver.integrate(func, ts, y0, args)
         ctx.ys = ys
+        ctx.args = args
         return ys
 
     @staticmethod
@@ -26,6 +28,7 @@ class odeint_ACA(torch.autograd.Function):
         dt = ctx.ts[1] - ctx.ts[0]
         ys = ctx.ys
         ts = ctx.ts
+        args = ctx.args
 
         solver = ctx.solver
         params = ctx.saved_tensors
@@ -36,7 +39,7 @@ class odeint_ACA(torch.autograd.Function):
             y_t = torch.autograd.Variable(ys[:, -i - 1], requires_grad=True)
 
             with torch.enable_grad():
-                out = ctx.func(current_t, y_t)
+                out = ctx.func(current_t, y_t, args)
                 adj_dyn = lambda t, adj_y: torch.autograd.grad(
                     out, y_t, -adj_y, retain_graph=True
                 )[0]
@@ -61,6 +64,7 @@ def odesolve_adjoint(
     z0: Float[torch.Tensor, "batch ..."],
     func: torch.nn.Module,
     ts: Float[torch.Tensor, "time ..."],
+    args,
     solver: AbstractOdeSolver,
 ) -> Float[torch.Tensor, "batch time ..."]:
     # Main function to be called to integrate the NODE
@@ -75,7 +79,7 @@ def odesolve_adjoint(
     params = find_parameters(func)
 
     # Forward integrating the NODE and returning the state at each evaluation step
-    zs = odeint_ACA.apply(z0, func, ts, solver, *params)
+    zs = odeint_ACA.apply(z0, func, ts, args, solver, *params)
     return zs
 
 
