@@ -32,7 +32,8 @@ theme:
 
 site_name: torchdde
 site_description: The documentation for the torchdde software library.
-site_author: Patrick Kidger
+site_author: 
+
 
 repo_url: https://github.com/thibmonsel/torchdde
 repo_name: thibmonsel/torchdde
@@ -89,11 +90,10 @@ plugins:
                     heading_level: 4  # Makes everything top-level be <h4>. Child entries will be <h5> etc., but because of toc_depth, above, (deliberately) won't appear in the TOC.
 
 
-
+site_url: ""
 site_name: torchdde
-site_url: https://example.com/
 nav:
-  - Home: index.md
+  - 'index.md'
   - Usage:  
       - 'usage/getting-started.md'
       - 'usage/neural-dde.md'
