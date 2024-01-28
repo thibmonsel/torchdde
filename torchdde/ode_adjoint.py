@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from jaxtyping import Float
-
 from torchdde.solver.ode_solver import *
 
 
@@ -40,10 +39,12 @@ class odeint_ACA(torch.autograd.Function):
 
             with torch.enable_grad():
                 out = ctx.func(current_t, y_t, args)
-                adj_dyn = lambda t, adj_y: torch.autograd.grad(
+                adj_dyn = lambda t, adj_y, args: torch.autograd.grad(
                     out, y_t, -adj_y, retain_graph=True
                 )[0]
-                adjoint_state = solver.step(adj_dyn, current_t, adjoint_state, -dt)
+                adjoint_state = solver.step(
+                    adj_dyn, current_t, adjoint_state, -dt, None
+                )
                 adjoint_state -= grad_output[:, -i - 1]
 
                 param_inc = torch.autograd.grad(
