@@ -5,12 +5,14 @@ An illustrative example which solves the following DDE
 $\frac{dy}{dt}= -y(t-2), \quad \psi(t<0) = 2$ over the interval $[0, 5]$.
 
 ```python
-import torch
 import matplotlib.pyplot as plt
+import torch
 from torchdde import DDESolver, RK4
 
+
 def simple_dde(t, y, args, *, history):
-    return - history[0]
+    return -history[0]
+
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -26,11 +28,11 @@ list_delays = list_delays.to(device)
 history_values = torch.tensor([3.0])
 history_values = history_values.reshape(-1, 1)
 history_values = history_values.to(device)
-history_interpolator = lambda t : history_values
+history_function = lambda t: history_values
 
 # Solve the DDE by using the RK4 method
 dde_solver = DDESolver(RK4(), list_delays)
-ys, _ = dde_solver.integrate(simple_dde, ts, history_function)
+ys, _ = dde_solver.integrate(simple_dde, ts, history_function, None)
 ```
 
 - The numerical solver used is `RK4` is the 4th Runge Kutta method.

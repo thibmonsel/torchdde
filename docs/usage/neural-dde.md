@@ -17,7 +17,7 @@ from torchdde import ddesolve_adjoint, DDESolver, Euler
 from torchvision.ops import MLP
 
 
-device =  torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ```
 
 Recalling that a neural DDE is defined as
@@ -44,20 +44,21 @@ class NDDE(nn.Module):
             hidden_channels=depth * [width_size] + [out_size],
         )
 
-    def forward(self, t, z, *, history):
+    def forward(self, t, z, args, *, history):
         return self.mlp(torch.cat([z, *history], dim=-1))
+
 ```
 
 We generate the toy dataset of the [delayed logistic equation](https://www.math.miami.edu/~ruan/MyPapers/Ruan-nato.pdf) (Equation 2.1).
 
 ```python
 def get_data(y0, ts, tau=torch.tensor([1.0])):
-    def f(t, y, history):
+    def f(t, y, args, history):
         return y * (1 - history[0])
 
     solver = DDESolver(Euler(), tau)
-    ys, _ = solver.integrate(f, ts, lambda t: torch.unsqueeze(y0, dim=1))
-    return ts, ys
+    ys, _ = solver.integrate(f, ts, lambda t: torch.unsqueeze(y0, dim=1), None)
+    return ys
 
 
 class MyDataset(Dataset):
@@ -69,6 +70,7 @@ class MyDataset(Dataset):
 
     def __len__(self):
         return self.ys.shape[0]
+
 ```
 
 Main entry point. Try running `main()`.
@@ -115,7 +117,7 @@ def main(
             optimizer.zero_grad()
             data = data.to(device)
             history_fn = lambda t: data[:, 0]
-            ys_pred = ddesolve_adjoint(history_fn, model, ts, Euler())
+            ys_pred = ddesolve_adjoint(history_fn, model, ts, None, Euler())
             loss = loss_fn(ys_pred, data)
             loss.backward()
             optimizer.step()
@@ -148,6 +150,7 @@ def main(
         plt.close()
 
     return ts, ys, model
+
 
 ts, ys, model = main()
 ```

@@ -17,7 +17,7 @@ from torchdde import ddesolve_adjoint
 
 history_function = lambda t : ...
 ts = torch.linspace(...)
-pred = ddesolve_adjoint(history_function, model, ts, solver)
+pred = ddesolve_adjoint(history_function, model, ts, args, solver)
 ```
 
 ::: torchdde.ddesolve_adjoint
@@ -39,5 +39,5 @@ tensor_delays = ...
 dde_solver = DDEsolver(ode_solver, tensor_delays)
 history_function = lambda t : ...
 ts = torch.linspace(...)
-pred, _ = dde_solver.integrate(model, ts, history_function)
+pred, _ = dde_solver.integrate(model, ts, history_function, args)
 ```

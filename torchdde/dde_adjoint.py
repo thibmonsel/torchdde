@@ -3,7 +3,6 @@ from typing import Callable
 import torch
 import torch.nn as nn
 from jaxtyping import Float
-
 from torchdde.interpolation.linear_interpolation import TorchLinearInterpolator
 from torchdde.solver.dde_solver import DDESolver
 from torchdde.solver.ode_solver import *
@@ -215,7 +214,7 @@ class nddeint_ACA(torch.autograd.Function):
             for _1, _2 in zip([*out3], [*last_out3]):
                 _1 -= -dt / 2 * _2 if _2 is not None else 0.0
 
-        return None, None, None, None, *(out3[0] + out2[0], *out2[1:])
+        return None, None, None, None, None, *(out3[0] + out2[0], *out2[1:])
 
 
 def ddesolve_adjoint(

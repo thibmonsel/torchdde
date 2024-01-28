@@ -19,7 +19,7 @@ from torchdde import odesolve_adjoint
 
 history_function = torch.Tensor([...])
 ts = torch.linspace(...)
-pred = odesolve_adjoint(y0, model, ts, solver)
+pred = odesolve_adjoint(y0, model, ts, args, solver)
 ```
 
 ::: torchdde.odesolve_adjoint
@@ -35,5 +35,5 @@ from torchdde import odesolve_adjoint
 ode_solver = ...
 y0 = ...
 ts = torch.linspace(...)
-pred = ode_solver.integrate(model, ts, y0)
+pred = ode_solver.integrate(model, ts, y0, args)
 ```
