@@ -48,6 +48,6 @@ delays = torch.tensor([1.0])
 solver = DDESolver(RK2(), delays)
 history_values = torch.arange(1, 5).reshape(-1, 1)
 history_function = lambda t: history_values
-solution, _ = solver.integrate(f, torch.linspace(0, 20, 201), history_function)
+solution, _ = solver.integrate(f, torch.linspace(0, 20, 201), history_function,None)
 
 ```
