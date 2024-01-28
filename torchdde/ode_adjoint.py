@@ -1,16 +1,13 @@
-import functools
-
-import numpy as np
-import scipy
-import scipy.integrate as sciinteg
 import torch
 import torch.nn as nn
+from jaxtyping import Float
+
 from torchdde.solver.ode_solver import *
 
 
 class odeint_ACA(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, y0, func, ts, solver, *params):
+    def forward(ctx, y0, func, ts, args, solver, *params):
         # Saving parameters for backward()
         ctx.func = func
         ctx.ts = ts
@@ -18,8 +15,9 @@ class odeint_ACA(torch.autograd.Function):
         ctx.solver = solver
         with torch.no_grad():
             ctx.save_for_backward(*params)
-            ys = solver.integrate(func, ts, y0)
+            ys = solver.integrate(func, ts, y0, args)
         ctx.ys = ys
+        ctx.args = args
         return ys
 
     @staticmethod
@@ -27,37 +25,48 @@ class odeint_ACA(torch.autograd.Function):
         # grad_output holds the gradient of the loss w.r.t. each evaluation step
         grad_output = grad_y[0]
 
-        h = -(ctx.ts[1] - ctx.ts[0])
+        dt = ctx.ts[1] - ctx.ts[0]
         ys = ctx.ys
         ts = ctx.ts
+        args = ctx.args
 
+        solver = ctx.solver
         params = ctx.saved_tensors
-        adjoint_state = torch.zeros_like(grad_output[:, -1])
+        adjoint_state = grad_output[:, -1]
 
         out2 = None
-        for i in range(len(ts), 0, -1):
-            adjoint_state -= grad_output[:, i - 1]
-            z_var = torch.autograd.Variable(ys[:, i - 1], requires_grad=True)
+        for i, current_t in enumerate(reversed(ts)):
+            y_t = torch.autograd.Variable(ys[:, -i - 1], requires_grad=True)
 
             with torch.enable_grad():
-                out = ctx.func(ts[i - 1], z_var)
+                out = ctx.func(current_t, y_t, args)
+                adj_dyn = lambda t, adj_y: torch.autograd.grad(
+                    out, y_t, -adj_y, retain_graph=True
+                )[0]
+                adjoint_state = solver.step(adj_dyn, current_t, adjoint_state, -dt)
+                adjoint_state -= grad_output[:, -i - 1]
+
                 param_inc = torch.autograd.grad(
                     out, params, -adjoint_state, retain_graph=True
                 )
-                adjoint_state = torch.autograd.grad(out, z_var, -adjoint_state)[0]
-
             if out2 is None:
-                out2 = tuple([h * p for p in param_inc])
+                out2 = tuple([dt * p for p in param_inc])
             else:
                 for _1, _2 in zip([*out2], [*param_inc]):
-                    _1 += h * _2
+                    _1 += dt * _2
 
         out = adjoint_state, None, None, None, *out2
 
         return out
 
 
-def odesolve_adjoint(z0, func, ts, solver):
+def odesolve_adjoint(
+    z0: Float[torch.Tensor, "batch ..."],
+    func: torch.nn.Module,
+    ts: Float[torch.Tensor, "time ..."],
+    args,
+    solver: AbstractOdeSolver,
+) -> Float[torch.Tensor, "batch time ..."]:
     # Main function to be called to integrate the NODE
 
     # z0 : (tensor) Initial state of the NODE
@@ -70,7 +79,7 @@ def odesolve_adjoint(z0, func, ts, solver):
     params = find_parameters(func)
 
     # Forward integrating the NODE and returning the state at each evaluation step
-    zs = odeint_ACA.apply(z0, func, ts, solver, *params)
+    zs = odeint_ACA.apply(z0, func, ts, args, solver, *params)
     return zs
 
 

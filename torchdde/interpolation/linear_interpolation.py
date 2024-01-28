@@ -1,14 +1,19 @@
 import warnings
 
-import matplotlib.pyplot as plt
-import numpy as np
 import torch
+from jaxtyping import Float
 
 tiny = 10e-3
 
 
 class TorchLinearInterpolator:
-    def __init__(self, ts, ys):
+    r"""Linear interpolator class that is compatible with batching."""
+
+    def __init__(
+        self,
+        ts: Float[torch.Tensor, "time"],
+        ys: Float[torch.Tensor, "batch time ..."],
+    ):
         self.ts = ts  # [N_t]
         self.ys = ys  # [N, N_t, D]
 
@@ -29,7 +34,7 @@ class TorchLinearInterpolator:
         self.ys = self.ys.to(device)
         self.ts = self.ts.to(device)
 
-    def _interpret_t(self, t: float, left: bool):
+    def _interpret_t(self, t: torch.Tensor, left: bool):
         maxlen = self.ts.shape[0] - 2
         index = torch.searchsorted(self.ts, t, side="left" if left else "right")
         index = torch.clip(index - 1, 0, maxlen)
@@ -37,7 +42,7 @@ class TorchLinearInterpolator:
         fractional_part = t - self.ts[index]
         return index, fractional_part
 
-    def __call__(self, t, left=True):
+    def __call__(self, t: Float[torch.Tensor, "1"], left=True):
         if t > self.ts[-1] or t < self.ts[0]:
             if self.ys.shape[1] == 1:
                 return self.ys[:, 0]
@@ -58,9 +63,11 @@ class TorchLinearInterpolator:
         diff_t = next_t - prev_t
         return prev_ys + (next_ys - prev_ys) * (fractional_part / diff_t)
 
-    def add_point(self, new_t, new_y):
-        # new_t : float
-        # new_y : torch.tensor size [N, D]
+    def add_point(
+        self,
+        new_t: Float[torch.Tensor, "1"],
+        new_y: Float[torch.Tensor, "batch ..."],
+    ):
         if new_t in self.ts:
             warnings.warn(
                 f"already have new_t={new_t} point in interpolation, overwriting it "
@@ -92,3 +99,23 @@ class TorchLinearInterpolator:
 
         self.ys = new_ys
         self.ts = new_ts
+
+
+TorchLinearInterpolator.__init__.__doc__ = """**Arguments:**
+
+- `ts`: Some increasing collection of times. 
+- `ys`: The observations themselves.
+
+"""
+
+
+TorchLinearInterpolator.__call__.__doc__ = """**Arguments:**
+
+- `t`: time to evalute to 
+"""
+
+TorchLinearInterpolator.add_point.__doc__ = """**Arguments:**
+
+- `new_t`: new timestamp added to the interpolation
+- `new_ys`: new observation added to the interpolation 
+"""

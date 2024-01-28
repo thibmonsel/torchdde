@@ -1,7 +1,8 @@
-import numpy as np
+from typing import Callable
+
 import torch
 import torch.nn as nn
-from matplotlib import pyplot as plt
+from jaxtyping import Float
 from torchdde.interpolation.linear_interpolation import TorchLinearInterpolator
 from torchdde.solver.dde_solver import DDESolver
 from torchdde.solver.ode_solver import *
@@ -9,7 +10,7 @@ from torchdde.solver.ode_solver import *
 
 class nddeint_ACA(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, history_func, func, ts, solver, *params):
+    def forward(ctx, history_func, func, ts, args, solver, *params):
         # Saving parameters for backward()
         ctx.history_func = history_func
         ctx.solver = solver
@@ -20,10 +21,11 @@ class nddeint_ACA(torch.autograd.Function):
 
             # Simulation
             dde_solver = DDESolver(solver, func.delays)
-            ys, ys_interpolator = dde_solver.integrate(func, ts, history_func)
+            ys, ys_interpolator = dde_solver.integrate(func, ts, history_func, args)
 
         ctx.ys_interpolator = ys_interpolator
         ctx.ys = ys
+        ctx.args = args
         return ys
 
     @staticmethod
@@ -33,6 +35,7 @@ class nddeint_ACA(torch.autograd.Function):
         # as learnable parameter alongside with the neural network.
         grad_output = grad_y[0]
 
+        args = ctx.args
         T = ctx.ts[-1]
         dt = ctx.ts[1] - ctx.ts[0]
         solver = ctx.solver
@@ -63,12 +66,16 @@ class nddeint_ACA(torch.autograd.Function):
         adjoint_ys_final = -grad_output[:, -1].reshape(
             adjoint_state.shape[0], 1, *adjoint_state.shape[1:]
         )
+        adjoint_ys_final = adjoint_ys_final.to(ctx.ts.device)
+        add_t = torch.tensor([ctx.ts[-1], ctx.ts[-1] + dt])
+        add_t = add_t.to(ctx.ts.device)
+
         adjoint_interpolator = TorchLinearInterpolator(
-            torch.unsqueeze(ctx.ts[-1], dim=0),
-            adjoint_ys_final,
+            add_t,
+            torch.concat([adjoint_ys_final, adjoint_ys_final], dim=1),
         )
 
-        def adjoint_dyn(t, adjoint_y, has_aux=False):
+        def adjoint_dyn(t, adjoint_y, args, has_aux=False):
             h_t = torch.autograd.Variable(
                 state_interpolator(t) if t >= ctx.ts[0] else ctx.history_func(t),
                 requires_grad=True,
@@ -79,7 +86,7 @@ class nddeint_ACA(torch.autograd.Function):
                 else ctx.history_func(t - tau)
                 for tau in ctx.func.delays
             ]
-            out = ctx.func(t, h_t, history=h_t_minus_tau)
+            out = ctx.func(t, h_t, args, history=h_t_minus_tau)
             # This correspond to the term adjoint(t) df(t, y(t), y(t-tau))_dy(t)
             rhs_adjoint_1 = torch.autograd.grad(
                 out,
@@ -101,7 +108,7 @@ class nddeint_ACA(torch.autograd.Function):
                         for tau_j in ctx.func.delays
                     ]
                     history[idx] = h_t
-                    out_other = ctx.func(t + tau_i, h_t_plus_tau, history=history)
+                    out_other = ctx.func(t + tau_i, h_t_plus_tau, args, history=history)
 
                     # This correspond to the term adjoint(t+tau) df(t+tau, y(t+tau), y(t))_dy(t)
                     rhs_adjoint_2 = torch.autograd.grad(
@@ -137,7 +144,7 @@ class nddeint_ACA(torch.autograd.Function):
                 adjoint_state -= grad_output[:, -j - 1]
                 adjoint_interpolator.add_point(current_t, adjoint_state)
                 adj, (param_derivative_inc, delay_derivative_inc) = solver.step(
-                    adjoint_dyn, current_t, adjoint_state, -dt, has_aux=True
+                    adjoint_dyn, current_t, adjoint_state, -dt, args, has_aux=True
                 )
                 adjoint_state = adj
 
@@ -170,6 +177,7 @@ class nddeint_ACA(torch.autograd.Function):
                         else ctx.history_func(t),
                         requires_grad=True,
                     )
+                    # print("adjoint_interpolator.ts", adjoint_interpolator.ts, t, tau_i)
                     adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
                     h_t_plus_tau = state_interpolator(t + tau_i)
                     history = [
@@ -179,7 +187,7 @@ class nddeint_ACA(torch.autograd.Function):
                         for tau_j in ctx.func.delays
                     ]
                     history[idx] = h_t
-                    out_other = ctx.func(t + tau_i, h_t_plus_tau, history=history)
+                    out_other = ctx.func(t + tau_i, h_t_plus_tau, args, history=history)
                     rhs_adjoint_inc = torch.autograd.grad(
                         out_other, h_t, -adjoint_t_plus_tau
                     )[0]
@@ -202,26 +210,35 @@ class nddeint_ACA(torch.autograd.Function):
         for _1, _2 in zip([*out2], [*last_out2]):
             _1 -= dt / 2 * _2 if _2 is not None else 0.0
 
-        for _1, _2 in zip([*out3], [*(last_out3 or [])]):
-            _1 -= -dt / 2 * _2 if _2 is not None else 0.0
+        if last_out3 is not None:
+            for _1, _2 in zip([*out3], [*last_out3]):
+                _1 -= -dt / 2 * _2 if _2 is not None else 0.0
 
-        return None, None, None, None, *(out3[0] + out2[0], *out2[1:])
+        return None, None, None, None, None, *(out3[0] + out2[0], *out2[1:])
 
 
-def ddesolve_adjoint(history, func, ts, solver):
-    """Main function to integrate a constant time delay DDE with the adjoint method
+def ddesolve_adjoint(
+    history_func: Callable,
+    func: torch.nn.Module,
+    ts: Float[torch.Tensor, "time"],
+    args,
+    solver: AbstractOdeSolver,
+) -> Float[torch.Tensor, "batch time ..."]:
+    r"""Main function to integrate a constant time delay DDE with the adjoint method
 
-    Args:
-        history (callable): correspond to the history function of the DDE
-        func (nn.Module): neural network
-        ts (torch.tensor): time mesh
-        solver (AbstractOdeSolver): ODE solver used for integration
+    **Arguments:**
 
-    Returns:
-        torch.tensor : trajectory from the integrated DDE
+    - `history_func`: DDE's history function
+    - `func`: Pytorch model, i.e vector field
+    - `ts`: Integration span
+    - `solver`: ODE solver use
+
+    **Returns:**
+
+    Integration result over `ts`.
     """
     params = find_parameters(func)
-    ys = nddeint_ACA.apply(history, func, ts, solver, *params)
+    ys = nddeint_ACA.apply(history_func, func, ts, args, solver, *params)
     return ys
 
 
