@@ -56,7 +56,7 @@ class odeint_ACA(torch.autograd.Function):
                 for _1, _2 in zip([*out2], [*param_inc]):
                     _1 += dt * _2
 
-        out = adjoint_state, None, None, None, *out2
+        out = adjoint_state, None, None, None, None, *out2
 
         return out
 
