@@ -6,13 +6,13 @@
 ## Installation
 
 ```bash
-pip install git@github.com:thibmonsel/torchdde.git
+pip install git+ssh://git@git.example.com/MyProject
 ```
 
 or local installation
 
 ```bash
-git clone https://github.com/thibmonsel/torchdde.git
+git clone https://github.com/usr/MyProject.git
 cd torchdde/
 pip install .
 ```
@@ -49,5 +49,3 @@ history_function = lambda t: history_values
 solution, _ = solver.integrate(f, torch.linspace(0, 20, 201), history_function)
 
 ```
-
-Please note that this library is fairly new so bugs might arise, if so please raise an issue !

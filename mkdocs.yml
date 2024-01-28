@@ -35,8 +35,8 @@ site_description: The documentation for the torchdde software library.
 site_author: 
 
 
-repo_url: https://github.com/thibmonsel/torchdde
-repo_name: thibmonsel/torchdde
+repo_url: 
+repo_name: 
 edit_uri: ""  # No edit button, as some of our pages are in /docs and some in /examples via symlink, so it's impossible for them all to be accurate
 
 strict: true  # Don't allow warnings during the build process
