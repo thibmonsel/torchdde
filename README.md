@@ -22,6 +22,8 @@ pip install .
 To generate the documentation :
 
 ```bash
+mkdocs build
+mkdocs build 
 mkdocs serve 
 ```
 
