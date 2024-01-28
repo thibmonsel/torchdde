@@ -6,13 +6,13 @@
 ## Installation
 
 ```bash
-pip install git+ssh://git@git.example.com/MyProject
+pip install git@github.com:usr/torchdde.git
 ```
 
-or local installation
+or locally
 
 ```bash
-git clone https://github.com/usr/MyProject.git
+git clone https://github.com/usr/torchdde.git
 cd torchdde/
 pip install .
 ```
