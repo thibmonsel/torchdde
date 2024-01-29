@@ -26,7 +26,8 @@ url = "https://github.com/usr/" + name
 
 license = "Apache-2.0"
 
-
+author = ""
+author_email = ""
 python_requires = "~=3.9"
 
 install_requires = ["torch>=2.1", "matplotlib", "numpy", "scipy", "seaborn"]
