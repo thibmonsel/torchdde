@@ -16,16 +16,16 @@ with open(_here / name / "__init__.py") as f:
     else:
         raise RuntimeError("Unable to find __version__ string.")
 
-author = "Thibault Monsel"
+author = ""
 
-author_email = "thibaultmonsel@gmail.com"
+author_email = ""
 
-description = "RL with DDEs"
+description = "DDEs"
 
 with open(_here / "README.md", "r") as f:
     readme = f.read()
 
-url = "https://github.com/thibmonsel/" + name
+url = "https://github.com/usr/" + name
 
 license = "Apache-2.0"
 
