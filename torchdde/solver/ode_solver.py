@@ -81,12 +81,11 @@ class Euler(AbstractOdeSolver):
 
 
 class ImplicitEuler(AbstractOdeSolver):
-    """ImplicitEuler Euler's method
-    Credits to the TorchDyn team for the implementation of the implicit Euler method.
-    Savagely copied from:
-    https://github.com/DiffEqML/torchdyn/blob/95cc74b0e35330b03d2cd4d875df362a93e1b5ea/torchdyn/numerics/solvers/ode.py#L181
+    """ImplicitEuler Euler's method"""
 
-    """
+    #  Credits to the TorchDyn team for the implementation of the implicit Euler method.
+    # Savagely copied from:
+    # https://github.com/DiffEqML/torchdyn/blob/95cc74b0e35330b03d2cd4d875df362a93e1b5ea/torchdyn/numerics/solvers/ode.py#L181
 
     def __init__(self):
         super().__init__()

@@ -5,7 +5,7 @@ import torch.nn as nn
 from jaxtyping import Float
 from torchdde.interpolation.linear_interpolation import TorchLinearInterpolator
 from torchdde.solver.dde_solver import DDESolver
-from torchdde.solver.ode_solver import *
+from torchdde.solver.ode_solver import AbstractOdeSolver
 
 
 class nddeint_ACA(torch.autograd.Function):
