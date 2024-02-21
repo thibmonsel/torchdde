@@ -14,6 +14,8 @@ Only a few explicit solvers are available to use :
             - step
             - integrate
 
+### Explicit Solvers
+
 ::: torchdde.Euler
     selection:
         members: false
@@ -25,6 +27,12 @@ Only a few explicit solvers are available to use :
         members: false
 
 ::: torchdde.RK4
+    selection:
+        members: false
+
+### Implicit Solvers
+
+::: torchdde.ImplicitEuler
     selection:
         members: false
 
