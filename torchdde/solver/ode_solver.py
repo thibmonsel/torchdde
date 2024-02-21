@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Optional
 
 import torch
 from jaxtyping import Float
@@ -81,6 +80,54 @@ class Euler(AbstractOdeSolver):
             return y + dt * func(t, y, args)
 
 
+class ImplicitEuler(AbstractOdeSolver):
+    """ImplicitEuler Euler's method
+    Credits to the TorchDyn team for the implementation of the implicit Euler method.
+    Savagely copied from:
+    https://github.com/DiffEqML/torchdyn/blob/95cc74b0e35330b03d2cd4d875df362a93e1b5ea/torchdyn/numerics/solvers/ode.py#L181
+
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.opt = torch.optim.LBFGS
+        self.max_iters = 100
+
+    @staticmethod
+    def _residual(f, t, y, dt, y_sol, args):
+        f_sol = f(t, y_sol, args)
+        return torch.sum((y_sol - y - dt * f_sol) ** 2)
+
+    def step(self, func, t, y, dt, args, has_aux=False):
+        y_sol = y.clone()
+        y_sol = torch.nn.Parameter(data=y_sol)
+        opt = self.opt(
+            [y_sol],
+            lr=1,
+            max_iter=self.max_iters,
+            max_eval=10 * self.max_iters,
+            tolerance_grad=1.0e-12,
+            tolerance_change=1.0e-12,
+            history_size=100,
+            line_search_fn="strong_wolfe",
+        )
+
+        def closure():
+            opt.zero_grad()
+            residual = ImplicitEuler._residual(func, t, y, dt, y_sol, args)
+            (y_sol.grad,) = torch.autograd.grad(
+                residual, y_sol, only_inputs=True, allow_unused=False
+            )
+            return residual
+
+        opt.step(closure)
+        if has_aux:
+            _, aux = func(t, y, args, has_aux)
+            return y_sol, aux
+        else:
+            return y_sol
+
+
 class RK2(AbstractOdeSolver):
     """2nd order explicit Runge-Kutta method"""
 
@@ -134,3 +181,13 @@ class RK4(AbstractOdeSolver):
             k3 = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k2, args)
             k4 = func(t + dt, y + dt * k3, args)
             return y + 1 / 6 * dt * (k1 + 2 * k2 + 2 * k3 + k4)
+
+
+# solver = ImplicitEuler()
+# ts = torch.linspace(0, 20, 201)
+# ys = solver.integrate(lambda t, y, args: -y, ts, torch.tensor([1.0]), None)
+# import matplotlib.pyplot as plt
+
+
+# plt.plot(ts, ys[0].detach().numpy())
+# plt.show()

@@ -81,9 +81,11 @@ class nddeint_ACA(torch.autograd.Function):
                 requires_grad=True,
             )
             h_t_minus_tau = [
-                state_interpolator(t - tau)
-                if t - tau >= ctx.ts[0]
-                else ctx.history_func(t - tau)
+                (
+                    state_interpolator(t - tau)
+                    if t - tau >= ctx.ts[0]
+                    else ctx.history_func(t - tau)
+                )
                 for tau in ctx.func.delays
             ]
             out = ctx.func(t, h_t, args, history=h_t_minus_tau)
@@ -102,9 +104,11 @@ class nddeint_ACA(torch.autograd.Function):
                     adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
                     h_t_plus_tau = state_interpolator(t + tau_i)
                     history = [
-                        state_interpolator(t + tau_i - tau_j)
-                        if t + tau_i - tau_j >= ctx.ts[0]
-                        else ctx.history_func(t + tau_i - tau_j)
+                        (
+                            state_interpolator(t + tau_i - tau_j)
+                            if t + tau_i - tau_j >= ctx.ts[0]
+                            else ctx.history_func(t + tau_i - tau_j)
+                        )
                         for tau_j in ctx.func.delays
                     ]
                     history[idx] = h_t
@@ -141,7 +145,7 @@ class nddeint_ACA(torch.autograd.Function):
         out2, out3, last_out2, last_out3 = None, None, None, None
         for j, current_t in enumerate(reversed(ctx.ts)):
             with torch.enable_grad():
-                adjoint_state -= grad_output[:, -j - 1]
+                adjoint_state = adjoint_state - grad_output[:, -j - 1]
                 adjoint_interpolator.add_point(current_t, adjoint_state)
                 adj, (param_derivative_inc, delay_derivative_inc) = solver.step(
                     adjoint_dyn, current_t, adjoint_state, -dt, args, has_aux=True
@@ -172,18 +176,22 @@ class nddeint_ACA(torch.autograd.Function):
             for k, t in enumerate(reversed(ts_history_i)):
                 with torch.enable_grad():
                     h_t = torch.autograd.Variable(
-                        state_interpolator(t)
-                        if t >= ctx.ts[0]
-                        else ctx.history_func(t),
+                        (
+                            state_interpolator(t)
+                            if t >= ctx.ts[0]
+                            else ctx.history_func(t)
+                        ),
                         requires_grad=True,
                     )
                     # print("adjoint_interpolator.ts", adjoint_interpolator.ts, t, tau_i)
                     adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
                     h_t_plus_tau = state_interpolator(t + tau_i)
                     history = [
-                        state_interpolator(t + tau_i - tau_j)
-                        if t + tau_i - tau_j >= ctx.ts[0]
-                        else ctx.history_func(t + tau_i - tau_j)
+                        (
+                            state_interpolator(t + tau_i - tau_j)
+                            if t + tau_i - tau_j >= ctx.ts[0]
+                            else ctx.history_func(t + tau_i - tau_j)
+                        )
                         for tau_j in ctx.func.delays
                     ]
                     history[idx] = h_t
