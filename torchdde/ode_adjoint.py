@@ -1,12 +1,23 @@
+from typing import Any, Union
+
 import torch
 import torch.nn as nn
 from jaxtyping import Float
-from torchdde.solver.ode_solver import *
+
+from torchdde.solver.ode_solver import AbstractOdeSolver
 
 
 class odeint_ACA(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, y0, func, ts, args, solver, *params):
+    def forward(  # type: ignore
+        ctx,
+        y0: Float[torch.Tensor, "batch ..."],
+        func: torch.nn.Module,
+        ts: Float[torch.Tensor, " time"],
+        args: Any,
+        solver: AbstractOdeSolver,
+        *params: tuple[Float[torch.Tensor, "..."], ...],
+    ) -> Float[torch.Tensor, "batch time ..."]:
         # Saving parameters for backward()
         ctx.func = func
         ctx.ts = ts
@@ -20,8 +31,9 @@ class odeint_ACA(torch.autograd.Function):
         return ys
 
     @staticmethod
-    def backward(ctx, *grad_y):
-        # grad_output holds the gradient of the loss w.r.t. each evaluation step
+    def backward(ctx, *grad_y) -> tuple[Float[torch.Tensor, "..."], Any, Any, Any, Any]:
+        # grad_output holds the gradient of the
+        # loss w.r.t. each evaluation step
         grad_output = grad_y[0]
 
         dt = ctx.ts[1] - ctx.ts[0]
@@ -56,31 +68,30 @@ class odeint_ACA(torch.autograd.Function):
                 for _1, _2 in zip([*out2], [*param_inc]):
                     _1 += dt * _2
 
-        out = adjoint_state, None, None, None, None, *out2
-
-        return out
+        return adjoint_state, None, None, None, None, *out2  # type: ignore
 
 
 def odesolve_adjoint(
-    z0: Float[torch.Tensor, "batch ..."],
+    y0: Float[torch.Tensor, "batch ..."],
     func: torch.nn.Module,
     ts: Float[torch.Tensor, "time ..."],
-    args,
+    args: Any,
     solver: AbstractOdeSolver,
-) -> Float[torch.Tensor, "batch time ..."]:
+) -> Union[Float[torch.Tensor, "batch time ..."], Any]:
     # Main function to be called to integrate the NODE
 
     # z0 : (tensor) Initial state of the NODE
     # func : (torch Module) Derivative of the NODE
     # options : (dict) Dictionary of solver options, should at least have a
 
-    # The parameters for which a gradient should be computed are passed as a flat list of tensors to the forward function
+    # The parameters for which a gradient should be computed
+    # are passed as a flat list of tensors to the forward function
     # The gradient returned by backward() will take the same shape.
     # flat_params = flatten_grad_params(func.parameters())
     params = find_parameters(func)
 
     # Forward integrating the NODE and returning the state at each evaluation step
-    zs = odeint_ACA.apply(z0, func, ts, args, solver, *params)
+    zs = odeint_ACA.apply(y0, func, ts, args, solver, *params)
     return zs
 
 
