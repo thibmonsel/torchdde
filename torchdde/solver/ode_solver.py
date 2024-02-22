@@ -58,10 +58,8 @@ class AbstractOdeSolver(ABC):
 
         dt = ts[1] - ts[0]
         ys = torch.unsqueeze(y0.clone(), dim=1)
-        # current_y = y0
         for current_t in ts[1:]:
-            y, _ = self.step(func, current_t, ys[:, 0], dt, args, has_aux=False)
-            # current_y = y
+            y, _ = self.step(func, current_t, ys[:, -1], dt, args, has_aux=False)
             ys = torch.cat((ys, torch.unsqueeze(y, dim=1)), dim=1)
         return ys
 
@@ -108,8 +106,12 @@ class ImplicitEuler(AbstractOdeSolver):
         dt: Union[Float[torch.Tensor, "1"], float],
         y_sol: Float[torch.Tensor, "batch ..."],
         args: Any,
+        has_aux=False,
     ) -> Float[torch.Tensor, "1"]:
-        f_sol = func(t, y_sol, args)
+        if has_aux:
+            f_sol, _ = func(t, y_sol, args)
+        else:
+            f_sol = func(t, y_sol, args)
         return torch.sum((y_sol - y - dt * f_sol) ** 2)
 
     def step(
@@ -136,16 +138,17 @@ class ImplicitEuler(AbstractOdeSolver):
 
         def closure() -> Float[torch.Tensor, "1"]:
             opt.zero_grad()
-            residual = ImplicitEuler._residual(func, t, y, dt, y_sol, args)
+            residual = ImplicitEuler._residual(
+                func, t, y, dt, y_sol, args, has_aux=has_aux
+            )
             (y_sol.grad,) = torch.autograd.grad(
                 residual, y_sol, only_inputs=True, allow_unused=False
             )
-            print("residual type", type(residual))
             return residual
 
         opt.step(closure)  # type: ignore
         if has_aux:
-            _, aux = func(t, y, args, has_aux)
+            _, aux = func(t, y, args)
             return y_sol, aux
         else:
             return y_sol, None
