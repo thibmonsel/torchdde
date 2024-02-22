@@ -44,4 +44,3 @@ Only a few explicit solvers are available to use :
             - __init__
             - step
             - integrate
-            - integrate_with_cubic_interpolator
