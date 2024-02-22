@@ -1,8 +1,9 @@
-from typing import Callable
+from typing import Any, Callable, Union
 
 import torch
 import torch.nn as nn
 from jaxtyping import Float
+
 from torchdde.interpolation.linear_interpolation import TorchLinearInterpolator
 from torchdde.solver.dde_solver import DDESolver
 from torchdde.solver.ode_solver import AbstractOdeSolver
@@ -10,16 +11,23 @@ from torchdde.solver.ode_solver import AbstractOdeSolver
 
 class nddeint_ACA(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, history_func, func, ts, args, solver, *params):
+    def forward(  # type: ignore
+        ctx,
+        history_func: Callable,
+        func: torch.nn.Module,
+        ts: Float[torch.Tensor, " time"],
+        args: Any,
+        solver: AbstractOdeSolver,
+        *params: tuple[Float[torch.Tensor, "..."], ...],
+    ) -> Float[torch.Tensor, "batch time ..."]:
         # Saving parameters for backward()
         ctx.history_func = history_func
         ctx.solver = solver
         ctx.func = func
         ctx.ts = ts
+
         with torch.no_grad():
             ctx.save_for_backward(*params)
-
-            # Simulation
             dde_solver = DDESolver(solver, func.delays)
             ys, ys_interpolator = dde_solver.integrate(func, ts, history_func, args)
 
@@ -29,9 +37,10 @@ class nddeint_ACA(torch.autograd.Function):
         return ys
 
     @staticmethod
-    def backward(ctx, *grad_y):
+    def backward(ctx, *grad_y) -> tuple[Any, Any, Any, Any, Any, Any]:
         # http://www.cs.utoronto.ca/~calver/papers/adjoint_paper.pdf
-        # This function implements the adjoint gradient estimation method for NDDEs with constant delays
+        # This function implements the adjoint gradient
+        # estimation method for NDDEs with constant delays
         # as learnable parameter alongside with the neural network.
         grad_output = grad_y[0]
 
@@ -42,7 +51,8 @@ class nddeint_ACA(torch.autograd.Function):
         params = ctx.saved_tensors
         state_interpolator = ctx.ys_interpolator
 
-        # computing y'(t-tau) for the contribution of delay parameters in the loss w.r.t to the parameters
+        # computing y'(t-tau) for the contribution of
+        # delay parameters in the loss w.r.t to the parameters
         grad_ys = torch.gradient(ctx.ys, dim=1)[0] / dt
         ts_history = torch.linspace(
             ctx.ts[0] - max(ctx.func.delays).item(),
@@ -60,7 +70,8 @@ class nddeint_ACA(torch.autograd.Function):
         grad_ys = torch.cat((grad_ys_history_func, grad_ys), dim=1)
 
         # adjoint history shape [N, N_t=1, D]
-        # create an adjoint interpolator that will be used for the integration of the adjoint DDE
+        # create an adjoint interpolator that will be
+        # used for the integration of the adjoint DDE
         # Our adjoint state is null for t>=T
         adjoint_state = torch.zeros_like(grad_output[:, -1])
         adjoint_ys_final = -grad_output[:, -1].reshape(
@@ -75,7 +86,7 @@ class nddeint_ACA(torch.autograd.Function):
             torch.concat([adjoint_ys_final, adjoint_ys_final], dim=1),
         )
 
-        def adjoint_dyn(t, adjoint_y, args, has_aux=False):
+        def adjoint_dyn(t, adjoint_y, args):
             h_t = torch.autograd.Variable(
                 state_interpolator(t) if t >= ctx.ts[0] else ctx.history_func(t),
                 requires_grad=True,
@@ -114,35 +125,35 @@ class nddeint_ACA(torch.autograd.Function):
                     history[idx] = h_t
                     out_other = ctx.func(t + tau_i, h_t_plus_tau, args, history=history)
 
-                    # This correspond to the term adjoint(t+tau) df(t+tau, y(t+tau), y(t))_dy(t)
+                    # This correspond to the term
+                    # adjoint(t+tau) df(t+tau, y(t+tau), y(t))_dy(t)
                     rhs_adjoint_2 = torch.autograd.grad(
                         out_other, h_t, -adjoint_t_plus_tau
                     )[0]
                     rhs_adjoint_1 += rhs_adjoint_2
-                    if has_aux:
-                        # contribution of the delay in the gradient's loss ie int_0^{T-\tau} \pdv{f(x_{t+\tau}, x_{t})}{x_t} x'(t) dt
-                        delay_derivative_inc[idx] += torch.sum(
-                            rhs_adjoint_2 * grad_ys[:, -1 - j],
-                            dim=(tuple(range(len(rhs_adjoint_2.shape)))),
-                        )
 
-            if has_aux:
-                param_derivative_inc = torch.autograd.grad(
-                    out,
-                    params,
-                    -adjoint_y,
-                    retain_graph=True,
-                    allow_unused=True,
-                )
-                return rhs_adjoint_1, (
-                    param_derivative_inc,
-                    delay_derivative_inc,
-                )
-            else:
-                return rhs_adjoint_1
+                    # contribution of the delay in the gradient's loss
+                    # ie int_0^{T-\tau} \pdv{f(x_{t+\tau}, x_{t})}{x_t} x'(t) dt
+                    delay_derivative_inc[idx] += torch.sum(
+                        rhs_adjoint_2 * grad_ys[:, -1 - j],
+                        dim=(tuple(range(len(rhs_adjoint_2.shape)))),
+                    )
+
+            param_derivative_inc = torch.autograd.grad(
+                out,
+                params,
+                -adjoint_y,
+                retain_graph=True,
+                allow_unused=True,
+            )
+            return rhs_adjoint_1, (
+                param_derivative_inc,
+                delay_derivative_inc,
+            )
 
         # computing the adjoint dynamics
         out2, out3, last_out2, last_out3 = None, None, None, None
+        delay_derivative_inc = torch.zeros_like(ctx.func.delays)[..., None]
         for j, current_t in enumerate(reversed(ctx.ts)):
             with torch.enable_grad():
                 adjoint_state = adjoint_state - grad_output[:, -j - 1]
@@ -156,19 +167,23 @@ class nddeint_ACA(torch.autograd.Function):
                     out2 = tuple([dt / 2 * p for p in param_derivative_inc])
                 else:
                     for _1, _2 in zip([*out2], [*param_derivative_inc]):
-                        _1 += dt * _2 if _2 is not None else 0.0
+                        if _2 is not None:
+                            _1 += dt * _2
 
                 if out3 is None:
                     out3 = tuple([-dt / 2 * p for p in delay_derivative_inc])
                 else:
                     for _1, _2 in zip([*out3], [*delay_derivative_inc]):
-                        _1 += -dt * _2 if _2 is not None else 0.0
+                        if _2 is not None:
+                            _1 += -dt * _2
 
                 if current_t == T:
                     last_out2 = tuple([p for p in param_derivative_inc])
 
-        # adding the last contribution of the delay parameters in the loss w.r.t. the parameters
-        # ie which is the last part of the integration from t = 0 to t = -tau
+        # adding the last contribution of the delay
+        # parameters in the loss w.r.t. the parameters
+        # ie which is the last part of the integration
+        # from t = 0 to t = -tau
         for idx, tau_i in enumerate(ctx.func.delays):
             ts_history_i = torch.linspace(
                 ctx.ts[0] - tau_i.item(), ctx.ts[0], int(tau_i.item() / dt)
@@ -183,7 +198,7 @@ class nddeint_ACA(torch.autograd.Function):
                         ),
                         requires_grad=True,
                     )
-                    # print("adjoint_interpolator.ts", adjoint_interpolator.ts, t, tau_i)
+
                     adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
                     h_t_plus_tau = state_interpolator(t + tau_i)
                     history = [
@@ -200,7 +215,8 @@ class nddeint_ACA(torch.autograd.Function):
                         out_other, h_t, -adjoint_t_plus_tau
                     )[0]
 
-                    # remaining contribution of the delay in the gradient's loss ie int_{-\tau}^{0} \pdv{f(x_{t+\tau}, x_{t})}{x_t} x'(t) dt
+                    # remaining contribution of the delay in the gradient's
+                    # loss ie int_{-\tau}^{0} \pdv{f(x_{t+\tau}, x_{t})}{x_t} x'(t) dt
                     delay_derivative_inc[idx] += torch.sum(
                         rhs_adjoint_inc * grad_ys[:, k],
                         dim=(tuple(range(len(rhs_adjoint_inc.shape)))),
@@ -208,30 +224,37 @@ class nddeint_ACA(torch.autograd.Function):
 
                     if k == len(ts_history_i) - 1:
                         last_out3 = delay_derivative_inc
+        if out3 is not None:
+            for _1, _2 in zip([*out3], [*delay_derivative_inc]):
+                if _2 is not None:
+                    _1 += -dt * _2
 
-        for _1, _2 in zip([*out3], [*delay_derivative_inc]):
-            _1 += -dt * _2 if _2 is not None else 0.0
-
-        # Adding last term in order to get a trapz rule estimate of the grad wtr to the parameters
-        # trapezoid is h/2 * (f(a) + f(b) +2 (f(x1) + ... + f(xn-1)))
+        # Adding last term in order to get a trapz rule
+        # estimate of the grad wtr to the parameters
+        # trapezoid is h/2 * (f(a) + f(b) + 2 (f(x1) + ... + f(xn-1)))
         # compared to rectangle rule is h * (f(a) + f(b) + f(x1) + ... + f(xn-1))
-        for _1, _2 in zip([*out2], [*last_out2]):
-            _1 -= dt / 2 * _2 if _2 is not None else 0.0
+        if out2 is not None:
+            if last_out2 is not None:
+                for _1, _2 in zip([*out2], [*last_out2]):
+                    if _2 is not None:
+                        _1 += dt / 2 * _2
 
-        if last_out3 is not None:
-            for _1, _2 in zip([*out3], [*last_out3]):
-                _1 -= -dt / 2 * _2 if _2 is not None else 0.0
+        if out3 is not None:
+            if last_out3 is not None:
+                for _1, _2 in zip([*out3], [*last_out3]):
+                    if _2 is not None:
+                        _1 -= -dt / 2 * _2
 
-        return None, None, None, None, None, *(out3[0] + out2[0], *out2[1:])
+        return None, None, None, None, None, *(out3[0] + out2[0], *out2[1:])  # type: ignore
 
 
 def ddesolve_adjoint(
     history_func: Callable,
     func: torch.nn.Module,
-    ts: Float[torch.Tensor, "time"],
-    args,
+    ts: Float[torch.Tensor, " time"],
+    args: Any,
     solver: AbstractOdeSolver,
-) -> Float[torch.Tensor, "batch time ..."]:
+) -> Union[Float[torch.Tensor, "batch time ..."], Any]:
     r"""Main function to integrate a constant time delay DDE with the adjoint method
 
     **Arguments:**
