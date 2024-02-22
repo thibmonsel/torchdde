@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python ="~=3.9"
 license = {file = "LICENSE"}
 authors = [
-  {name = "", email = ""},
+  {name = "thibault monsel", email = "thibaultmonsel@gmail.com"},
 ]
 keywords = ["torch", "dynamical-systems", "differential-equations", "deep-learning", "neural-differential-equations"]
 classifiers = [
@@ -22,7 +22,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Information Analysis",
     "Topic :: Scientific/Engineering :: Mathematics",
 ]
-urls = {repository = "" }
+urls = {repository = "https://github.com/thibmonsel/torchdde" }
 install_requires = ["torch>=2.1", "matplotlib", "numpy", "scipy", "jaxtyping>=0.2.24", "typing_extensions>=4.5.0"]
 
 [build-system]
