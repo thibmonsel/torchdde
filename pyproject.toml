@@ -23,7 +23,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Mathematics",
 ]
 urls = {repository = "https://github.com/thibmonsel/torchdde" }
-install_requires = ["torch>=2.1", "matplotlib", "numpy", "scipy", "jaxtyping>=0.2.24", "typing_extensions>=4.5.0"]
+install_requires = ["torch>=2.1", "matplotlib", "numpy", "scipy", "jaxtyping>=0.2.24", "typing_extensions>=4.5.0", "pip install git+https://github.com/patrick-kidger/torchcubicspline.git"]
 
 [build-system]
 requires = ["hatchling"]

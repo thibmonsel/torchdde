@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Any, Union
 
 import torch
 from jaxtyping import Float
@@ -15,10 +16,10 @@ class AbstractOdeSolver(ABC):
         func: torch.nn.Module,
         t: Float[torch.Tensor, "1"],
         y: Float[torch.Tensor, "batch ..."],
-        dt: Float[torch.Tensor, "1"],
-        args=None,
+        dt: Union[Float[torch.Tensor, "1"], float],
+        args: Any,
         has_aux=False,
-    ) -> torch.Tensor:
+    ) -> tuple[Float[torch.Tensor, "batch ..."], Any]:
         r"""ODE's stepping definition
 
         **Arguments:**
@@ -38,11 +39,10 @@ class AbstractOdeSolver(ABC):
     def integrate(
         self,
         func: torch.nn.Module,
-        ts: Float[torch.Tensor, "time"],
+        ts: Float[torch.Tensor, " time"],
         y0: Float[torch.Tensor, "batch ..."],
-        args=None,
-        has_aux=False,
-    ) -> torch.Tensor:
+        args: Any,
+    ) -> Float[torch.Tensor, "batch ..."]:
         r"""Integrate a system of ODEs.
         **Arguments:**
 
@@ -58,11 +58,11 @@ class AbstractOdeSolver(ABC):
 
         dt = ts[1] - ts[0]
         ys = torch.unsqueeze(y0.clone(), dim=1)
-        current_y = y0
+        # current_y = y0
         for current_t in ts[1:]:
-            y = self.step(func, current_t, current_y, dt, args=args, has_aux=has_aux)
-            current_y = y
-            ys = torch.cat((ys, torch.unsqueeze(current_y, dim=1)), dim=1)
+            y, _ = self.step(func, current_t, ys[:, 0], dt, args, has_aux=False)
+            # current_y = y
+            ys = torch.cat((ys, torch.unsqueeze(y, dim=1)), dim=1)
         return ys
 
 
@@ -72,12 +72,20 @@ class Euler(AbstractOdeSolver):
     def __init__(self):
         super().__init__()
 
-    def step(self, func, t, y, dt, args, has_aux=False):
+    def step(
+        self,
+        func: torch.nn.Module,
+        t: Float[torch.Tensor, "1"],
+        y: Float[torch.Tensor, "batch ..."],
+        dt: Union[Float[torch.Tensor, "1"], float],
+        args: Any,
+        has_aux=False,
+    ) -> tuple[Float[torch.Tensor, "batch ..."], Any]:
         if has_aux:
-            k1, aux = func(t, y, args, has_aux)
+            k1, aux = func(t, y, args)
             return y + dt * k1, aux
         else:
-            return y + dt * func(t, y, args)
+            return y + dt * func(t, y, args), None
 
 
 class ImplicitEuler(AbstractOdeSolver):
@@ -93,11 +101,26 @@ class ImplicitEuler(AbstractOdeSolver):
         self.max_iters = 100
 
     @staticmethod
-    def _residual(f, t, y, dt, y_sol, args):
-        f_sol = f(t, y_sol, args)
+    def _residual(
+        func: torch.nn.Module,
+        t: Float[torch.Tensor, "1"],
+        y: Float[torch.Tensor, "batch ..."],
+        dt: Union[Float[torch.Tensor, "1"], float],
+        y_sol: Float[torch.Tensor, "batch ..."],
+        args: Any,
+    ) -> Float[torch.Tensor, "1"]:
+        f_sol = func(t, y_sol, args)
         return torch.sum((y_sol - y - dt * f_sol) ** 2)
 
-    def step(self, func, t, y, dt, args, has_aux=False):
+    def step(
+        self,
+        func: torch.nn.Module,
+        t: Float[torch.Tensor, "1"],
+        y: Float[torch.Tensor, "batch ..."],
+        dt: Union[Float[torch.Tensor, "1"], float],
+        args: Any,
+        has_aux=False,
+    ) -> tuple[Float[torch.Tensor, "batch ..."], Any]:
         y_sol = y.clone()
         y_sol = torch.nn.Parameter(data=y_sol)
         opt = self.opt(
@@ -111,20 +134,21 @@ class ImplicitEuler(AbstractOdeSolver):
             line_search_fn="strong_wolfe",
         )
 
-        def closure():
+        def closure() -> Float[torch.Tensor, "1"]:
             opt.zero_grad()
             residual = ImplicitEuler._residual(func, t, y, dt, y_sol, args)
             (y_sol.grad,) = torch.autograd.grad(
                 residual, y_sol, only_inputs=True, allow_unused=False
             )
+            print("residual type", type(residual))
             return residual
 
-        opt.step(closure)
+        opt.step(closure)  # type: ignore
         if has_aux:
             _, aux = func(t, y, args, has_aux)
             return y_sol, aux
         else:
-            return y_sol
+            return y_sol, None
 
 
 class RK2(AbstractOdeSolver):
@@ -133,15 +157,23 @@ class RK2(AbstractOdeSolver):
     def __init__(self):
         super().__init__()
 
-    def step(self, func, t, y, dt, args, has_aux=False):
+    def step(
+        self,
+        func: torch.nn.Module,
+        t: Float[torch.Tensor, "1"],
+        y: Float[torch.Tensor, "batch ..."],
+        dt: Union[Float[torch.Tensor, "1"], float],
+        args: Any,
+        has_aux=False,
+    ) -> tuple[Float[torch.Tensor, "batch ..."], Any]:
         if has_aux:
-            k1, aux = func(t, y, args, has_aux)
-            k2 = func(t + dt, y + dt * k1, args)
+            k1, aux = func(t, y, args)
+            k2, _ = func(t + dt, y + dt * k1, args)
             return y + dt / 2 * (k1 + k2), aux
         else:
             k1 = func(t, y, args)
             k2 = func(t + dt, y + dt * k1, args)
-            return y + dt / 2 * (k1 + k2)
+            return y + dt / 2 * (k1 + k2), None
 
 
 class Ralston(AbstractOdeSolver):
@@ -150,15 +182,23 @@ class Ralston(AbstractOdeSolver):
     def __init__(self):
         super().__init__()
 
-    def step(self, func, t, y, dt, args, has_aux=False):
+    def step(
+        self,
+        func: torch.nn.Module,
+        t: Float[torch.Tensor, "1"],
+        y: Float[torch.Tensor, "batch ..."],
+        dt: Union[Float[torch.Tensor, "1"], float],
+        args: Any,
+        has_aux=False,
+    ) -> tuple[Float[torch.Tensor, "batch ..."], Any]:
         if has_aux:
-            k1, aux = func(t, y, args, has_aux)
-            k2 = func(t + 2 / 3 * dt, y + 2 / 3 * dt * k1, args)
+            k1, aux = func(t, y, args)
+            k2, _ = func(t + 2 / 3 * dt, y + 2 / 3 * dt * k1, args)
             return y + dt * (1 / 4 * k1 + 3 / 4 * k2), aux
         else:
             k1 = func(t, y, args)
             k2 = func(t + 2 / 3 * dt, y + 2 / 3 * dt * k1, args)
-            return y + dt * (1 / 4 * k1 + 3 / 4 * k2)
+            return y + dt * (1 / 4 * k1 + 3 / 4 * k2), None
 
 
 class RK4(AbstractOdeSolver):
@@ -167,26 +207,24 @@ class RK4(AbstractOdeSolver):
     def __init__(self):
         super().__init__()
 
-    def step(self, func, t, y, dt, args, has_aux=False):
+    def step(
+        self,
+        func: torch.nn.Module,
+        t: Float[torch.Tensor, "1"],
+        y: Float[torch.Tensor, "batch ..."],
+        dt: Union[Float[torch.Tensor, "1"], float],
+        args: Any,
+        has_aux=False,
+    ) -> tuple[Float[torch.Tensor, "batch ..."], Any]:
         if has_aux:
-            k1, aux = func(t, y, args, has_aux)
-            k2 = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k1, args)
-            k3 = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k2, args)
-            k4 = func(t + dt, y + dt * k3, args)
+            k1, aux = func(t, y, args)
+            k2, _ = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k1, args)
+            k3, _ = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k2, args)
+            k4, _ = func(t + dt, y + dt * k3, args)
             return y + 1 / 6 * dt * (k1 + 2 * k2 + 2 * k3 + k4), aux
         else:
             k1 = func(t, y, args)
             k2 = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k1, args)
             k3 = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k2, args)
             k4 = func(t + dt, y + dt * k3, args)
-            return y + 1 / 6 * dt * (k1 + 2 * k2 + 2 * k3 + k4)
-
-
-# solver = ImplicitEuler()
-# ts = torch.linspace(0, 20, 201)
-# ys = solver.integrate(lambda t, y, args: -y, ts, torch.tensor([1.0]), None)
-# import matplotlib.pyplot as plt
-
-
-# plt.plot(ts, ys[0].detach().numpy())
-# plt.show()
+            return y + 1 / 6 * dt * (k1 + 2 * k2 + 2 * k3 + k4), None
