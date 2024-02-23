@@ -18,7 +18,7 @@ class nddeint_ACA(torch.autograd.Function):
         ts: Float[torch.Tensor, " time"],
         args: Any,
         solver: AbstractOdeSolver,
-        *params: tuple[Float[torch.Tensor, "..."], ...],
+        *params,  # type: ignore
     ) -> Float[torch.Tensor, "batch time ..."]:
         # Saving parameters for backward()
         ctx.history_func = history_func

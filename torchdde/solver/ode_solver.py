@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Union
+from typing import Any, Callable, Union
 
 import torch
 from jaxtyping import Float
@@ -13,10 +13,10 @@ class AbstractOdeSolver(ABC):
     @abstractmethod
     def step(
         self,
-        func: torch.nn.Module,
-        t: Float[torch.Tensor, "1"],
+        func: Union[torch.nn.Module, Callable],
+        t: Float[torch.Tensor, ""],
         y: Float[torch.Tensor, "batch ..."],
-        dt: Union[Float[torch.Tensor, "1"], float],
+        dt: Union[Float[torch.Tensor, ""], float],
         args: Any,
         has_aux=False,
     ) -> tuple[Float[torch.Tensor, "batch ..."], Any]:
@@ -38,7 +38,7 @@ class AbstractOdeSolver(ABC):
 
     def integrate(
         self,
-        func: torch.nn.Module,
+        func: Union[torch.nn.Module, Callable],
         ts: Float[torch.Tensor, " time"],
         y0: Float[torch.Tensor, "batch ..."],
         args: Any,
@@ -72,10 +72,10 @@ class Euler(AbstractOdeSolver):
 
     def step(
         self,
-        func: torch.nn.Module,
-        t: Float[torch.Tensor, "1"],
+        func: Union[torch.nn.Module, Callable],
+        t: Float[torch.Tensor, ""],
         y: Float[torch.Tensor, "batch ..."],
-        dt: Union[Float[torch.Tensor, "1"], float],
+        dt: Union[Float[torch.Tensor, ""], float],
         args: Any,
         has_aux=False,
     ) -> tuple[Float[torch.Tensor, "batch ..."], Any]:
@@ -100,14 +100,14 @@ class ImplicitEuler(AbstractOdeSolver):
 
     @staticmethod
     def _residual(
-        func: torch.nn.Module,
-        t: Float[torch.Tensor, "1"],
+        func: Union[torch.nn.Module, Callable],
+        t: Float[torch.Tensor, ""],
         y: Float[torch.Tensor, "batch ..."],
-        dt: Union[Float[torch.Tensor, "1"], float],
+        dt: Union[Float[torch.Tensor, ""], float],
         y_sol: Float[torch.Tensor, "batch ..."],
         args: Any,
         has_aux=False,
-    ) -> Float[torch.Tensor, "1"]:
+    ) -> Float[torch.Tensor, ""]:
         if has_aux:
             f_sol, _ = func(t, y_sol, args)
         else:
@@ -116,10 +116,10 @@ class ImplicitEuler(AbstractOdeSolver):
 
     def step(
         self,
-        func: torch.nn.Module,
-        t: Float[torch.Tensor, "1"],
+        func: Union[torch.nn.Module, Callable],
+        t: Float[torch.Tensor, ""],
         y: Float[torch.Tensor, "batch ..."],
-        dt: Union[Float[torch.Tensor, "1"], float],
+        dt: Union[Float[torch.Tensor, ""], float],
         args: Any,
         has_aux=False,
     ) -> tuple[Float[torch.Tensor, "batch ..."], Any]:
@@ -136,7 +136,7 @@ class ImplicitEuler(AbstractOdeSolver):
             line_search_fn="strong_wolfe",
         )
 
-        def closure() -> Float[torch.Tensor, "1"]:
+        def closure() -> Float[torch.Tensor, ""]:
             opt.zero_grad()
             residual = ImplicitEuler._residual(
                 func, t, y, dt, y_sol, args, has_aux=has_aux
@@ -162,10 +162,10 @@ class RK2(AbstractOdeSolver):
 
     def step(
         self,
-        func: torch.nn.Module,
-        t: Float[torch.Tensor, "1"],
+        func: Union[torch.nn.Module, Callable],
+        t: Float[torch.Tensor, ""],
         y: Float[torch.Tensor, "batch ..."],
-        dt: Union[Float[torch.Tensor, "1"], float],
+        dt: Union[Float[torch.Tensor, ""], float],
         args: Any,
         has_aux=False,
     ) -> tuple[Float[torch.Tensor, "batch ..."], Any]:
@@ -187,10 +187,10 @@ class Ralston(AbstractOdeSolver):
 
     def step(
         self,
-        func: torch.nn.Module,
-        t: Float[torch.Tensor, "1"],
+        func: Union[torch.nn.Module, Callable],
+        t: Float[torch.Tensor, ""],
         y: Float[torch.Tensor, "batch ..."],
-        dt: Union[Float[torch.Tensor, "1"], float],
+        dt: Union[Float[torch.Tensor, ""], float],
         args: Any,
         has_aux=False,
     ) -> tuple[Float[torch.Tensor, "batch ..."], Any]:
@@ -212,10 +212,10 @@ class RK4(AbstractOdeSolver):
 
     def step(
         self,
-        func: torch.nn.Module,
-        t: Float[torch.Tensor, "1"],
+        func: Union[torch.nn.Module, Callable],
+        t: Float[torch.Tensor, ""],
         y: Float[torch.Tensor, "batch ..."],
-        dt: Union[Float[torch.Tensor, "1"], float],
+        dt: Union[Float[torch.Tensor, ""], float],
         args: Any,
         has_aux=False,
     ) -> tuple[Float[torch.Tensor, "batch ..."], Any]:

@@ -1,4 +1,4 @@
-from typing import Any, Callable, Tuple
+from typing import Any, Callable, Tuple, Union
 
 import torch
 from jaxtyping import Float
@@ -23,7 +23,7 @@ class DDESolver:
 
     def integrate(
         self,
-        func: torch.nn.Module,
+        func: Union[torch.nn.Module, Callable],
         ts: Float[torch.Tensor, " time"],
         history_func: Callable,
         args: Any,
@@ -49,8 +49,8 @@ class DDESolver:
         ys_interpolation = TorchLinearInterpolator(ts[0].view(1), y0)
 
         def ode_func(
-            t: Float[torch.Tensor, "1"],
-            y: Float[torch.Tensor, "batch features"],
+            t: Float[torch.Tensor, ""],
+            y: Float[torch.Tensor, "batch ..."],
             args: Any,
         ):
             # applies the function func to the current

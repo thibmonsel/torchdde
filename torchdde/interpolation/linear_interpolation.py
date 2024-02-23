@@ -2,7 +2,7 @@ import warnings
 from typing import Union
 
 import torch
-from jaxtyping import Float
+from jaxtyping import Float, Integer
 
 
 tiny = 10e-3
@@ -37,11 +37,8 @@ class TorchLinearInterpolator:
         self.ts = self.ts.to(device)
 
     def _interpret_t(
-        self, t: Float[Union[torch.Tensor, float], "#1"], left: bool
-    ) -> tuple[
-        Float[torch.Tensor, ""],
-        Union[Float[torch.Tensor, "1"], float],
-    ]:
+        self, t: Union[Float[torch.Tensor, ""], float], left: bool
+    ) -> tuple[Integer[torch.Tensor, ""], Float[torch.Tensor, ""]]:
         maxlen = self.ts.shape[0] - 2
         index = torch.searchsorted(self.ts, t, side="left" if left else "right")
         index = torch.clip(index - 1, 0, maxlen)
