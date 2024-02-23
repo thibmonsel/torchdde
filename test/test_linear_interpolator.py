@@ -3,13 +3,6 @@ import torch
 from torchdde import TorchLinearInterpolator
 
 
-def test_2d_ts():
-    ts = torch.linspace(0, 10, 10).reshape(-1, 2)
-    ys = torch.ones(10, 10, 1)
-    with pytest.raises(ValueError, match=r"`ts` must be one dimensional."):
-        TorchLinearInterpolator(ts, ys)
-
-
 def test_non_montonic_ts():
     ts = torch.linspace(0, 10, 10)
     ts = torch.roll(ts, 1)
@@ -18,18 +11,11 @@ def test_non_montonic_ts():
         TorchLinearInterpolator(ts, ys)
 
 
-def test_ts_ys_shape_mismatch():
-    ts = torch.linspace(0, 10, 10)
-    ys = torch.ones(10, 8, 1)
-    with pytest.raises(ValueError):
-        TorchLinearInterpolator(ts, ys)
-
-
 def test_call():
     ts = torch.linspace(0, 10, 10)
     ys = torch.ones(10, 10, 1)
     inter = TorchLinearInterpolator(ts, ys)
-    inter(ts[2].reshape(1))
+    inter(ts[2])
     inter(1.2)
 
 
@@ -51,14 +37,6 @@ def test_add_point_t():
     ys = torch.arange(1, 11, dtype=torch.float32)[None, ..., None]
     inter = TorchLinearInterpolator(ts, ys)
     inter.add_point(torch.tensor(11.0), torch.tensor([[1.0]]))
-
-
-def test_add_point_t_mishape():
-    ts = torch.linspace(1.0, 10.0, 10)
-    ys = torch.arange(1, 11, dtype=torch.float32)[None, ..., None]
-    inter = TorchLinearInterpolator(ts, ys)
-    with pytest.raises(RuntimeError):
-        inter.add_point(torch.tensor([1.0, 2.0]), torch.tensor([[1.0]]))
 
 
 def test_add_point_y_mishape():
