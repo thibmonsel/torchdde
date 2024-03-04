@@ -44,7 +44,6 @@ class odeint_ACA(torch.autograd.Function):
         solver = ctx.solver
         params = ctx.saved_tensors
         adjoint_state = grad_output[:, -1]
-
         out2 = None
         for i, current_t in enumerate(reversed(ts)):
             y_t = torch.autograd.Variable(ys[:, -i - 1], requires_grad=True)
@@ -54,16 +53,26 @@ class odeint_ACA(torch.autograd.Function):
                 adj_dyn = lambda t, adj_y, args: torch.autograd.grad(
                     out, y_t, -adj_y, retain_graph=True
                 )[0]
-                adjoint_state = solver.step(
+                adjoint_state, _ = solver.step(
                     adj_dyn, current_t, adjoint_state, -dt, None
                 )
+
                 adjoint_state -= grad_output[:, -i - 1]
 
                 param_inc = torch.autograd.grad(
                     out, params, -adjoint_state, retain_graph=True
                 )
+
+            # Adding last term in order to get a trapz rule
+            # estimate of the grad wtr to the parameters
+            # trapezoid is h/2 * (f(a) + f(b) + 2 (f(x1) + ... + f(xn-1)))
+            # compared to rectangle rule is h * (f(a) + f(b) + f(x1) + ... + f(xn-1))
+            # This could be improved by using intermediate stages by RK solvers
             if out2 is None:
-                out2 = tuple([dt * p for p in param_inc])
+                out2 = tuple([dt / 2 * p for p in param_inc])
+            elif current_t == ts[0]:
+                for _1, _2 in zip([*out2], [*param_inc]):
+                    _1 += dt / 2 * _2
             else:
                 for _1, _2 in zip([*out2], [*param_inc]):
                     _1 += dt * _2
