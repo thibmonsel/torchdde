@@ -1,9 +1,8 @@
 import pytest
 import torch
 import torch.nn as nn
-from torchdde import ddesolve_adjoint
-from torchdde.solver.dde_solver import DDESolver
-from torchdde.solver.ode_solver import Euler, ImplicitEuler, Ralston, RK2, RK4
+from torchdde import integrate
+from torchdde.solver import Euler, ImplicitEuler, Ralston, RK2, RK4
 
 
 @pytest.mark.parametrize("solver", [Euler(), RK2(), Ralston(), RK4(), ImplicitEuler()])
@@ -34,8 +33,7 @@ def test_learning_delay_in_convex_case(solver):
 
     ts = torch.linspace(0, 10, 101)
     list_delays = torch.tensor([1.0])
-    dde_solver = DDESolver(solver, list_delays)
-    ys, _ = dde_solver.integrate(simple_dde, ts, history_function, None)
+    ys, _ = integrate(simple_dde, solver, ts, history_function, None, list_delays)
 
     learnable_delays = torch.abs(torch.randn((len(list_delays),)))
     model = SimpleNDDE(dim=1, list_delays=learnable_delays)
@@ -45,7 +43,7 @@ def test_learning_delay_in_convex_case(solver):
     for _ in range(1000):
         model.linear.weight.requires_grad = False
         opt.zero_grad()
-        ret = ddesolve_adjoint(history_function, model, ts, None, solver)
+        ret = integrate(model, solver, ts, history_function, None, model.delays)
         loss = lossfunc(ret, ys)
         loss.backward()
         opt.step()

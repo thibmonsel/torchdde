@@ -3,8 +3,8 @@ from typing import Any, Union
 import torch
 import torch.nn as nn
 from jaxtyping import Float
-
-from torchdde.solver.ode_solver import AbstractOdeSolver
+from torchdde.integrate import _integrate
+from torchdde.solver.base import AbstractOdeSolver
 
 
 class odeint_ACA(torch.autograd.Function):
@@ -25,7 +25,7 @@ class odeint_ACA(torch.autograd.Function):
         ctx.solver = solver
         with torch.no_grad():
             ctx.save_for_backward(*params)
-            ys = solver.integrate(func, ts, y0, args)
+            ys = _integrate(func, solver, ts, y0, args)
         ctx.ys = ys
         ctx.args = args
         return ys
@@ -35,7 +35,6 @@ class odeint_ACA(torch.autograd.Function):
         # grad_output holds the gradient of the
         # loss w.r.t. each evaluation step
         grad_output = grad_y[0]
-
         dt = ctx.ts[1] - ctx.ts[0]
         ys = ctx.ys
         ts = ctx.ts
@@ -44,7 +43,9 @@ class odeint_ACA(torch.autograd.Function):
         solver = ctx.solver
         params = ctx.saved_tensors
         adjoint_state = grad_output[:, -1]
+
         out2 = None
+        current_t = ts[-1]
         for i, current_t in enumerate(reversed(ts)):
             y_t = torch.autograd.Variable(ys[:, -i - 1], requires_grad=True)
 
@@ -56,7 +57,6 @@ class odeint_ACA(torch.autograd.Function):
                 adjoint_state, _ = solver.step(
                     adj_dyn, current_t, adjoint_state, -dt, None
                 )
-
                 adjoint_state -= grad_output[:, -i - 1]
 
                 param_inc = torch.autograd.grad(
@@ -65,7 +65,7 @@ class odeint_ACA(torch.autograd.Function):
 
             # Adding last term in order to get a trapz rule
             # estimate of the grad wtr to the parameters
-            # trapezoid is h/2 * (f(a) + f(b) + 2 (f(x1) + ... + f(xn-1)))
+            # trapezoid is h/2 * (f(a) + f(b)) + [f(x1) + ... + f(xn-1)]
             # compared to rectangle rule is h * (f(a) + f(b) + f(x1) + ... + f(xn-1))
             # This could be improved by using intermediate stages by RK solvers
             if out2 is None:
