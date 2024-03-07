@@ -3,6 +3,7 @@ from typing import Any, Union
 import torch
 import torch.nn as nn
 from jaxtyping import Float
+
 from torchdde.integrate import _integrate
 from torchdde.solver.base import AbstractOdeSolver
 

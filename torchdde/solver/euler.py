@@ -2,6 +2,7 @@ from typing import Any, Callable, Union
 
 import torch
 from jaxtyping import Float
+
 from torchdde.solver.base import AbstractOdeSolver
 
 

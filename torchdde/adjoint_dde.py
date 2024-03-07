@@ -3,6 +3,7 @@ from typing import Any, Callable, Union
 import torch
 import torch.nn as nn
 from jaxtyping import Float
+
 from torchdde.integrate import _integrate
 from torchdde.interpolation.linear_interpolation import TorchLinearInterpolator
 from torchdde.solver.base import AbstractOdeSolver
@@ -12,7 +13,9 @@ class nddeint_ACA(torch.autograd.Function):
     @staticmethod
     def forward(  # type: ignore
         ctx,
-        history_func: Callable,
+        history_func: Callable[
+            [Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]
+        ],
         func: torch.nn.Module,
         ts: Float[torch.Tensor, " time"],
         args: Any,
@@ -249,7 +252,7 @@ class nddeint_ACA(torch.autograd.Function):
 
 
 def ddesolve_adjoint(
-    history_func: Callable,
+    history_func: Callable[[Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]],
     func: torch.nn.Module,
     ts: Float[torch.Tensor, " time"],
     args: Any,

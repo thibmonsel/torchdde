@@ -1,7 +1,8 @@
-from typing import Any, Callable, Union
+from typing import Any, Callable, Optional, Union
 
 import torch
 from jaxtyping import Float
+
 from torchdde.interpolation.linear_interpolation import TorchLinearInterpolator
 from torchdde.solver.base import AbstractOdeSolver
 
@@ -10,11 +11,14 @@ def integrate(
     func: Union[torch.nn.Module, Callable],
     solver: AbstractOdeSolver,
     ts: Float[torch.Tensor, " time"],
-    y0: Float[torch.Tensor, "batch ..."],
+    y0: Union[
+        Float[torch.Tensor, "batch ..."],
+        Callable[[Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]],
+    ],
     args: Any,
-    delays: Float[torch.Tensor, "batch ..."] = None,
+    delays: Optional[Float[torch.Tensor, "batch ..."]] = None,
     discretize_then_optimize: bool = False,
-):
+) -> Float[torch.Tensor, "batch time ..."]:
     # imported here to handle circular dependencies
     # not sure this is the best...
     from torchdde.adjoint_dde import ddesolve_adjoint
@@ -24,8 +28,14 @@ def integrate(
         return _integrate(func, solver, ts, y0, args, delays)
     else:
         if delays is not None:
-            return ddesolve_adjoint(y0, func, ts, args, solver), None
+            # y0 is a Callable that encaptulates
+            # the history function and y0 at the same time
+            # by enforcing that history_func = y0 and
+            # history_func(ts[0]) = y0 in _integrate
+            assert isinstance(y0, Callable)
+            return ddesolve_adjoint(y0, func, ts, args, solver)
         else:
+            assert isinstance(y0, torch.Tensor)
             return odesolve_adjoint(y0, func, ts, args, solver)
 
 
@@ -33,9 +43,12 @@ def _integrate(
     func: Union[torch.nn.Module, Callable],
     solver: AbstractOdeSolver,
     ts: Float[torch.Tensor, " time"],
-    y0: Float[torch.Tensor, "batch ..."],
+    y0: Union[
+        Float[torch.Tensor, "batch ..."],
+        Callable[[Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]],
+    ],
     args: Any,
-    delays: Float[torch.Tensor, "batch ..."] = None,
+    delays: Optional[Float[torch.Tensor, "batch ..."]] = None,
 ) -> Float[torch.Tensor, "batch ..."]:
     r"""Integrate a system of ODEs.
     **Arguments:**
@@ -50,16 +63,24 @@ def _integrate(
     Integration result over `ts`
     """
     if delays is not None:
+        assert isinstance(y0, Callable)
         history_func = y0
-        y0 = history_func(ts[0])
-
-        return _integrate_dde(func, ts, y0, history_func, args, delays, solver)
+        y0_ = history_func(ts[0])
+        return _integrate_dde(func, ts, y0_, history_func, args, delays, solver)[0]
     else:
+        assert isinstance(y0, torch.Tensor)
         return _integrate_ode(func, ts, y0, args, solver)
 
 
-def _integrate_dde(func, ts, y0, history_func, args, delays, solver):
-
+def _integrate_dde(
+    func: Union[torch.nn.Module, Callable],
+    ts: Float[torch.Tensor, " time"],
+    y0: Float[torch.Tensor, "batch ..."],
+    history_func: Callable[[Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]],
+    args: Any,
+    delays: Float[torch.Tensor, " delays"],
+    solver: AbstractOdeSolver,
+) -> tuple[Float[torch.Tensor, "batch ..."], Callable]:
     dt = ts[1] - ts[0]
     # y0 should have the shape [batch, N_t=1, features]
     # in order to properly instantiate the
@@ -99,7 +120,13 @@ def _integrate_dde(func, ts, y0, history_func, args, delays, solver):
     return ys, ys_interpolation
 
 
-def _integrate_ode(func, ts, y0, args, solver):
+def _integrate_ode(
+    func: Union[torch.nn.Module, Callable],
+    ts: Float[torch.Tensor, " time"],
+    y0: Float[torch.Tensor, "batch ..."],
+    args: Any,
+    solver: AbstractOdeSolver,
+) -> Float[torch.Tensor, "batch time ..."]:
     dt = ts[1] - ts[0]
     ys = torch.unsqueeze(y0.clone(), dim=1)
     current_t = ts[0]
