@@ -25,12 +25,7 @@ def integrate(
     from torchdde.adjoint_ode import odesolve_adjoint
 
     if discretize_then_optimize or not isinstance(func, torch.nn.Module):
-        if delays is not None:
-            # assert isinstance(y0, (Callable, torch.Tensor))
-            return _integrate(func, solver, ts, y0, args, delays)[0]
-        else:
-            # assert isinstance(y0, torch.Tensor)
-            return _integrate(func, solver, ts, y0, args, delays)[0]
+        return _integrate(func, solver, ts, y0, args, delays)[0]
     else:
         if delays is not None:
             # y0 is a Callable that encaptulates
@@ -118,7 +113,7 @@ def _integrate_dde(
     current_y = y0[:, 0]
     ys = torch.unsqueeze(current_y, dim=1)
     current_t = ts[0]
-    while current_t < ts[-1]:
+    while current_t <= ts[-1]:
         # the stepping method give the next y
         # with a shape [batch, features]
         y, _ = solver.step(ode_func, current_t, ys[:, -1], dt, args)  # type: ignore
@@ -140,7 +135,7 @@ def _integrate_ode(
     dt = ts[1] - ts[0]
     ys = torch.unsqueeze(y0.clone(), dim=1)
     current_t = ts[0]
-    while current_t <= ts[-1]:
+    while current_t < ts[-1]:
         y, _ = solver.step(func, current_t, ys[:, -1], dt, args, has_aux=False)
         current_t = current_t + dt
         ys = torch.cat((ys, torch.unsqueeze(y, dim=1)), dim=1)

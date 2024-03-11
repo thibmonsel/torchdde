@@ -9,14 +9,14 @@ from torchdde.solver.base import AbstractOdeSolver
 class ImplicitEuler(AbstractOdeSolver):
     """ImplicitEuler Euler's method"""
 
-    #  Credits to the TorchDyn team for the implementation of the implicit Euler method.
-    # Savagely copied from:
+    # Credits to the TorchDyn team for the implementation
+    # of the implicit Euler method, adapted from:
     # https://github.com/DiffEqML/torchdyn/blob/95cc74b0e35330b03d2cd4d875df362a93e1b5ea/torchdyn/numerics/solvers/ode.py#L181
 
-    def __init__(self):
+    def __init__(self, max_iters=100):
         super().__init__()
         self.opt = torch.optim.LBFGS
-        self.max_iters = 100
+        self.max_iters = max_iters
 
     def init(self):
         pass

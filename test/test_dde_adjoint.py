@@ -40,7 +40,7 @@ def test_learning_delay_in_convex_case(solver):
     lossfunc = nn.MSELoss()
     opt = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0)
 
-    for _ in range(1000):
+    for _ in range(2000):
         model.linear.weight.requires_grad = False
         opt.zero_grad()
         ret = integrate(model, solver, ts, history_function, None, model.delays)

@@ -17,7 +17,7 @@ class odeint_ACA(torch.autograd.Function):
         ts: Float[torch.Tensor, " time"],
         args: Any,
         solver: AbstractOdeSolver,
-        *params: tuple[Float[torch.Tensor, "..."], ...],
+        *params,  # type: ignore
     ) -> Float[torch.Tensor, "batch time ..."]:
         # Saving parameters for backward()
         ctx.func = func
@@ -26,13 +26,13 @@ class odeint_ACA(torch.autograd.Function):
         ctx.solver = solver
         with torch.no_grad():
             ctx.save_for_backward(*params)
-            ys = _integrate(func, solver, ts, y0, args)
+            ys, _ = _integrate(func, solver, ts, y0, args)
         ctx.ys = ys
         ctx.args = args
         return ys
 
     @staticmethod
-    def backward(ctx, *grad_y) -> tuple[Float[torch.Tensor, "..."], Any, Any, Any, Any]:
+    def backward(ctx, *grad_y):  # type: ignore
         # grad_output holds the gradient of the
         # loss w.r.t. each evaluation step
         grad_output = grad_y[0]
@@ -58,12 +58,11 @@ class odeint_ACA(torch.autograd.Function):
                 adjoint_state, _ = solver.step(
                     adj_dyn, current_t, adjoint_state, -dt, None
                 )
-                adjoint_state -= grad_output[:, -i - 1]
+                adjoint_state = adjoint_state - grad_output[:, -i - 1]
 
                 param_inc = torch.autograd.grad(
                     out, params, -adjoint_state, retain_graph=True
                 )
-
             # Adding last term in order to get a trapz rule
             # estimate of the grad wtr to the parameters
             # trapezoid is h/2 * (f(a) + f(b)) + [f(x1) + ... + f(xn-1)]
