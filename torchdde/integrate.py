@@ -16,16 +16,21 @@ def integrate(
         Callable[[Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]],
     ],
     args: Any,
-    delays: Optional[Float[torch.Tensor, "batch ..."]] = None,
+    delays: Optional[Float[torch.Tensor, " delays"]] = None,
     discretize_then_optimize: bool = False,
 ) -> Float[torch.Tensor, "batch time ..."]:
     # imported here to handle circular dependencies
-    # not sure this is the best...
+    # this surely isn't the best...
     from torchdde.adjoint_dde import ddesolve_adjoint
     from torchdde.adjoint_ode import odesolve_adjoint
 
     if discretize_then_optimize or not isinstance(func, torch.nn.Module):
-        return _integrate(func, solver, ts, y0, args, delays)
+        if delays is not None:
+            # assert isinstance(y0, (Callable, torch.Tensor))
+            return _integrate(func, solver, ts, y0, args, delays)[0]
+        else:
+            # assert isinstance(y0, torch.Tensor)
+            return _integrate(func, solver, ts, y0, args, delays)[0]
     else:
         if delays is not None:
             # y0 is a Callable that encaptulates
@@ -48,8 +53,11 @@ def _integrate(
         Callable[[Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]],
     ],
     args: Any,
-    delays: Optional[Float[torch.Tensor, "batch ..."]] = None,
-) -> Float[torch.Tensor, "batch ..."]:
+    delays: Optional[Float[torch.Tensor, " delays"]] = None,
+) -> tuple[
+    Float[torch.Tensor, "batch time ..."],
+    Union[Callable[[Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]], Any],
+]:
     r"""Integrate a system of ODEs.
     **Arguments:**
 
@@ -66,10 +74,10 @@ def _integrate(
         assert isinstance(y0, Callable)
         history_func = y0
         y0_ = history_func(ts[0])
-        return _integrate_dde(func, ts, y0_, history_func, args, delays, solver)[0]
+        return _integrate_dde(func, ts, y0_, history_func, args, delays, solver)
     else:
         assert isinstance(y0, torch.Tensor)
-        return _integrate_ode(func, ts, y0, args, solver)
+        return _integrate_ode(func, ts, y0, args, solver), None
 
 
 def _integrate_dde(
@@ -80,7 +88,10 @@ def _integrate_dde(
     args: Any,
     delays: Float[torch.Tensor, " delays"],
     solver: AbstractOdeSolver,
-) -> tuple[Float[torch.Tensor, "batch ..."], Callable]:
+) -> tuple[
+    Float[torch.Tensor, "batch time ..."],
+    Callable[[Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]],
+]:
     dt = ts[1] - ts[0]
     # y0 should have the shape [batch, N_t=1, features]
     # in order to properly instantiate the
@@ -116,7 +127,6 @@ def _integrate_dde(
         # it is unsqueezed in the interpolator class
         ys_interpolation.add_point(current_t + dt, y)
         ys = torch.concat((ys, torch.unsqueeze(y, dim=1)), dim=1)
-
     return ys, ys_interpolation
 
 
