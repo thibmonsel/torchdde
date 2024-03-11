@@ -4,16 +4,18 @@ import torch
 import torch.nn as nn
 from jaxtyping import Float
 
+from torchdde.integrate import _integrate
 from torchdde.interpolation.linear_interpolation import TorchLinearInterpolator
-from torchdde.solver.dde_solver import DDESolver
-from torchdde.solver.ode_solver import AbstractOdeSolver
+from torchdde.solver.base import AbstractOdeSolver
 
 
 class nddeint_ACA(torch.autograd.Function):
     @staticmethod
     def forward(  # type: ignore
         ctx,
-        history_func: Callable,
+        history_func: Callable[
+            [Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]
+        ],
         func: torch.nn.Module,
         ts: Float[torch.Tensor, " time"],
         args: Any,
@@ -28,9 +30,11 @@ class nddeint_ACA(torch.autograd.Function):
 
         with torch.no_grad():
             ctx.save_for_backward(*params)
-            dde_solver = DDESolver(solver, func.delays)
-            ys, ys_interpolator = dde_solver.integrate(func, ts, history_func, args)
-
+            # dde_solver = DDESolver(solver, func.delays)
+            # ys, ys_interpolator = dde_solver.integrate(func, ts, history_func, args)
+            ys, ys_interpolator = _integrate(
+                func, solver, ts, history_func, args, delays=func.delays
+            )
         ctx.ys_interpolator = ys_interpolator
         ctx.ys = ys
         ctx.args = args
@@ -58,8 +62,8 @@ class nddeint_ACA(torch.autograd.Function):
             ctx.ts[0] - max(ctx.func.delays).item(),
             ctx.ts[0],
             int(max(ctx.func.delays) / dt) + 2,
+            device=ctx.ts.device,
         )
-        ts_history = ts_history.to(ctx.ts.device)
         ys_history_eval = torch.concat(
             [torch.unsqueeze(ctx.history_func(t), dim=1) for t in ts_history],
             dim=1,
@@ -73,13 +77,11 @@ class nddeint_ACA(torch.autograd.Function):
         # create an adjoint interpolator that will be
         # used for the integration of the adjoint DDE
         # Our adjoint state is null for t>=T
-        adjoint_state = torch.zeros_like(grad_output[:, -1])
+        adjoint_state = torch.zeros_like(grad_output[:, -1], device=ctx.ts.device)
         adjoint_ys_final = -grad_output[:, -1].reshape(
             adjoint_state.shape[0], 1, *adjoint_state.shape[1:]
         )
-        adjoint_ys_final = adjoint_ys_final.to(ctx.ts.device)
-        add_t = torch.tensor([ctx.ts[-1], ctx.ts[-1] + dt])
-        add_t = add_t.to(ctx.ts.device)
+        add_t = torch.tensor([ctx.ts[-1], ctx.ts[-1] + dt], device=ctx.ts.device)
 
         adjoint_interpolator = TorchLinearInterpolator(
             add_t,
@@ -244,12 +246,11 @@ class nddeint_ACA(torch.autograd.Function):
                 for _1, _2 in zip([*out3], [*last_out3]):
                     if _2 is not None:
                         _1 -= -dt / 2 * _2
-
         return None, None, None, None, None, *(out3[0] + out2[0], *out2[1:])  # type: ignore
 
 
 def ddesolve_adjoint(
-    history_func: Callable,
+    history_func: Callable[[Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]],
     func: torch.nn.Module,
     ts: Float[torch.Tensor, " time"],
     args: Any,
