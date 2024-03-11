@@ -7,7 +7,7 @@ from torchdde.solver import Euler, ImplicitEuler, Ralston, RK2, RK4
 @pytest.mark.parametrize("solver", [Euler(), RK2(), Ralston(), RK4()])
 def test_explicit_solver(solver):
     vf = lambda t, y, args, history: -history[0]
-    ts = torch.linspace(0, 0.2, 10)
+    ts = torch.linspace(0, 2, 200)
     y0 = torch.rand((10, 1))
     ys = integrate(
         vf,
@@ -25,8 +25,7 @@ def test_explicit_solver(solver):
 @pytest.mark.parametrize("solver", [ImplicitEuler()])
 def test_implicit_solver(solver):
     vf = lambda t, y, args, history: -history[0]
-    # ts = torch.linspace(0, 2, 200)
-    ts = torch.linspace(0, 0.2, 10)
+    ts = torch.linspace(0, 2, 200)
     y0 = torch.rand((10, 1))
     ys = integrate(
         vf,
