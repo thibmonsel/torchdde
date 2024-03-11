@@ -62,8 +62,8 @@ class nddeint_ACA(torch.autograd.Function):
             ctx.ts[0] - max(ctx.func.delays).item(),
             ctx.ts[0],
             int(max(ctx.func.delays) / dt) + 2,
+            device=ctx.ts.device,
         )
-        ts_history = ts_history.to(ctx.ts.device)
         ys_history_eval = torch.concat(
             [torch.unsqueeze(ctx.history_func(t), dim=1) for t in ts_history],
             dim=1,
@@ -77,13 +77,11 @@ class nddeint_ACA(torch.autograd.Function):
         # create an adjoint interpolator that will be
         # used for the integration of the adjoint DDE
         # Our adjoint state is null for t>=T
-        adjoint_state = torch.zeros_like(grad_output[:, -1])
+        adjoint_state = torch.zeros_like(grad_output[:, -1], device=ctx.ts.device)
         adjoint_ys_final = -grad_output[:, -1].reshape(
             adjoint_state.shape[0], 1, *adjoint_state.shape[1:]
         )
-        adjoint_ys_final = adjoint_ys_final.to(ctx.ts.device)
-        add_t = torch.tensor([ctx.ts[-1], ctx.ts[-1] + dt])
-        add_t = add_t.to(ctx.ts.device)
+        add_t = torch.tensor([ctx.ts[-1], ctx.ts[-1] + dt], device=ctx.ts.device)
 
         adjoint_interpolator = TorchLinearInterpolator(
             add_t,
