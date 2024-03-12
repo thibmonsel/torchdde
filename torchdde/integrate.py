@@ -5,6 +5,10 @@ from jaxtyping import Float
 
 from torchdde.interpolation.linear_interpolation import TorchLinearInterpolator
 from torchdde.solver.base import AbstractOdeSolver
+from torchdde.step_size_controller import (
+    AbstractStepSizeController,
+    ConstantStepSizeController,
+)
 
 
 def integrate(
@@ -16,6 +20,7 @@ def integrate(
         Callable[[Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]],
     ],
     args: Any,
+    stepsize_controller: AbstractStepSizeController = ConstantStepSizeController(),
     delays: Optional[Float[torch.Tensor, " delays"]] = None,
     discretize_then_optimize: bool = False,
 ) -> Float[torch.Tensor, "batch time ..."]:
@@ -25,7 +30,7 @@ def integrate(
     from torchdde.adjoint_ode import odesolve_adjoint
 
     if discretize_then_optimize or not isinstance(func, torch.nn.Module):
-        return _integrate(func, solver, ts, y0, args, delays)[0]
+        return _integrate(func, solver, ts, y0, args, stepsize_controller, delays)[0]
     else:
         if delays is not None:
             # y0 is a Callable that encaptulates
@@ -33,10 +38,10 @@ def integrate(
             # by enforcing that history_func = y0 and
             # history_func(ts[0]) = y0 in _integrate
             assert isinstance(y0, Callable)
-            return ddesolve_adjoint(y0, func, ts, args, solver)
+            return ddesolve_adjoint(y0, func, ts, args, solver, stepsize_controller)
         else:
             assert isinstance(y0, torch.Tensor)
-            return odesolve_adjoint(y0, func, ts, args, solver)
+            return odesolve_adjoint(y0, func, ts, args, solver, stepsize_controller)
 
 
 def _integrate(
@@ -48,6 +53,7 @@ def _integrate(
         Callable[[Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]],
     ],
     args: Any,
+    stepsize_controller: AbstractStepSizeController,
     delays: Optional[Float[torch.Tensor, " delays"]] = None,
 ) -> tuple[
     Float[torch.Tensor, "batch time ..."],
@@ -69,10 +75,12 @@ def _integrate(
         assert isinstance(y0, Callable)
         history_func = y0
         y0_ = history_func(ts[0])
-        return _integrate_dde(func, ts, y0_, history_func, args, delays, solver)
+        return _integrate_dde(
+            func, ts, y0_, history_func, args, delays, solver, stepsize_controller
+        )
     else:
         assert isinstance(y0, torch.Tensor)
-        return _integrate_ode(func, ts, y0, args, solver), None
+        return _integrate_ode(func, ts, y0, args, solver, stepsize_controller), None
 
 
 def _integrate_dde(
@@ -83,14 +91,15 @@ def _integrate_dde(
     args: Any,
     delays: Float[torch.Tensor, " delays"],
     solver: AbstractOdeSolver,
+    stepsize_controller: AbstractStepSizeController,
 ) -> tuple[
     Float[torch.Tensor, "batch time ..."],
     Callable[[Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]],
 ]:
-    dt = ts[1] - ts[0]
     # y0 should have the shape [batch, N_t=1, features]
     # in order to properly instantiate the
     # interpolator class
+
     y0 = torch.unsqueeze(y0.clone(), dim=1)
     ys_interpolation = TorchLinearInterpolator(ts[0].view(1), y0)
 
@@ -110,18 +119,36 @@ def _integrate_dde(
         ]
         return func(t, y, args, history=history)
 
+    tnext, controller_state = stepsize_controller.init(
+        ode_func, ts[0], ts[-1], y0, ts[1] - ts[0], args, solver.order
+    )
     current_y = y0[:, 0]
     ys = torch.unsqueeze(current_y, dim=1)
-    current_t = ts[0]
-    while current_t <= ts[-1]:
+    tprev = ts[0]
+    while tprev < ts[-1]:
         # the stepping method give the next y
         # with a shape [batch, features]
-        y, _ = solver.step(ode_func, current_t, ys[:, -1], dt, args)  # type: ignore
-        current_t = current_t + dt
+        y_candidate, y_error, _ = solver.step(
+            ode_func, tprev, ys[:, -1], controller_state, args, has_aux=False
+        )
+        keep_step, tprev, tnext, controller_state = stepsize_controller.adapt_step_size(
+            ode_func,
+            tprev,
+            tnext,
+            ys[:, -1],
+            y_candidate,
+            args,
+            solver.order,
+            y_error,
+            controller_state,
+        )
         # by adding the y to the interpolator,
         # it is unsqueezed in the interpolator class
-        ys_interpolation.add_point(current_t + dt, y)
-        ys = torch.concat((ys, torch.unsqueeze(y, dim=1)), dim=1)
+        y = y_candidate if keep_step else ys[:, -1]
+        if keep_step:
+            ys_interpolation.add_point(tprev, y)
+            ys = torch.concat((ys, torch.unsqueeze(y, dim=1)), dim=1)
+
     return ys, ys_interpolation
 
 
@@ -131,12 +158,28 @@ def _integrate_ode(
     y0: Float[torch.Tensor, "batch ..."],
     args: Any,
     solver: AbstractOdeSolver,
+    stepsize_controller: AbstractStepSizeController,
 ) -> Float[torch.Tensor, "batch time ..."]:
-    dt = ts[1] - ts[0]
+    tnext, controller_state = stepsize_controller.init(
+        func, ts[0], ts[-1], y0, ts[1] - ts[0], args, solver.order
+    )
     ys = torch.unsqueeze(y0.clone(), dim=1)
-    current_t = ts[0]
-    while current_t < ts[-1]:
-        y, _ = solver.step(func, current_t, ys[:, -1], dt, args, has_aux=False)
-        current_t = current_t + dt
+    tprev = ts[0]
+    while tprev < ts[-1]:
+        y_candidate, y_error, _ = solver.step(
+            func, tprev, ys[:, -1], controller_state, args, has_aux=False
+        )
+        keep_step, tprev, tnext, controller_state = stepsize_controller.adapt_step_size(
+            func,
+            tprev,
+            tnext,
+            ys[:, -1],
+            y_candidate,
+            args,
+            solver.order,
+            y_error,
+            controller_state,
+        )
+        y = y_candidate if keep_step else ys[:, -1]
         ys = torch.cat((ys, torch.unsqueeze(y, dim=1)), dim=1)
     return ys

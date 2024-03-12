@@ -21,6 +21,9 @@ class ImplicitEuler(AbstractOdeSolver):
     def init(self):
         pass
 
+    def order(self):
+        return 1
+
     @staticmethod
     def _residual(
         func: Union[torch.nn.Module, Callable],
@@ -45,7 +48,9 @@ class ImplicitEuler(AbstractOdeSolver):
         dt: Union[Float[torch.Tensor, ""], float],
         args: Any,
         has_aux=False,
-    ) -> tuple[Float[torch.Tensor, "batch ..."], Any]:
+    ) -> tuple[
+        Float[torch.Tensor, "batch ..."], Union[Float[torch.Tensor, " batch"], Any], Any
+    ]:
         y_sol = y.clone()
         y_sol = torch.nn.Parameter(data=y_sol)
         opt = self.opt(
@@ -72,6 +77,6 @@ class ImplicitEuler(AbstractOdeSolver):
         opt.step(closure)  # type: ignore
         if has_aux:
             _, aux = func(t, y, args)
-            return y_sol, aux
+            return y_sol, None, aux
         else:
-            return y_sol, None
+            return y_sol, None, None

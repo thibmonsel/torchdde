@@ -18,6 +18,10 @@ class AbstractOdeSolver(ABC):
         pass
 
     @abstractmethod
+    def order(self) -> int:
+        pass
+
+    @abstractmethod
     def step(
         self,
         func: Union[torch.nn.Module, Callable],
@@ -26,7 +30,22 @@ class AbstractOdeSolver(ABC):
         dt: Union[Float[torch.Tensor, ""], float],
         args: Any,
         has_aux=False,
-    ) -> tuple[Float[torch.Tensor, "batch ..."], Any]:
+    ) -> tuple[
+        Float[torch.Tensor, "batch ..."], Union[Float[torch.Tensor, " batch"], Any], Any
+    ]:
+        """
+        **Returns:**
+
+        A tuple of several objects:
+
+        - The value of the solution at `t+dt`.
+        - A local error estimate made during the step. (Used by adaptive step size
+            controllers to change the step size.) May be `None` if no estimate was
+            made.
+        - The value of the solver state at `t+dt`.
+        - `has_aux`: Whether the model has an auxiliary output.
+        """
+
         r"""ODE's stepping definition
 
         **Arguments:**

@@ -1,1 +1,1 @@
-from .linear_interpolation import TorchLinearInterpolator
+from .linear_interpolation import TorchLinearInterpolator as TorchLinearInterpolator

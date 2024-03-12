@@ -7,6 +7,7 @@ from jaxtyping import Float
 from torchdde.integrate import _integrate
 from torchdde.interpolation.linear_interpolation import TorchLinearInterpolator
 from torchdde.solver.base import AbstractOdeSolver
+from torchdde.step_size_controller.base import AbstractStepSizeController
 
 
 class nddeint_ACA(torch.autograd.Function):
@@ -20,20 +21,26 @@ class nddeint_ACA(torch.autograd.Function):
         ts: Float[torch.Tensor, " time"],
         args: Any,
         solver: AbstractOdeSolver,
+        stepsize_controller: AbstractStepSizeController,
         *params,  # type: ignore
     ) -> Float[torch.Tensor, "batch time ..."]:
         # Saving parameters for backward()
         ctx.history_func = history_func
+        ctx.stepsize_controller = stepsize_controller
         ctx.solver = solver
         ctx.func = func
         ctx.ts = ts
 
         with torch.no_grad():
             ctx.save_for_backward(*params)
-            # dde_solver = DDESolver(solver, func.delays)
-            # ys, ys_interpolator = dde_solver.integrate(func, ts, history_func, args)
             ys, ys_interpolator = _integrate(
-                func, solver, ts, history_func, args, delays=func.delays
+                func,
+                solver,
+                ts,
+                history_func,
+                args,
+                stepsize_controller,
+                delays=func.delays,
             )
         ctx.ys_interpolator = ys_interpolator
         ctx.ys = ys
@@ -41,7 +48,7 @@ class nddeint_ACA(torch.autograd.Function):
         return ys
 
     @staticmethod
-    def backward(ctx, *grad_y) -> tuple[Any, Any, Any, Any, Any, Any]:
+    def backward(ctx, *grad_y):  # type: ignore
         # http://www.cs.utoronto.ca/~calver/papers/adjoint_paper.pdf
         # This function implements the adjoint gradient
         # estimation method for NDDEs with constant delays
@@ -52,6 +59,7 @@ class nddeint_ACA(torch.autograd.Function):
         T = ctx.ts[-1]
         dt = ctx.ts[1] - ctx.ts[0]
         solver = ctx.solver
+        stepsize_controller = ctx.stepsize_controller
         params = ctx.saved_tensors
         state_interpolator = ctx.ys_interpolator
 
@@ -156,31 +164,57 @@ class nddeint_ACA(torch.autograd.Function):
         # computing the adjoint dynamics
         out2, out3, last_out2, last_out3 = None, None, None, None
         delay_derivative_inc = torch.zeros_like(ctx.func.delays)[..., None]
+
+        tnext, controller_state = stepsize_controller.init(
+            adjoint_dyn, T, ctx.ts[0], adjoint_state, -dt, args, solver.order
+        )
+        tprev = T
         for j, current_t in enumerate(reversed(ctx.ts)):
             with torch.enable_grad():
                 adjoint_state = adjoint_state - grad_output[:, -j - 1]
-                adjoint_interpolator.add_point(current_t, adjoint_state)
-                adj, (param_derivative_inc, delay_derivative_inc) = solver.step(
+                adjoint_interpolator.add_point(tprev, adjoint_state)
+                (
+                    adj_candidate,
+                    adj_error,
+                    (param_derivative_inc, delay_derivative_inc),
+                ) = solver.step(
                     adjoint_dyn, current_t, adjoint_state, -dt, args, has_aux=True
                 )
-                adjoint_state = adj
+                (
+                    keep_step,
+                    tprev,
+                    tnext,
+                    controller_state,
+                ) = stepsize_controller.adapt_step_size(
+                    adjoint_dyn,
+                    tprev,
+                    tnext,
+                    adjoint_state,
+                    adj_candidate,
+                    args,
+                    solver.order,
+                    adj_error,
+                    controller_state,
+                )
+                if keep_step:
+                    adjoint_state = adj_candidate
 
-                if out2 is None:
-                    out2 = tuple([dt / 2 * p for p in param_derivative_inc])
-                else:
-                    for _1, _2 in zip([*out2], [*param_derivative_inc]):
-                        if _2 is not None:
-                            _1 += dt * _2
+                    if out2 is None:
+                        out2 = tuple([dt / 2 * p for p in param_derivative_inc])
+                    else:
+                        for _1, _2 in zip([*out2], [*param_derivative_inc]):
+                            if _2 is not None:
+                                _1 += dt * _2
 
-                if out3 is None:
-                    out3 = tuple([-dt / 2 * p for p in delay_derivative_inc])
-                else:
-                    for _1, _2 in zip([*out3], [*delay_derivative_inc]):
-                        if _2 is not None:
-                            _1 += -dt * _2
+                    if out3 is None:
+                        out3 = tuple([-dt / 2 * p for p in delay_derivative_inc])
+                    else:
+                        for _1, _2 in zip([*out3], [*delay_derivative_inc]):
+                            if _2 is not None:
+                                _1 += -dt * _2
 
-                if current_t == T:
-                    last_out2 = tuple([p for p in param_derivative_inc])
+                    if current_t == T:
+                        last_out2 = tuple([p for p in param_derivative_inc])
 
         # adding the last contribution of the delay
         # parameters in the loss w.r.t. the parameters
@@ -246,7 +280,7 @@ class nddeint_ACA(torch.autograd.Function):
                 for _1, _2 in zip([*out3], [*last_out3]):
                     if _2 is not None:
                         _1 -= -dt / 2 * _2
-        return None, None, None, None, None, *(out3[0] + out2[0], *out2[1:])  # type: ignore
+        return None, None, None, None, None, None, *(out3[0] + out2[0], *out2[1:])  # type: ignore
 
 
 def ddesolve_adjoint(
@@ -255,6 +289,7 @@ def ddesolve_adjoint(
     ts: Float[torch.Tensor, " time"],
     args: Any,
     solver: AbstractOdeSolver,
+    stepsize_controller: AbstractStepSizeController,
 ) -> Union[Float[torch.Tensor, "batch time ..."], Any]:
     r"""Main function to integrate a constant time delay DDE with the adjoint method
 
@@ -270,7 +305,9 @@ def ddesolve_adjoint(
     Integration result over `ts`.
     """
     params = find_parameters(func)
-    ys = nddeint_ACA.apply(history_func, func, ts, args, solver, *params)
+    ys = nddeint_ACA.apply(
+        history_func, func, ts, args, solver, stepsize_controller, *params
+    )
     return ys
 
 

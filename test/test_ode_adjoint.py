@@ -15,7 +15,7 @@ def test_very_simple_system(solver):
 
         def init_weight(self):
             with torch.no_grad():
-                self.params.weight = nn.Parameter(-torch.abs(torch.rand((1,))))
+                self.params.weight = nn.Parameter(-torch.tensor([1.0]))
 
         def forward(self, t, z, args):
             return self.params.weight * z

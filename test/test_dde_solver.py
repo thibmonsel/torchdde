@@ -33,7 +33,7 @@ def test_implicit_solver(solver):
         ts,
         lambda t: y0,
         None,
-        torch.tensor([1.0]),
+        delays=torch.tensor([1.0]),
         discretize_then_optimize=True,
     )
     assert torch.allclose(ys[:, :80, 0], y0 * (1 - ts[:80]))

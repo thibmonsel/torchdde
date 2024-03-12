@@ -15,6 +15,9 @@ class RK2(AbstractOdeSolver):
     def init(self):
         pass
 
+    def order(self):
+        return 2
+
     def step(
         self,
         func: Union[torch.nn.Module, Callable],
@@ -23,12 +26,16 @@ class RK2(AbstractOdeSolver):
         dt: Union[Float[torch.Tensor, ""], float],
         args: Any,
         has_aux=False,
-    ) -> tuple[Float[torch.Tensor, "batch ..."], Any]:
+    ) -> tuple[
+        Float[torch.Tensor, "batch ..."], Union[Float[torch.Tensor, " batch"], Any], Any
+    ]:
         if has_aux:
             k1, aux = func(t, y, args)
             k2, _ = func(t + dt, y + dt * k1, args)
-            return y + dt / 2 * (k1 + k2), aux
+            y1 = y + dt / 2 * (k1 + k2)
+            return y1, None, aux
         else:
             k1 = func(t, y, args)
             k2 = func(t + dt, y + dt * k1, args)
-            return y + dt / 2 * (k1 + k2), None
+            y1 = y + dt / 2 * (k1 + k2)
+            return y1, None, None
