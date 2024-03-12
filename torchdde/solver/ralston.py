@@ -33,9 +33,9 @@ class Ralston(AbstractOdeSolver):
             k1, aux = func(t, y, args)
             k2, _ = func(t + 2 / 3 * dt, y + 2 / 3 * dt * k1, args)
             y1 = y + dt * (1 / 4 * k1 + 3 / 4 * k2)
-            return y1, None, aux
+            return y1, None, dict(y0=y, y1=y1), aux
         else:
             k1 = func(t, y, args)
             k2 = func(t + 2 / 3 * dt, y + 2 / 3 * dt * k1, args)
             y1 = y + dt * (1 / 4 * k1 + 3 / 4 * k2)
-            return y1, None, None
+            return y1, None, dict(y0=y, y1=y1), None

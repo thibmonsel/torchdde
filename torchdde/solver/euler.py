@@ -32,7 +32,7 @@ class Euler(AbstractOdeSolver):
         if has_aux:
             k1, aux = func(t, y, args)
             y1 = y + dt * k1
-            return y1, None, aux
+            return y1, None, dict(y0=y, y1=y1), aux
         else:
             y1 = y + dt * func(t, y, args)
-            return y1, None, None
+            return y1, None, dict(y0=y, y1=y1), None

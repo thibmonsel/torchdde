@@ -166,7 +166,7 @@ class nddeint_ACA(torch.autograd.Function):
         delay_derivative_inc = torch.zeros_like(ctx.func.delays)[..., None]
 
         tnext, controller_state = stepsize_controller.init(
-            adjoint_dyn, T, ctx.ts[0], adjoint_state, -dt, args, solver.order
+            adjoint_dyn, T, ctx.ts[0], adjoint_state, -dt, args, solver.order()
         )
         tprev = T
         for j, current_t in enumerate(reversed(ctx.ts)):
@@ -192,7 +192,7 @@ class nddeint_ACA(torch.autograd.Function):
                     adjoint_state,
                     adj_candidate,
                     args,
-                    solver.order,
+                    solver.order(),
                     adj_error,
                     controller_state,
                 )

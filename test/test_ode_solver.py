@@ -1,10 +1,10 @@
 import pytest
 import torch
 from torchdde import integrate
-from torchdde.solver import Euler, ImplicitEuler, Ralston, RK2, RK4
+from torchdde.solver import Dopri5, Euler, ImplicitEuler, Ralston, RK2, RK4
 
 
-@pytest.mark.parametrize("solver", [Euler(), RK2(), Ralston(), RK4()])
+@pytest.mark.parametrize("solver", [Euler(), RK2(), Ralston(), RK4(), Dopri5()])
 def test_explicit_solver(solver):
     vf = lambda t, y, args: -y
     ts = torch.linspace(0, 5, 500)
@@ -13,7 +13,7 @@ def test_explicit_solver(solver):
     assert torch.allclose(ys[:, -1], y0 * torch.exp(-ts[-1]), rtol=10e-3, atol=10e-3)
 
 
-@pytest.mark.parametrize("solver", [Euler(), RK2(), Ralston(), RK4()])
+@pytest.mark.parametrize("solver", [Euler(), RK2(), Ralston(), RK4(), Dopri5()])
 def test_explicit_solver2(solver):
     vf = lambda t, y, args: t + t**2
     ts = torch.linspace(0, 5, 500)

@@ -120,7 +120,7 @@ def _integrate_dde(
         return func(t, y, args, history=history)
 
     tnext, controller_state = stepsize_controller.init(
-        ode_func, ts[0], ts[-1], y0, ts[1] - ts[0], args, solver.order
+        ode_func, ts[0], ts[-1], y0, ts[1] - ts[0], args, solver.order()
     )
     current_y = y0[:, 0]
     ys = torch.unsqueeze(current_y, dim=1)
@@ -128,7 +128,7 @@ def _integrate_dde(
     while tprev < ts[-1]:
         # the stepping method give the next y
         # with a shape [batch, features]
-        y_candidate, y_error, _ = solver.step(
+        y_candidate, y_error, dense_info, _ = solver.step(
             ode_func, tprev, ys[:, -1], controller_state, args, has_aux=False
         )
         keep_step, tprev, tnext, controller_state = stepsize_controller.adapt_step_size(
@@ -138,8 +138,8 @@ def _integrate_dde(
             ys[:, -1],
             y_candidate,
             args,
-            solver.order,
             y_error,
+            solver.order(),
             controller_state,
         )
         # by adding the y to the interpolator,
@@ -161,25 +161,31 @@ def _integrate_ode(
     stepsize_controller: AbstractStepSizeController,
 ) -> Float[torch.Tensor, "batch time ..."]:
     tnext, controller_state = stepsize_controller.init(
-        func, ts[0], ts[-1], y0, ts[1] - ts[0], args, solver.order
+        func, ts[0], ts[-1], y0, ts[1] - ts[0], args, solver.order()
     )
     ys = torch.unsqueeze(y0.clone(), dim=1)
     tprev = ts[0]
     while tprev < ts[-1]:
-        y_candidate, y_error, _ = solver.step(
+        y_candidate, y_error, dense_info, _ = solver.step(
             func, tprev, ys[:, -1], controller_state, args, has_aux=False
         )
-        keep_step, tprev, tnext, controller_state = stepsize_controller.adapt_step_size(
+        (
+            keep_step,
+            new_tprev,
+            new_tnext,
+            new_controller_state,
+        ) = stepsize_controller.adapt_step_size(
             func,
             tprev,
             tnext,
             ys[:, -1],
             y_candidate,
             args,
-            solver.order,
             y_error,
+            solver.order(),
             controller_state,
         )
         y = y_candidate if keep_step else ys[:, -1]
         ys = torch.cat((ys, torch.unsqueeze(y, dim=1)), dim=1)
+        tprev, tnext, controller_state = new_tprev, new_tnext, new_controller_state
     return ys

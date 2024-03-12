@@ -35,11 +35,11 @@ class RK4(AbstractOdeSolver):
             k3, _ = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k2, args)
             k4, _ = func(t + dt, y + dt * k3, args)
             y1 = y + 1 / 6 * dt * (k1 + 2 * k2 + 2 * k3 + k4)
-            return y1, None, aux
+            return y1, None, dict(y0=y, y1=y1), aux
         else:
             k1 = func(t, y, args)
             k2 = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k1, args)
             k3 = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k2, args)
             k4 = func(t + dt, y + dt * k3, args)
             y1 = y + 1 / 6 * dt * (k1 + 2 * k2 + 2 * k3 + k4)
-            return y1, None, None
+            return y1, None, dict(y0=y, y1=y1), None

@@ -2,10 +2,12 @@ import pytest
 import torch
 import torch.nn as nn
 from torchdde import integrate
-from torchdde.solver import Euler, ImplicitEuler, Ralston, RK2, RK4
+from torchdde.solver import Dopri5, Euler, ImplicitEuler, Ralston, RK2, RK4
 
 
-@pytest.mark.parametrize("solver", [Euler(), RK2(), Ralston(), RK4(), ImplicitEuler()])
+@pytest.mark.parametrize(
+    "solver", [Euler(), RK2(), Ralston(), RK4(), Dopri5(), ImplicitEuler()]
+)
 def test_very_simple_system(solver):
     class SimpleNODE(nn.Module):
         def __init__(self):
@@ -42,5 +44,4 @@ def test_very_simple_system(solver):
         if loss < 10e-8:
             break
 
-
-# #     assert torch.allclose(ys, ret, atol=0.01, rtol=0.01)
+    assert torch.allclose(ys, ret, atol=0.01, rtol=0.01)

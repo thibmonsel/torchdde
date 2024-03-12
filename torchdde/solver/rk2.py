@@ -33,9 +33,9 @@ class RK2(AbstractOdeSolver):
             k1, aux = func(t, y, args)
             k2, _ = func(t + dt, y + dt * k1, args)
             y1 = y + dt / 2 * (k1 + k2)
-            return y1, None, aux
+            return y1, None, dict(y0=y, y1=y1), aux
         else:
             k1 = func(t, y, args)
             k2 = func(t + dt, y + dt * k1, args)
             y1 = y + dt / 2 * (k1 + k2)
-            return y1, None, None
+            return y1, None, dict(y0=y, y1=y1), None

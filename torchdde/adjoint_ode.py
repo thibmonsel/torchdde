@@ -53,7 +53,7 @@ class odeint_ACA(torch.autograd.Function):
 
         out2 = None
         tnext, controller_state = stepsize_controller.init(
-            ctx.func, ts[-1], ts[-2], adjoint_state, -dt, args, solver.order
+            ctx.func, ts[-1], ts[-2], adjoint_state, -dt, args, solver.order()
         )
         tprev = ts[-1]
         for i, current_t in enumerate(reversed(ts)):
@@ -79,7 +79,7 @@ class odeint_ACA(torch.autograd.Function):
                     adjoint_state,
                     adjoint_candidate,
                     args,
-                    solver.order,
+                    solver.order(),
                     adjoint_error,
                     controller_state,
                 )

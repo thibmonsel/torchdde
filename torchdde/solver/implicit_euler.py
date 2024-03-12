@@ -77,6 +77,6 @@ class ImplicitEuler(AbstractOdeSolver):
         opt.step(closure)  # type: ignore
         if has_aux:
             _, aux = func(t, y, args)
-            return y_sol, None, aux
+            return y_sol, None, dict(y0=y, y1=y_sol), aux
         else:
-            return y_sol, None, None
+            return y_sol, None, dict(y0=y, y1=y_sol), None

@@ -1,10 +1,10 @@
 import pytest
 import torch
 from torchdde import integrate
-from torchdde.solver import Euler, ImplicitEuler, Ralston, RK2, RK4
+from torchdde.solver import Dopri5, Euler, ImplicitEuler, Ralston, RK2, RK4
 
 
-@pytest.mark.parametrize("solver", [Euler(), RK2(), Ralston(), RK4()])
+@pytest.mark.parametrize("solver", [Euler(), RK2(), Ralston(), RK4(), Dopri5()])
 def test_explicit_solver(solver):
     vf = lambda t, y, args, history: -history[0]
     ts = torch.linspace(0, 2, 200)
