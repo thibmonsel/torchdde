@@ -31,7 +31,10 @@ class AbstractOdeSolver(ABC):
         args: Any,
         has_aux=False,
     ) -> tuple[
-        Float[torch.Tensor, "batch ..."], Union[Float[torch.Tensor, " batch"], Any], Any
+        Float[torch.Tensor, "batch ..."],
+        Float[torch.Tensor, "batch ..."],
+        dict[str, Float[torch.Tensor, "batch order"]],
+        Union[Float[torch.Tensor, " batch"], Any],
     ]:
         """
         **Returns:**
@@ -42,7 +45,7 @@ class AbstractOdeSolver(ABC):
         - A local error estimate made during the step. (Used by adaptive step size
             controllers to change the step size.) May be `None` if no estimate was
             made.
-        - The value of the solver state at `t+dt`.
+        - Dense info
         - `has_aux`: Whether the model has an auxiliary output.
         """
 
