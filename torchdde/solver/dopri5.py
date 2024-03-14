@@ -6,9 +6,6 @@ from jaxtyping import Float
 from torchdde.solver.base import AbstractOdeSolver
 
 
-torch.set_default_dtype(torch.float64)
-
-
 class Dopri5(AbstractOdeSolver):
     """5th order order explicit Runge-Kutta method"""
 
@@ -78,7 +75,7 @@ class Dopri5(AbstractOdeSolver):
     ]:
         if has_aux:
             k = []
-            k1, aux = dt * func(t, y, args)
+            k1, aux = func(t, y, args)
             k.append(k1)
             for ci, ai in zip(self.c[0], self.a_lower[0]):
                 ki = func(
@@ -95,7 +92,7 @@ class Dopri5(AbstractOdeSolver):
             return y1, y_error, dense_info, aux
         else:
             k = []
-            k.append(dt * func(t, y, args))
+            k.append(func(t, y, args))
             for ci, ai in zip(self.c[0], self.a_lower[0]):
                 ki = func(
                     t + dt * ci,

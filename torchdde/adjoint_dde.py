@@ -176,6 +176,7 @@ class nddeint_ACA(torch.autograd.Function):
                 (
                     adj_candidate,
                     adj_error,
+                    adj_dense_info,
                     (param_derivative_inc, delay_derivative_inc),
                 ) = solver.step(
                     adjoint_dyn, current_t, adjoint_state, -dt, args, has_aux=True

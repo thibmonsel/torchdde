@@ -64,7 +64,7 @@ class odeint_ACA(torch.autograd.Function):
                 adj_dyn = lambda t, adj_y, args: torch.autograd.grad(
                     out, y_t, -adj_y, retain_graph=True
                 )[0]
-                adjoint_candidate, adjoint_error, _ = solver.step(
+                adjoint_candidate, adjoint_error, _, _ = solver.step(
                     adj_dyn, tprev, adjoint_state, controller_state, args
                 )
                 (
