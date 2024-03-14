@@ -5,6 +5,8 @@ from jaxtyping import Float
 
 from torchdde.solver.base import AbstractOdeSolver
 
+from ..local_interpolation import FourthOrderPolynomialInterpolation
+
 
 class Dopri5(AbstractOdeSolver):
     """5th order order explicit Runge-Kutta method"""
@@ -49,6 +51,18 @@ class Dopri5(AbstractOdeSolver):
         ),
     )
     c = (torch.tensor([1 / 5, 3 / 10, 4 / 5, 8 / 9, 1.0, 1.0], dtype=torch.float64),)
+    c_mid = torch.tensor(
+        [
+            6025192743 / 30085553152 / 2,
+            0,
+            51252292925 / 65400821598 / 2,
+            -2691868925 / 45128329728 / 2,
+            187940372067 / 1594534317056 / 2,
+            -1776094331 / 19743644256 / 2,
+            11237099 / 235043384 / 2,
+        ],
+        dtype=torch.float64,
+    )
 
     def __init__(self):
         super().__init__()
@@ -85,10 +99,8 @@ class Dopri5(AbstractOdeSolver):
                 )
                 k.append(ki)
             y1 = y + dt * torch.einsum("k, kbf -> bf", self.b_sol[0], torch.stack(k))
-            y_error = y + dt * torch.einsum(
-                "k, kbf -> bf", self.b_error[0], torch.stack(k)
-            )
-            dense_info = dict(y0=y, y1=y1, k=torch.concat(k, dim=-1))
+            y_error = torch.einsum("k, kbf -> bf", self.b_error[0], torch.stack(k))
+            dense_info = dict(y0=y, y1=y1, k=torch.stack(k))
             return y1, y_error, dense_info, aux
         else:
             k = []
@@ -101,7 +113,9 @@ class Dopri5(AbstractOdeSolver):
                 )
                 k.append(ki)
             y1 = y + dt * torch.einsum("k, kbf -> bf", self.b_sol[0], torch.stack(k))
-            z1 = y + dt * torch.einsum("k, kbf -> bf", self.b_error[0], torch.stack(k))
-            y_error = torch.abs(z1 - y1)
-            dense_info = dict(y0=y, y1=y1, k=torch.concat(k[1:-1], dim=-1))
+            y_error = torch.einsum("k, kbf -> bf", self.b_error[0], torch.stack(k))
+            dense_info = dict(y0=y, y1=y1, k=torch.stack(k))
             return y1, y_error, dense_info, None
+
+    def build_intepolator(self, k, t0, t1, y0, y1):
+        return FourthOrderPolynomialInterpolation.from_k(t0, t1, y0, y1, k, self.c_mid)
