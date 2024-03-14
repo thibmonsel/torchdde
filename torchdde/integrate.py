@@ -144,10 +144,9 @@ def _integrate_dde(
         )
         # by adding the y to the interpolator,
         # it is unsqueezed in the interpolator class
-        y = y_candidate if keep_step else ys[:, -1]
         if keep_step:
-            ys_interpolation.add_point(tprev, y)
-            ys = torch.concat((ys, torch.unsqueeze(y, dim=1)), dim=1)
+            ys_interpolation.add_point(tprev, y_candidate)
+            ys = torch.concat((ys, torch.unsqueeze(y_candidate, dim=1)), dim=1)
 
     return ys, ys_interpolation
 
@@ -185,7 +184,7 @@ def _integrate_ode(
             solver.order(),
             controller_state,
         )
-        y = y_candidate if keep_step else ys[:, -1]
-        ys = torch.cat((ys, torch.unsqueeze(y, dim=1)), dim=1)
+        if keep_step:
+            ys = torch.cat((ys, torch.unsqueeze(y_candidate, dim=1)), dim=1)
         tprev, tnext, controller_state = new_tprev, new_tnext, new_controller_state
     return ys
