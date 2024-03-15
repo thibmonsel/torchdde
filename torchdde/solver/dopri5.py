@@ -118,4 +118,4 @@ class Dopri5(AbstractOdeSolver):
             return y1, y_error, dense_info, None
 
     def build_intepolator(self, k, t0, t1, y0, y1):
-        return FourthOrderPolynomialInterpolation.from_k(t0, t1, y0, y1, k, self.c_mid)
+        return FourthOrderPolynomialInterpolation(t0, t1, y0, y1, k, self.c_mid)

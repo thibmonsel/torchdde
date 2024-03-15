@@ -1,22 +1,15 @@
 import torch
 
 
-def poly4eval(e, d, c, b, a, t, t0, t1):
-    """Evaluate a 4th order polynomial on the interval [t0, t1].
-
-    The coefficients a..e define the polynomial on the interval [0, 1].
+def linear_rescale(t0, t, t1):
     """
-    dt = t1 - t0
-    dt = torch.where(dt.abs() > 0.0, dt, 1.0)
-    x = ((t - t0) / (dt))[:, None].to(dtype=a.dtype)
+    Calculates (t - t0) / (t1 - t0), assuming t0 <= t <= t1.
+    """
 
-    # Evaluate the polynomial with Horner's method
-    y = a
-    y = torch.addcmul(b, y, x)
-    y = torch.addcmul(c, y, x)
-    y = torch.addcmul(d, y, x)
-    y = torch.addcmul(e, y, x)
-    return y
+    cond = t0 == t1
+    numerator = 0 if cond else t - t0
+    denominator = 1 if cond else t1 - t0
+    return numerator / denominator
 
 
 class FourthOrderPolynomialInterpolation:
@@ -26,59 +19,37 @@ class FourthOrderPolynomialInterpolation:
     increasing order, i.e. `cofficients[i]` belongs to `x**i`.
     """
 
-    def __init__(
-        self,
-        t0,
-        t1,
-        coefficients,
-    ):
+    def __init__(self, t0, t1, y0, y1, k, c_mid):
         self.t0 = t0
         self.t1 = t1
-        self.coefficients = coefficients
+        self.coeffs = self._calculate(y0, y1, k, c_mid)
 
-    @staticmethod
-    def from_k(
-        t0,
-        t1,
-        y0,
-        y1,
-        k,
-        c_mid,
-    ):
-        # print("k.shape",k.shape)
-        dt = (t1 - t0).to(dtype=y0.dtype)
-        f0 = dt * k[0]
-        f1 = dt * k[-1]
-        # print('f0.shape, f1.shape, c_mid.shape',f0.shape, f1.shape, c_mid.shape)
-        y_mid = y0 + dt * torch.tensordot(c_mid, k, dims=0)
-        # print("y_mid", y_mid.shape)
-        a = (2 * (f1 - f0)).add(y1 + y0, alpha=-8).add(y_mid, alpha=16)
-        b = (
-            (5 * f0)
-            .add(f1, alpha=-3)
-            .add(y0, alpha=18)
-            .add(y1, alpha=14)
-            .add(y_mid, alpha=-32)
-        )
-        c = (
-            f1.add(f0, alpha=-4)
-            .add(y0, alpha=-11)
-            .add(y1, alpha=-5)
-            .add(y_mid, alpha=16)
-        )
-        d = f0
-        e = y0
-        print(a.shape, d.shape)
-        coefficients = (e, d, c, b, a)
-        return FourthOrderPolynomialInterpolation(t0, t1, coefficients)
+    def _calculate(self, _y0, _y1, _k, c_mid):
+        dt = self.t1 - self.t0
+        _ymid = _y0 + dt * torch.einsum("c, cbf -> bf", c_mid, _k)
 
-    # def evaluate(self, t):
-    #     e, d, c, b, a = self.coefficients
-    #     coeff = (e[idx], d[idx], c[idx], b[idx], a[idx])
-    #     return poly4eval(*coeff, t, self.t0[idx], self.t1[idx])
+        _f0 = dt * _k[0]
+        _f1 = dt * _k[-1]
+
+        _a = 2 * (_f1 - _f0) - 8 * (_y1 + _y0) + 16 * _ymid
+        _b = 5 * _f0 - 3 * _f1 + 18 * _y0 + 14 * _y1 - 32 * _ymid
+        _c = _f1 - 4 * _f0 - 11 * _y0 - 5 * _y1 + 16 * _ymid
+        return torch.stack([_a, _b, _c, _f0, _y0]).type(torch.float32)
+
+    def evaluate(self, t0, t1=None, left: bool = True):
+        del left
+        if t1 is not None:
+            return self.evaluate(t1) - self.evaluate(t0)
+
+        t = linear_rescale(self.t0, t0, self.t1)
+        t_polynomial = torch.pow(
+            torch.tensor(t)[:, None].expand(-1, 5),
+            exponent=torch.flip(torch.arange(5), dims=(0,)),  # pyright : ignore
+        ).T
+        return torch.einsum("cp, cbf -> bpf", t_polynomial, self.coeffs)
 
     def __repr__(self):
         return (
             f"FourthOrderPolynomialInterpolation(t0={self.t0}, t1={self.t1}, "
-            f"coefficients={self.coefficients})"
+            f"coefficients={self.coeffs})"
         )
