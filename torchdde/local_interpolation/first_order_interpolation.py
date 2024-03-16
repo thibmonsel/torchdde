@@ -14,7 +14,6 @@ class FirstOrderPolynomialInterpolation:
         dt = self.t1 - self.t0
         dt = torch.where(dt.abs() > 0.0, dt, 1.0)
         coeff = (self.y1 - self.y0) / dt
-        print(t)
         return self.y0 + coeff * (t - self.t0)
 
     def evaluate(self, t):

@@ -104,6 +104,37 @@ class TorchLinearInterpolator:
         self.ys = new_ys
         self.ts = new_ts
 
+    def add_points(
+        self,
+        new_ts: Float[torch.Tensor, " time"],
+        new_ys: Float[torch.Tensor, "batch time ..."],
+    ) -> None:
+        if not torch.all(torch.diff(new_ts) > 0):
+            raise ValueError(f"`new_ts`={new_ts} must be monotonically increasing.")
+
+        if self.ys.shape[-1] != new_ys.shape[-1]:
+            raise ValueError(
+                "You tried to add a new value that doesn't fit the shape of self.ys "
+            )
+
+        rel_position = self.ts < new_ts[0]
+        last_insertion = torch.sum(rel_position)
+        if last_insertion == len(rel_position):
+            new_ys = torch.concat((self.ys, new_ys), dim=1)
+            new_ts = torch.concat((self.ts, new_ts))
+        elif last_insertion == 0:
+            new_ys = torch.concat((new_ys, self.ys), dim=1)
+            new_ts = torch.concat((new_ts, self.ts))
+        else:
+            index = rel_position.nonzero()[-1] - 1
+            new_ys = torch.concat(
+                (self.ys[:, :index], new_ys, self.ys[:, index:]), dim=1
+            )
+            new_ts = torch.concat((self.ts[:index], new_ts, self.ts[index:]))
+
+        self.ys = new_ys
+        self.ts = new_ts
+
 
 TorchLinearInterpolator.__init__.__doc__ = """**Arguments:**
 

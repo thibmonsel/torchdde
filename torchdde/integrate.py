@@ -84,7 +84,17 @@ def _integrate(
         history_func = y0
         y0_ = history_func(ts[0])
         return _integrate_dde(
-            func, ts, y0_, history_func, args, delays, solver, stepsize_controller
+            func,
+            t0,
+            t1,
+            ts,
+            y0_,
+            history_func,
+            args,
+            delays,
+            solver,
+            stepsize_controller,
+            dt0,
         )
     else:
         assert isinstance(y0, torch.Tensor)
@@ -98,6 +108,8 @@ def _integrate(
 
 def _integrate_dde(
     func: Union[torch.nn.Module, Callable],
+    t0: Float[torch.Tensor, ""],
+    t1: Float[torch.Tensor, ""],
     ts: Float[torch.Tensor, " time"],
     y0: Float[torch.Tensor, "batch ..."],
     history_func: Callable[[Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]],
@@ -105,6 +117,7 @@ def _integrate_dde(
     delays: Float[torch.Tensor, " delays"],
     solver: AbstractOdeSolver,
     stepsize_controller: AbstractStepSizeController,
+    dt0: Optional[Float[torch.Tensor, ""]] = None,
 ) -> tuple[
     Float[torch.Tensor, "batch time ..."],
     Callable[[Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]],
@@ -112,6 +125,18 @@ def _integrate_dde(
     # y0 should have the shape [batch, N_t=1, features]
     # in order to properly instantiate the
     # interpolator class
+    if dt0 is None and isinstance(stepsize_controller, ConstantStepSizeController):
+        raise ValueError(
+            "Please give a value to dt0 since the stepsize"
+            "controller {} cannot have a dt0=None".format(stepsize_controller)
+        )
+
+    tnext, controller_state = stepsize_controller.init(
+        func, t0, t1, y0, dt0, args, solver.order()
+    )
+
+    tprev, y = t0, y0
+    ys = torch.empty((y0.shape[0], ts.shape[0], *(y0.shape[1:])))
 
     y0 = torch.unsqueeze(y0.clone(), dim=1)
     ys_interpolation = TorchLinearInterpolator(ts[0].view(1), y0)
@@ -132,34 +157,60 @@ def _integrate_dde(
         ]
         return func(t, y, args, history=history)
 
-    tnext, controller_state = stepsize_controller.init(
-        ode_func, ts[0], ts[-1], y0, ts[1] - ts[0], args, solver.order()
-    )
-    current_y = y0[:, 0]
-    ys = torch.unsqueeze(current_y, dim=1)
-    tprev = ts[0]
-    while tprev < ts[-1]:
-        # the stepping method give the next y
-        # with a shape [batch, features]
+    while tprev < t1:
         y_candidate, y_error, dense_info, _ = solver.step(
-            ode_func, tprev, ys[:, -1], controller_state, args, has_aux=False
+            ode_func, tprev, y, controller_state, args, has_aux=False
         )
-        keep_step, tprev, tnext, controller_state = stepsize_controller.adapt_step_size(
+        (
+            keep_step,
+            new_tprev,
+            new_tnext,
+            new_controller_state,
+        ) = stepsize_controller.adapt_step_size(
             ode_func,
             tprev,
             tnext,
-            ys[:, -1],
+            y,
             y_candidate,
             args,
             y_error,
             solver.order(),
             controller_state,
         )
-        # by adding the y to the interpolator,
-        # it is unsqueezed in the interpolator class
+
         if keep_step:
-            ys_interpolation.add_point(tprev, y_candidate)
-            ys = torch.concat((ys, torch.unsqueeze(y_candidate, dim=1)), dim=1)
+            y = y_candidate
+            interp = solver.build_interpolation(tprev, tnext, dense_info)
+            start_idx = torch.where(ts > tprev)[0][0] - 1
+            if tnext >= ts[-1]:
+                ts_sub = ts[start_idx:]
+                ts_sub = ts_sub[None, ...] if len(ts_sub.size()) == 0 else ts_sub
+                new_ys = interp.evaluate(ts_sub)
+                new_ys = (
+                    new_ys.unsqueeze(dim=1)
+                    if len(new_ys.size()) == len(y.size())
+                    else new_ys
+                )
+                ys[:, start_idx:] = new_ys
+                ys_interpolation.add_points(ts_sub, new_ys)
+            else:
+                end_idx = torch.where(ts > tnext)[0][0]
+                if end_idx != start_idx:
+                    ts_sub = ts[start_idx:end_idx]
+                    ts_sub = ts_sub[None, ...] if len(ts_sub.size()) == 0 else ts_sub
+                    new_ys = interp.evaluate(ts_sub)
+                    new_ys = (
+                        new_ys.unsqueeze(dim=1)
+                        if len(new_ys.size()) == len(y.size())
+                        else new_ys
+                    )
+                    ys[:, start_idx:end_idx] = new_ys
+                    ys_interpolation.add_points(ts_sub, new_ys)
+
+        new_tprev = torch.clamp(new_tprev, max=ts[-1])
+        # new_tprev can't be beyond tprev + max(delays)
+        new_tprev = torch.clamp(new_tprev, max=torch.max(delays))
+        tprev, tnext, controller_state = new_tprev, new_tnext, new_controller_state
 
     return ys, ys_interpolation
 
@@ -191,6 +242,7 @@ def _integrate_ode(
         y_candidate, y_error, dense_info, _ = solver.step(
             func, tprev, y, controller_state, args, has_aux=False
         )
+
         (
             keep_step,
             new_tprev,
@@ -207,6 +259,7 @@ def _integrate_ode(
             solver.order(),
             controller_state,
         )
+
         if keep_step:
             y = y_candidate
             interp = solver.build_interpolation(tprev, tnext, dense_info)

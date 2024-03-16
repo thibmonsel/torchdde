@@ -31,7 +31,17 @@ class odeint_ACA(torch.autograd.Function):
 
         with torch.no_grad():
             ctx.save_for_backward(*params)
-            ys, _ = _integrate(func, solver, ts, y0, args, stepsize_controller)
+            ys, _ = _integrate(
+                func,
+                solver,
+                ts[0],
+                ts[1],
+                ts,
+                y0,
+                args,
+                stepsize_controller,
+                dt0=ts[1] - ts[0],
+            )
         ctx.ys = ys
         ctx.args = args
         return ys
