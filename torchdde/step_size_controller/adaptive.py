@@ -158,7 +158,7 @@ class AdaptiveStepSizeController(AbstractStepSizeController):
             dt0 = _select_initial_step(
                 func, t0, y0, args, error_order, self.rtol, self.atol, rms_norm
             )
-            return t0, dt0
+            return t0 + dt0, dt0
         else:
             return t0 + dt0, dt0
 

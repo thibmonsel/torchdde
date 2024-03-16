@@ -7,8 +7,8 @@ def linear_rescale(t0, t, t1):
     """
 
     cond = t0 == t1
-    numerator = 0 if cond else t - t0
-    denominator = 1 if cond else t1 - t0
+    numerator = torch.zeros_like(t) if cond else t - t0
+    denominator = torch.ones_like(t) if cond else t1 - t0
     return numerator / denominator
 
 
@@ -27,7 +27,6 @@ class FourthOrderPolynomialInterpolation:
     def _calculate(self, _y0, _y1, _k, c_mid):
         dt = self.t1 - self.t0
         _ymid = _y0 + dt * torch.einsum("c, cbf -> bf", c_mid, _k)
-
         _f0 = dt * _k[0]
         _f1 = dt * _k[-1]
 
@@ -36,16 +35,19 @@ class FourthOrderPolynomialInterpolation:
         _c = _f1 - 4 * _f0 - 11 * _y0 - 5 * _y1 + 16 * _ymid
         return torch.stack([_a, _b, _c, _f0, _y0]).type(torch.float32)
 
-    def evaluate(self, t0, t1=None, left: bool = True):
+    def evaluate(self, t, t1=None, left: bool = True):
         del left
         if t1 is not None:
-            return self.evaluate(t1) - self.evaluate(t0)
+            return self.evaluate(t1) - self.evaluate(t)
 
-        t = linear_rescale(self.t0, t0, self.t1)
+        t = linear_rescale(self.t0, t, self.t1)
+        # print(t)
         t_polynomial = torch.pow(
-            torch.tensor(t)[:, None].expand(-1, 5),
+            torch.tensor(t).clone().detach()[:, None].expand(-1, 5),
             exponent=torch.flip(torch.arange(5), dims=(0,)),  # pyright : ignore
         ).T
+        # print('t_polynomial',t_polynomial.shape, self.coeffs.shape)
+        # print( torch.einsum("cp, cbf -> bpf", t_polynomial, self.coeffs).shape)
         return torch.einsum("cp, cbf -> bpf", t_polynomial, self.coeffs)
 
     def __repr__(self):

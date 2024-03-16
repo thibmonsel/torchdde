@@ -5,6 +5,8 @@ from jaxtyping import Float
 
 from torchdde.solver.base import AbstractOdeSolver
 
+from ..local_interpolation import FirstOrderPolynomialInterpolation
+
 
 class RK4(AbstractOdeSolver):
     """4th order explicit Runge-Kutta method"""
@@ -27,7 +29,10 @@ class RK4(AbstractOdeSolver):
         args: Any,
         has_aux=False,
     ) -> tuple[
-        Float[torch.Tensor, "batch ..."], Union[Float[torch.Tensor, " batch"], Any], Any
+        Float[torch.Tensor, "batch ..."],
+        Any,
+        dict[str, Float[torch.Tensor, "batch order"]],
+        Union[Float[torch.Tensor, " batch"], Any],
     ]:
         if has_aux:
             k1, aux = func(t, y, args)
@@ -43,3 +48,8 @@ class RK4(AbstractOdeSolver):
             k4 = func(t + dt, y + dt * k3, args)
             y1 = y + 1 / 6 * dt * (k1 + 2 * k2 + 2 * k3 + k4)
             return y1, None, dict(y0=y, y1=y1), None
+
+    def build_interpolation(
+        self, t0, t1, dense_info
+    ) -> FirstOrderPolynomialInterpolation:
+        return FirstOrderPolynomialInterpolation(t0, t1, dense_info)

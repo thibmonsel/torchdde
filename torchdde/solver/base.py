@@ -64,3 +64,7 @@ class AbstractOdeSolver(ABC):
         Integration result at time `t+dt`
         """
         pass
+
+    @abstractmethod
+    def build_interpolation(self, t0, t1, dense_info) -> Any:
+        pass

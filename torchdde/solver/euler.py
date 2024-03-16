@@ -5,6 +5,8 @@ from jaxtyping import Float
 
 from torchdde.solver.base import AbstractOdeSolver
 
+from ..local_interpolation import FirstOrderPolynomialInterpolation
+
 
 class Euler(AbstractOdeSolver):
     """Euler's method"""
@@ -39,3 +41,6 @@ class Euler(AbstractOdeSolver):
         else:
             y1 = y + dt * func(t, y, args)
             return y1, None, dict(y0=y, y1=y1), None
+
+    def build_interpolation(self, t0, t1, dense_info):
+        return FirstOrderPolynomialInterpolation(t0, t1, dense_info)

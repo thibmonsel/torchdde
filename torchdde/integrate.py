@@ -14,6 +14,8 @@ from torchdde.step_size_controller import (
 def integrate(
     func: Union[torch.nn.Module, Callable],
     solver: AbstractOdeSolver,
+    t0: Float[torch.Tensor, ""],
+    t1: Float[torch.Tensor, ""],
     ts: Float[torch.Tensor, " time"],
     y0: Union[
         Float[torch.Tensor, "batch ..."],
@@ -21,6 +23,7 @@ def integrate(
     ],
     args: Any,
     stepsize_controller: AbstractStepSizeController = ConstantStepSizeController(),
+    dt0: Optional[Float[torch.Tensor, ""]] = None,
     delays: Optional[Float[torch.Tensor, " delays"]] = None,
     discretize_then_optimize: bool = False,
 ) -> Float[torch.Tensor, "batch time ..."]:
@@ -30,7 +33,9 @@ def integrate(
     from torchdde.adjoint_ode import odesolve_adjoint
 
     if discretize_then_optimize or not isinstance(func, torch.nn.Module):
-        return _integrate(func, solver, ts, y0, args, stepsize_controller, delays)[0]
+        return _integrate(
+            func, solver, t0, t1, ts, y0, args, stepsize_controller, dt0, delays
+        )[0]
     else:
         if delays is not None:
             # y0 is a Callable that encaptulates
@@ -47,6 +52,8 @@ def integrate(
 def _integrate(
     func: Union[torch.nn.Module, Callable],
     solver: AbstractOdeSolver,
+    t0: Float[torch.Tensor, ""],
+    t1: Float[torch.Tensor, ""],
     ts: Float[torch.Tensor, " time"],
     y0: Union[
         Float[torch.Tensor, "batch ..."],
@@ -54,6 +61,7 @@ def _integrate(
     ],
     args: Any,
     stepsize_controller: AbstractStepSizeController,
+    dt0: Optional[Float[torch.Tensor, ""]] = None,
     delays: Optional[Float[torch.Tensor, " delays"]] = None,
 ) -> tuple[
     Float[torch.Tensor, "batch time ..."],
@@ -80,7 +88,12 @@ def _integrate(
         )
     else:
         assert isinstance(y0, torch.Tensor)
-        return _integrate_ode(func, ts, y0, args, solver, stepsize_controller), None
+        return (
+            _integrate_ode(
+                func, t0, t1, ts, y0, args, solver, stepsize_controller, dt0
+            ),
+            None,
+        )
 
 
 def _integrate_dde(
@@ -153,20 +166,30 @@ def _integrate_dde(
 
 def _integrate_ode(
     func: Union[torch.nn.Module, Callable],
+    t0: Float[torch.Tensor, ""],
+    t1: Float[torch.Tensor, ""],
     ts: Float[torch.Tensor, " time"],
     y0: Float[torch.Tensor, "batch ..."],
     args: Any,
     solver: AbstractOdeSolver,
     stepsize_controller: AbstractStepSizeController,
+    dt0: Optional[Float[torch.Tensor, ""]] = None,
 ) -> Float[torch.Tensor, "batch time ..."]:
+    if dt0 is None and isinstance(stepsize_controller, ConstantStepSizeController):
+        raise ValueError(
+            "Please give a value to dt0 since the stepsize"
+            "controller {} cannot have a dt0=None".format(stepsize_controller)
+        )
+
     tnext, controller_state = stepsize_controller.init(
-        func, ts[0], ts[-1], y0, ts[1] - ts[0], args, solver.order()
+        func, t0, t1, y0, dt0, args, solver.order()
     )
-    ys = torch.unsqueeze(y0.clone(), dim=1)
-    tprev = ts[0]
-    while tprev < ts[-1]:
+
+    tprev, y = t0, y0
+    ys = torch.empty((y0.shape[0], ts.shape[0], *(y0.shape[1:])))
+    while tprev < t1:
         y_candidate, y_error, dense_info, _ = solver.step(
-            func, tprev, ys[:, -1], controller_state, args, has_aux=False
+            func, tprev, y, controller_state, args, has_aux=False
         )
         (
             keep_step,
@@ -177,7 +200,7 @@ def _integrate_ode(
             func,
             tprev,
             tnext,
-            ys[:, -1],
+            y,
             y_candidate,
             args,
             y_error,
@@ -185,6 +208,32 @@ def _integrate_ode(
             controller_state,
         )
         if keep_step:
-            ys = torch.cat((ys, torch.unsqueeze(y_candidate, dim=1)), dim=1)
+            y = y_candidate
+            interp = solver.build_interpolation(tprev, tnext, dense_info)
+            start_idx = torch.where(ts > tprev)[0][0] - 1
+            if tnext >= ts[-1]:
+                ts_sub = ts[start_idx:]
+                ts_sub = ts_sub[None, ...] if len(ts_sub.size()) == 0 else ts_sub
+                new_ys = interp.evaluate(ts_sub)
+                new_ys = (
+                    new_ys.unsqueeze(dim=1)
+                    if len(new_ys.size()) == len(y.size())
+                    else new_ys
+                )
+                ys[:, start_idx:] = new_ys
+            else:
+                end_idx = torch.where(ts > tnext)[0][0]
+                if end_idx != start_idx:
+                    ts_sub = ts[start_idx:end_idx]
+                    ts_sub = ts_sub[None, ...] if len(ts_sub.size()) == 0 else ts_sub
+                    new_ys = interp.evaluate(ts_sub)
+                    new_ys = (
+                        new_ys.unsqueeze(dim=1)
+                        if len(new_ys.size()) == len(y.size())
+                        else new_ys
+                    )
+                    ys[:, start_idx:end_idx] = new_ys
+        new_tprev = torch.clamp(new_tprev, max=ts[-1])
         tprev, tnext, controller_state = new_tprev, new_tnext, new_controller_state
+
     return ys

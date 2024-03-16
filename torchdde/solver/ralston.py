@@ -5,6 +5,8 @@ from jaxtyping import Float
 
 from torchdde.solver.base import AbstractOdeSolver
 
+from ..local_interpolation import FirstOrderPolynomialInterpolation
+
 
 class Ralston(AbstractOdeSolver):
     """Ralston's method (2nd order)"""
@@ -27,7 +29,10 @@ class Ralston(AbstractOdeSolver):
         args: Any,
         has_aux=False,
     ) -> tuple[
-        Float[torch.Tensor, "batch ..."], Union[Float[torch.Tensor, " batch"], Any], Any
+        Float[torch.Tensor, "batch ..."],
+        Any,
+        dict[str, Float[torch.Tensor, "batch order"]],
+        Union[Float[torch.Tensor, " batch"], Any],
     ]:
         if has_aux:
             k1, aux = func(t, y, args)
@@ -39,3 +44,8 @@ class Ralston(AbstractOdeSolver):
             k2 = func(t + 2 / 3 * dt, y + 2 / 3 * dt * k1, args)
             y1 = y + dt * (1 / 4 * k1 + 3 / 4 * k2)
             return y1, None, dict(y0=y, y1=y1), None
+
+    def build_interpolation(
+        self, t0, t1, dense_info
+    ) -> FirstOrderPolynomialInterpolation:
+        return FirstOrderPolynomialInterpolation(t0, t1, dense_info)

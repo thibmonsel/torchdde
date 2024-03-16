@@ -83,9 +83,9 @@ class Dopri5(AbstractOdeSolver):
         has_aux=False,
     ) -> tuple[
         Float[torch.Tensor, "batch ..."],
-        Float[torch.Tensor, " batch"],
-        dict[str, Float[torch.Tensor, "batch order"]],
-        Union[Float[torch.Tensor, " batch"], Any],
+        Float[torch.Tensor, "batch ..."],
+        dict[str, Float[torch.Tensor, "..."]],
+        Union[Float[torch.Tensor, "batch ..."], Any],
     ]:
         if has_aux:
             k = []
@@ -117,5 +117,7 @@ class Dopri5(AbstractOdeSolver):
             dense_info = dict(y0=y, y1=y1, k=torch.stack(k))
             return y1, y_error, dense_info, None
 
-    def build_intepolator(self, k, t0, t1, y0, y1):
-        return FourthOrderPolynomialInterpolation(t0, t1, y0, y1, k, self.c_mid)
+    def build_interpolation(self, t0, t1, dense_info):
+        return FourthOrderPolynomialInterpolation(
+            t0, t1, dense_info["y0"], dense_info["y1"], dense_info["k"], self.c_mid
+        )
