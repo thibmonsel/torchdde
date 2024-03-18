@@ -4,22 +4,24 @@ import torch
 import torch.nn as nn
 from jaxtyping import Float
 
-from torchdde.integrate import _integrate
+from torchdde.integrate import _integrate, _integrate_ode
 from torchdde.solver.base import AbstractOdeSolver
 from torchdde.step_size_controller.base import AbstractStepSizeController
-from torchdde.step_size_controller.constant import ConstantStepSizeController
 
 
 class odeint_ACA(torch.autograd.Function):
     @staticmethod
     def forward(  # type: ignore
         ctx,
-        y0: Float[torch.Tensor, "batch ..."],
         func: torch.nn.Module,
+        t0: Float[torch.Tensor, ""],
+        t1: Float[torch.Tensor, ""],
         ts: Float[torch.Tensor, " time"],
+        y0: Float[torch.Tensor, "batch ..."],
         args: Any,
         solver: AbstractOdeSolver,
         stepsize_controller: AbstractStepSizeController,
+        dt0: Float[torch.Tensor, ""],
         *params,  # type: ignore
     ) -> Float[torch.Tensor, "batch time ..."]:
         # Saving parameters for backward()
@@ -34,14 +36,15 @@ class odeint_ACA(torch.autograd.Function):
             ys, _ = _integrate(
                 func,
                 solver,
-                ts[0],
-                ts[1],
+                t0,
+                t1,
                 ts,
                 y0,
                 args,
                 stepsize_controller,
-                dt0=ts[1] - ts[0],
+                dt0,
             )
+        ctx.dt0 = dt0
         ctx.ys = ys
         ctx.args = args
         return ys
@@ -62,68 +65,58 @@ class odeint_ACA(torch.autograd.Function):
         adjoint_state = grad_output[:, -1]
 
         out2 = None
-        tnext, controller_state = stepsize_controller.init(
-            ctx.func, ts[-1], ts[-2], adjoint_state, -dt, args, solver.order()
+        _, dt = stepsize_controller.init(
+            ctx.func,
+            ts[-1],
+            ts[-2],
+            adjoint_state,
+            ts[-2] - ts[-1],
+            args,
+            solver.order(),
         )
-        tprev = ts[-1]
-        for i, current_t in enumerate(reversed(ts)):
-            y_t = torch.autograd.Variable(ys[:, -i - 1], requires_grad=True)
+        for i in range(len(ts) - 1, 0, -1):
+            y_t = torch.autograd.Variable(ys[:, i], requires_grad=True)
 
             with torch.enable_grad():
-                out = ctx.func(current_t, y_t, args)
+                out = ctx.func(ts[i], y_t, args)
                 adj_dyn = lambda t, adj_y, args: torch.autograd.grad(
                     out, y_t, -adj_y, retain_graph=True
                 )[0]
-                adjoint_candidate, adjoint_error, _, _ = solver.step(
-                    adj_dyn, tprev, adjoint_state, controller_state, args
-                )
-                (
-                    keep_step,
-                    tprev,
-                    tnext,
-                    controller_state,
-                ) = stepsize_controller.adapt_step_size(
+                adjoint_state = _integrate_ode(
                     adj_dyn,
-                    tprev,
-                    tnext,
+                    ts[i],
+                    ts[i - 1],
+                    ts[i - 1][None],
                     adjoint_state,
-                    adjoint_candidate,
                     args,
-                    solver.order(),
-                    adjoint_error,
-                    controller_state,
-                )
-
-                adjoint_state = adjoint_candidate if keep_step else ys[:, -1]
-                adjoint_state = adjoint_state - grad_output[:, -i - 1]
-
+                    solver,
+                    stepsize_controller,
+                    dt,
+                ).squeeze(dim=1)
+                adjoint_state = adjoint_state - grad_output[:, i]
                 param_inc = torch.autograd.grad(
                     out, params, -adjoint_state, retain_graph=True
                 )
-            # Adding last term in order to get a trapz rule
-            # estimate of the grad wtr to the parameters
-            # trapezoid is h/2 * (f(a) + f(b)) + [f(x1) + ... + f(xn-1)]
-            # compared to rectangle rule is h * (f(a) + f(b) + f(x1) + ... + f(xn-1))
-            # This could be improved by using intermediate stages by RK solvers
+
+            dt = ts[i - 1] - ts[i]
             if out2 is None:
-                out2 = tuple([dt / 2 * p for p in param_inc])
-            elif current_t == ts[0]:
-                for _1, _2 in zip([*out2], [*param_inc]):
-                    _1 += dt / 2 * _2
+                out2 = tuple([dt.abs() * p for p in param_inc])
             else:
                 for _1, _2 in zip([*out2], [*param_inc]):
-                    _1 += dt * _2
-
-        return adjoint_state, None, None, None, None, None, *out2  # type: ignore
+                    _1 += dt.abs() * _2
+        return None, None, None, None, adjoint_state, None, None, None, None, *out2  # type: ignore
 
 
 def odesolve_adjoint(
-    y0: Float[torch.Tensor, "batch ..."],
     func: torch.nn.Module,
-    ts: Float[torch.Tensor, "time ..."],
+    t0: Float[torch.Tensor, ""],
+    t1: Float[torch.Tensor, ""],
+    ts: Float[torch.Tensor, " time"],
+    y0: Float[torch.Tensor, "batch ..."],
     args: Any,
     solver: AbstractOdeSolver,
-    stepsize_controller: AbstractStepSizeController = ConstantStepSizeController(),
+    stepsize_controller: AbstractStepSizeController,
+    dt0: Float[torch.Tensor, ""],
 ) -> Union[Float[torch.Tensor, "batch time ..."], Any]:
     # Main function to be called to integrate the NODE
 
@@ -138,7 +131,9 @@ def odesolve_adjoint(
     params = find_parameters(func)
 
     # Forward integrating the NODE and returning the state at each evaluation step
-    zs = odeint_ACA.apply(y0, func, ts, args, solver, stepsize_controller, *params)
+    zs = odeint_ACA.apply(
+        func, t0, t1, ts, y0, args, solver, stepsize_controller, dt0, *params
+    )
     return zs
 
 

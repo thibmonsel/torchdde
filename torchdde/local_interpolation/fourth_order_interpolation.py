@@ -33,7 +33,7 @@ class FourthOrderPolynomialInterpolation:
         _a = 2 * (_f1 - _f0) - 8 * (_y1 + _y0) + 16 * _ymid
         _b = 5 * _f0 - 3 * _f1 + 18 * _y0 + 14 * _y1 - 32 * _ymid
         _c = _f1 - 4 * _f0 - 11 * _y0 - 5 * _y1 + 16 * _ymid
-        return torch.stack([_a, _b, _c, _f0, _y0]).type(torch.float32)
+        return torch.stack([_a, _b, _c, _f0, _y0], dim=1).type(torch.float32)
 
     def evaluate(self, t, t1=None, left: bool = True):
         del left
@@ -41,14 +41,13 @@ class FourthOrderPolynomialInterpolation:
             return self.evaluate(t1) - self.evaluate(t)
 
         t = linear_rescale(self.t0, t, self.t1)
-        # print(t)
         t_polynomial = torch.pow(
-            torch.tensor(t).clone().detach()[:, None].expand(-1, 5),
+            t * torch.ones((5,)),
             exponent=torch.flip(torch.arange(5), dims=(0,)),  # pyright : ignore
-        ).T
-        # print('t_polynomial',t_polynomial.shape, self.coeffs.shape)
-        # print( torch.einsum("cp, cbf -> bpf", t_polynomial, self.coeffs).shape)
-        return torch.einsum("cp, cbf -> bpf", t_polynomial, self.coeffs)
+        )
+        # print("t_po", t_polynomial.shape, self.coeffs.shape)
+        return torch.einsum("c, bcf -> bf", t_polynomial, self.coeffs)
+        # return torch.einsum("cp, cbf -> bpf", t_polynomial, self.coeffs)
 
     def __repr__(self):
         return (

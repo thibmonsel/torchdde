@@ -52,11 +52,6 @@ def _select_initial_step(func, t0, y0, args, order, rtol, atol, norm, f0=None):
     return torch.min(100 * h0, h1).to(t_dtype)
 
 
-def _compute_scaled_error(error_estimate, rtol, atol, y0, y1, norm):
-    error_tol = atol + rtol * torch.max(y0.abs(), y1.abs())
-    return norm(error_estimate / error_tol).abs()
-
-
 @torch.no_grad()
 def _optimal_step_size_with_pi(last_step, scaled_error, safety, icoeff, dcoeff, order):
     """Calculate the optimal size for the next step."""
@@ -107,24 +102,24 @@ def _optimal_step_size_with_pid(
         lambda coeff, inv_error: coeff == 0 or torch.zeros_like(inv_error) == inv_error
     )
     scaled_error, prev_scaled_errors, prev_prev_scaled_errors = scaled_errors
+
     inv_scaled_error, inv_prev_scaled_errors, inv_prev_prev_scaled_errors = (
-        scaled_error.reciprocal(),
+        scaled_error.reciprocal() ,
         prev_scaled_errors.reciprocal(),
         prev_prev_scaled_errors.reciprocal(),
     )
-
     factor1 = (
-        1
+        torch.tensor(1)
         if zero_coeff_or_inv_error(beta1, inv_scaled_error)
         else inv_scaled_error**beta1
     )
     factor2 = (
-        1
+        torch.tensor(1)
         if zero_coeff_or_inv_error(beta2, inv_prev_scaled_errors)
         else inv_prev_scaled_errors**beta2
     )
     factor3 = (
-        1
+        torch.tensor(1)
         if zero_coeff_or_inv_error(beta3, inv_prev_prev_scaled_errors)
         else inv_prev_prev_scaled_errors**beta3
     )
@@ -162,6 +157,13 @@ class AdaptiveStepSizeController(AbstractStepSizeController):
         else:
             return t0 + dt0, dt0
 
+
+    def _compute_scaled_error(self, y_error, y0, y1_candidate, norm):
+        _nan = torch.any(torch.isnan(y1_candidate))
+        y1_candidate = y0 if _nan else y1_candidate
+        error_tol = self.atol + self.rtol * torch.max(y0.abs(), y1_candidate.abs())
+        return norm(y_error / error_tol).abs()
+
     def update_scaled_error(self, current_scaled_error):
         if not torch.isfinite(self.scaled_error):
             self.scaled_error = current_scaled_error
@@ -188,11 +190,12 @@ class AdaptiveStepSizeController(AbstractStepSizeController):
         args,
         y_error,
         error_order,
-        controller_state,
+        dt,
     ):
         del func, args
-        scaled_error = _compute_scaled_error(
-            y_error, self.rtol, self.atol, y0, y1_candidate, rms_norm
+        y_error = torch.nan_to_num(y_error, nan=1)
+        scaled_error = self._compute_scaled_error(
+            y_error, y0, y1_candidate, rms_norm
         )
         self.update_scaled_error(scaled_error)
         keep_step = scaled_error <= 1
@@ -202,8 +205,8 @@ class AdaptiveStepSizeController(AbstractStepSizeController):
             self.prev_scaled_error,
             self.prev_prev_scaled_error,
         ]
-        next_controller_state = _optimal_step_size_with_pid(
-            controller_state,
+        dt = _optimal_step_size_with_pid(
+            dt,
             scaled_errors,
             self.safety,
             self.pcoeff,
@@ -213,8 +216,6 @@ class AdaptiveStepSizeController(AbstractStepSizeController):
             factormin,
             self.factormax,
         )
-        next_t0 = t1 if keep_step else t0
-        next_t1 = (
-            t1 + next_controller_state if keep_step else t0 + next_controller_state
-        )
-        return keep_step, next_t0, next_t1, next_controller_state
+        t0 = torch.where(keep_step, t1, t0)
+        t1 = torch.where(keep_step, t1 + dt, t0 + dt)
+        return keep_step, t0, t1, dt
