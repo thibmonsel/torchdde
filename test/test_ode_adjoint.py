@@ -34,8 +34,8 @@ def test_very_simple_system(solver):
             ts,
             y0,
             None,
-            discretize_then_optimize=True,
             dt0=ts[1] - ts[0],
+            discretize_then_optimize=True,
         )
 
     model = SimpleNODE()
