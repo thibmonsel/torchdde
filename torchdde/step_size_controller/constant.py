@@ -16,7 +16,7 @@ class ConstantStepSizeController(AbstractStepSizeController):
         args,
         y_error,
         error_order,
-        controller_state,
+        dt,
     ):
         del func, t0, y0, y1_candidate, args, y_error, error_order
-        return True, t1, t1 + controller_state, controller_state
+        return True, t1, t1 + dt, dt

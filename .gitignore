@@ -12,6 +12,8 @@ site/
 .pymon
 .idea/
 
+ode_test.py
+*.png
 ndde.py
 test1.py
 test2.py

@@ -34,7 +34,7 @@ class AbstractStepSizeController(ABC):
         args,
         y_error,
         error_order,
-        controller_state,
+        dt,
     ) -> tuple[
         bool, Float[torch.Tensor, ""], Float[torch.Tensor, ""], Float[torch.Tensor, ""]
     ]:
