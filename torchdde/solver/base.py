@@ -31,7 +31,10 @@ class AbstractOdeSolver(ABC):
         args: Any,
         has_aux=False,
     ) -> tuple[
-        Float[torch.Tensor, "batch ..."], Union[Float[torch.Tensor, " batch"], Any], Any
+        Float[torch.Tensor, "batch ..."],
+        Float[torch.Tensor, "batch ..."],
+        dict[str, Float[torch.Tensor, "batch order"]],
+        Union[Float[torch.Tensor, " batch"], Any],
     ]:
         """
         **Returns:**
@@ -60,4 +63,8 @@ class AbstractOdeSolver(ABC):
 
         Integration result at time `t+dt`
         """
+        pass
+
+    @abstractmethod
+    def build_interpolation(self, t0, t1, dense_info) -> Any:
         pass

@@ -1,3 +1,5 @@
+import torch
+
 from .base import AbstractStepSizeController
 
 
@@ -19,4 +21,4 @@ class ConstantStepSizeController(AbstractStepSizeController):
         dt,
     ):
         del func, t0, y0, y1_candidate, args, y_error, error_order
-        return True, t1, t1 + dt, dt
+        return torch.tensor([True]), t1, t1 + dt, dt

@@ -5,6 +5,8 @@ from jaxtyping import Float
 
 from torchdde.solver.base import AbstractOdeSolver
 
+from ..local_interpolation import FirstOrderPolynomialInterpolation
+
 
 class Euler(AbstractOdeSolver):
     """Euler's method"""
@@ -27,12 +29,18 @@ class Euler(AbstractOdeSolver):
         args: Any,
         has_aux=False,
     ) -> tuple[
-        Float[torch.Tensor, "batch ..."], Union[Float[torch.Tensor, " batch"], Any], Any
+        Float[torch.Tensor, "batch ..."],
+        Any,
+        dict[str, Float[torch.Tensor, "batch order"]],
+        Union[Float[torch.Tensor, " batch"], Any],
     ]:
         if has_aux:
             k1, aux = func(t, y, args)
             y1 = y + dt * k1
-            return y1, None, aux
+            return y1, None, dict(y0=y, y1=y1), aux
         else:
             y1 = y + dt * func(t, y, args)
-            return y1, None, None
+            return y1, None, dict(y0=y, y1=y1), None
+
+    def build_interpolation(self, t0, t1, dense_info):
+        return FirstOrderPolynomialInterpolation(t0, t1, dense_info)

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 import torch
-from jaxtyping import Float
+from jaxtyping import Bool, Float
 
 
 class AbstractStepSizeController(ABC):
@@ -36,7 +36,10 @@ class AbstractStepSizeController(ABC):
         error_order,
         dt,
     ) -> tuple[
-        bool, Float[torch.Tensor, ""], Float[torch.Tensor, ""], Float[torch.Tensor, ""]
+        Bool[torch.Tensor, ""],
+        Float[torch.Tensor, ""],
+        Float[torch.Tensor, ""],
+        Float[torch.Tensor, ""],
     ]:
         """
         **Returns:**

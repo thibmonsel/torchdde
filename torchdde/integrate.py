@@ -1,14 +1,41 @@
+from dataclasses import dataclass
 from typing import Any, Callable, Optional, Union
 
 import torch
-from jaxtyping import Float
+from jaxtyping import Float, Int
 
-from torchdde.interpolation.linear_interpolation import TorchLinearInterpolator
+from torchdde.global_interpolation.linear_interpolation import TorchLinearInterpolator
 from torchdde.solver.base import AbstractOdeSolver
 from torchdde.step_size_controller import (
     AbstractStepSizeController,
     ConstantStepSizeController,
 )
+
+
+@dataclass
+class State:
+    """Evolving state during the solve"""
+
+    y: Float[torch.Tensor, "batch ..."]
+    tprev: Float[torch.Tensor, ""]
+    tnext: Float[torch.Tensor, ""]
+    # solver_state: PyTree[ArrayLike]
+    dt: Float[torch.Tensor, ""]
+    # result: RESULTS
+    num_steps: Int[torch.Tensor, ""]
+    num_accepted_steps: Int[torch.Tensor, ""]
+    num_rejected_steps: Int[torch.Tensor, ""]
+    save_idx: Int[torch.Tensor, ""]
+
+    def __repr__(self) -> str:
+        return f"""State(\n y={self.y},"
+            \n tprev={self.tprev}, 
+            \n tnext={self.tnext}, 
+            \n dt={self.dt}, 
+            \n num_step={self.num_steps.item()},
+            \n num_accepted_steps={self.num_accepted_steps.item()}, 
+            \n num_rejected_steps={self.num_rejected_steps.item()}, 
+            \n save_idx={self.save_idx.item()}\n)"""
 
 
 def integrate(
@@ -46,7 +73,9 @@ def integrate(
             return ddesolve_adjoint(y0, func, ts, args, solver, stepsize_controller)
         else:
             assert isinstance(y0, torch.Tensor)
-            return odesolve_adjoint(y0, func, ts, args, solver, stepsize_controller)
+            return odesolve_adjoint(
+                func, t0, t1, ts, y0, args, solver, stepsize_controller, dt0
+            )
 
 
 def _integrate(
@@ -155,7 +184,7 @@ def _integrate_dde(
     while tprev < ts[-1]:
         # the stepping method give the next y
         # with a shape [batch, features]
-        y_candidate, y_error, _ = solver.step(
+        y_candidate, y_error, dense_info, _ = solver.step(
             ode_func, tprev, ys[:, -1], dt, args, has_aux=False
         )
         keep_step, tprev, tnext, dt = stepsize_controller.adapt_step_size(
@@ -190,26 +219,87 @@ def _integrate_ode(
     stepsize_controller: AbstractStepSizeController,
     dt0: Optional[Float[torch.Tensor, ""]] = None,
 ) -> Float[torch.Tensor, "batch time ..."]:
-    tnext, controller_state = stepsize_controller.init(
-        func, t0, t1, y0, dt0, args, solver.order
-    )
-    ys = torch.unsqueeze(y0.clone(), dim=1)
-    tprev = ts[0]
-    while tprev < ts[-1]:
-        y_candidate, y_error, _ = solver.step(
-            func, tprev, ys[:, -1], controller_state, args, has_aux=False
+    if dt0 is None and isinstance(stepsize_controller, ConstantStepSizeController):
+        raise ValueError(
+            "Please give a value to dt0 since the stepsize"
+            "controller {} cannot have a dt0=None".format(stepsize_controller)
         )
-        keep_step, tprev, tnext, controller_state = stepsize_controller.adapt_step_size(
-            func,
+
+    if dt0 is not None:
+        if dt0 * (t1 - t0) < 0:
+            raise ValueError("Must have (t1 - t0) * dt0 >= 0")
+
+    tnext, dt = stepsize_controller.init(func, t0, t1, y0, dt0, args, solver.order())
+
+    state = State(
+        y0,
+        t0,
+        tnext,
+        dt,
+        torch.tensor(0),
+        torch.tensor(0),
+        torch.tensor(0),
+        torch.tensor(0),
+    )
+    ys = torch.empty((y0.shape[0], ts.shape[0], *(y0.shape[1:])))
+    cond = state.tprev < t1 if (t1 > t0) else state.tprev > t1
+    while cond:
+        y, y_error, dense_info, _ = solver.step(
+            func, state.tprev, state.y, state.dt, args, has_aux=False
+        )
+        (
+            keep_step,
             tprev,
             tnext,
-            ys[:, -1],
-            y_candidate,
+            dt,
+        ) = stepsize_controller.adapt_step_size(
+            func,
+            state.tprev,
+            state.tnext,
+            state.y,
+            y,
             args,
-            solver.order,
             y_error,
-            controller_state,
+            solver.order(),
+            state.dt,
         )
-        y = y_candidate if keep_step else ys[:, -1]
-        ys = torch.cat((ys, torch.unsqueeze(y, dim=1)), dim=1)
+        tprev = torch.clamp(tprev, max=t1)
+        step_save_idx = 0
+        if keep_step:
+            interp = solver.build_interpolation(state.tprev, state.tnext, dense_info)
+            while torch.any(state.tnext >= ts[state.save_idx + step_save_idx :]):
+                idx = state.save_idx + step_save_idx
+                out = interp.evaluate(ts[idx])
+                ys[:, idx] = (
+                    out.unsqueeze(1) if len(out.shape) != len(ys[:, idx].shape) else out
+                )
+                step_save_idx += 1
+
+        ########################################
+        ##### Updating State for next step #####
+        ########################################
+
+        y = torch.where(keep_step, y, state.y)
+        num_accepted_steps = torch.where(
+            keep_step, state.num_accepted_steps + 1, state.num_accepted_steps
+        )
+        num_rejected_steps = torch.where(
+            keep_step, state.num_rejected_steps, state.num_rejected_steps + 1
+        )
+        save_idx = torch.where(
+            keep_step, state.save_idx + step_save_idx, state.save_idx
+        )
+
+        state = State(
+            y,
+            tprev,
+            tnext,
+            dt,
+            state.num_steps + 1,
+            num_accepted_steps,
+            num_rejected_steps,
+            save_idx,
+        )
+
+        cond = tprev < t1 if (t1 > t0) else tprev > t1
     return ys

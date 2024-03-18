@@ -5,6 +5,8 @@ from jaxtyping import Float
 
 from torchdde.solver.base import AbstractOdeSolver
 
+from ..local_interpolation import FirstOrderPolynomialInterpolation
+
 
 class ImplicitEuler(AbstractOdeSolver):
     """ImplicitEuler Euler's method"""
@@ -49,7 +51,10 @@ class ImplicitEuler(AbstractOdeSolver):
         args: Any,
         has_aux=False,
     ) -> tuple[
-        Float[torch.Tensor, "batch ..."], Union[Float[torch.Tensor, " batch"], Any], Any
+        Float[torch.Tensor, "batch ..."],
+        Any,
+        dict[str, Float[torch.Tensor, "batch order"]],
+        Union[Float[torch.Tensor, " batch"], Any],
     ]:
         y_sol = y.clone()
         y_sol = torch.nn.Parameter(data=y_sol)
@@ -77,6 +82,11 @@ class ImplicitEuler(AbstractOdeSolver):
         opt.step(closure)  # type: ignore
         if has_aux:
             _, aux = func(t, y, args)
-            return y_sol, None, aux
+            return y_sol, None, dict(y0=y, y1=y_sol), aux
         else:
-            return y_sol, None, None
+            return y_sol, None, dict(y0=y, y1=y_sol), None
+
+    def build_interpolation(
+        self, t0, t1, dense_info
+    ) -> FirstOrderPolynomialInterpolation:
+        return FirstOrderPolynomialInterpolation(t0, t1, dense_info)

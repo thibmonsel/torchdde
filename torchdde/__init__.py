@@ -1,5 +1,9 @@
+from .global_interpolation import TorchLinearInterpolator as TorchLinearInterpolator
 from .integrate import integrate as integrate
-from .interpolation import TorchLinearInterpolator as TorchLinearInterpolator
+from .local_interpolation import (
+    FirstOrderPolynomialInterpolation as FirstOrderPolynomialInterpolation,
+    FourthOrderPolynomialInterpolation as FourthOrderPolynomialInterpolation,
+)
 from .solver import (
     AbstractOdeSolver as AbstractOdeSolver,
     Euler as Euler,

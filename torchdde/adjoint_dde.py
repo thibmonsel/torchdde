@@ -4,8 +4,8 @@ import torch
 import torch.nn as nn
 from jaxtyping import Float
 
+from torchdde.global_interpolation.linear_interpolation import TorchLinearInterpolator
 from torchdde.integrate import _integrate
-from torchdde.interpolation.linear_interpolation import TorchLinearInterpolator
 from torchdde.solver.base import AbstractOdeSolver
 from torchdde.step_size_controller.base import AbstractStepSizeController
 
@@ -36,6 +36,8 @@ class nddeint_ACA(torch.autograd.Function):
             ys, ys_interpolator = _integrate(
                 func,
                 solver,
+                ts[0],
+                ts[-1],
                 ts,
                 history_func,
                 args,
