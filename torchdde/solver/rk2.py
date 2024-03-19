@@ -5,6 +5,8 @@ from jaxtyping import Float
 
 from torchdde.solver.base import AbstractOdeSolver
 
+from ..local_interpolation import FirstOrderPolynomialInterpolation
+
 
 class RK2(AbstractOdeSolver):
     """2nd order explicit Runge-Kutta method"""
@@ -15,20 +17,35 @@ class RK2(AbstractOdeSolver):
     def init(self):
         pass
 
+    def order(self):
+        return 2
+
     def step(
         self,
         func: Union[torch.nn.Module, Callable],
         t: Float[torch.Tensor, ""],
         y: Float[torch.Tensor, "batch ..."],
-        dt: Union[Float[torch.Tensor, ""], float],
+        dt: Float[torch.Tensor, ""],
         args: Any,
         has_aux=False,
-    ) -> tuple[Float[torch.Tensor, "batch ..."], Any]:
+    ) -> tuple[
+        Float[torch.Tensor, "batch ..."],
+        Any,
+        dict[str, Float[torch.Tensor, "batch order"]],
+        Union[Float[torch.Tensor, " batch"], Any],
+    ]:
         if has_aux:
             k1, aux = func(t, y, args)
             k2, _ = func(t + dt, y + dt * k1, args)
-            return y + dt / 2 * (k1 + k2), aux
+            y1 = y + dt / 2 * (k1 + k2)
+            return y1, None, dict(y0=y, y1=y1), aux
         else:
             k1 = func(t, y, args)
             k2 = func(t + dt, y + dt * k1, args)
-            return y + dt / 2 * (k1 + k2), None
+            y1 = y + dt / 2 * (k1 + k2)
+            return y1, None, dict(y0=y, y1=y1), None
+
+    def build_interpolation(
+        self, t0, t1, dense_info
+    ) -> FirstOrderPolynomialInterpolation:
+        return FirstOrderPolynomialInterpolation(t0, t1, dense_info)

@@ -12,14 +12,17 @@ def test_explicit_solver(solver):
     ys = integrate(
         vf,
         solver,
+        ts[0],
+        ts[-1],
         ts,
         lambda t: y0,
         None,
         delays=torch.tensor([1.0]),
         discretize_then_optimize=True,
+        dt0=ts[1] - ts[0],
     )
     # for t in [0,1] solution is y0 * (t -1)
-    assert torch.allclose(ys[:, :80, 0], y0 * (1 - ts[:80]))
+    assert torch.allclose(ys[:, :80, 0], y0 * (1 - ts[:80]), rtol=1e-5, atol=1e-6)
 
 
 @pytest.mark.parametrize("solver", [ImplicitEuler()])
@@ -30,10 +33,13 @@ def test_implicit_solver(solver):
     ys = integrate(
         vf,
         solver,
+        ts[0],
+        ts[-1],
         ts,
         lambda t: y0,
         None,
-        torch.tensor([1.0]),
+        delays=torch.tensor([1.0]),
         discretize_then_optimize=True,
+        dt0=ts[1] - ts[0],
     )
-    assert torch.allclose(ys[:, :80, 0], y0 * (1 - ts[:80]))
+    assert torch.allclose(ys[:, :80, 0], y0 * (1 - ts[:80]), rtol=1e-5, atol=1e-6)

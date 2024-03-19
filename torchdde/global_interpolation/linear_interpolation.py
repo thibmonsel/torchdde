@@ -76,7 +76,7 @@ class TorchLinearInterpolator:
     ) -> None:
         if new_t in self.ts:
             warnings.warn(
-                f"already have new_t={new_t} point in interpolation, overwriting it "
+                f"already have new_t={new_t} point in interpolation, overwriting it"
             )
 
         new_y = torch.unsqueeze(new_y, dim=1)
@@ -84,7 +84,7 @@ class TorchLinearInterpolator:
 
         if self.ys.shape[-1] != new_y.shape[-1]:
             raise ValueError(
-                "You tried to add a new value that doesn't fit the shape of self.ys "
+                "You tried to add a new value that doesn't fit self.ys's shape."
             )
         rel_position = self.ts < new_t
         last_insertion = torch.sum(rel_position)

@@ -5,6 +5,8 @@ from jaxtyping import Float
 
 from torchdde.solver.base import AbstractOdeSolver
 
+from ..local_interpolation import FirstOrderPolynomialInterpolation
+
 
 class RK4(AbstractOdeSolver):
     """4th order explicit Runge-Kutta method"""
@@ -15,24 +17,39 @@ class RK4(AbstractOdeSolver):
     def init(self):
         pass
 
+    def order(self):
+        return 2
+
     def step(
         self,
         func: Union[torch.nn.Module, Callable],
         t: Float[torch.Tensor, ""],
         y: Float[torch.Tensor, "batch ..."],
-        dt: Union[Float[torch.Tensor, ""], float],
+        dt: Float[torch.Tensor, ""],
         args: Any,
         has_aux=False,
-    ) -> tuple[Float[torch.Tensor, "batch ..."], Any]:
+    ) -> tuple[
+        Float[torch.Tensor, "batch ..."],
+        Any,
+        dict[str, Float[torch.Tensor, "batch order"]],
+        Union[Float[torch.Tensor, " batch"], Any],
+    ]:
         if has_aux:
             k1, aux = func(t, y, args)
             k2, _ = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k1, args)
             k3, _ = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k2, args)
             k4, _ = func(t + dt, y + dt * k3, args)
-            return y + 1 / 6 * dt * (k1 + 2 * k2 + 2 * k3 + k4), aux
+            y1 = y + 1 / 6 * dt * (k1 + 2 * k2 + 2 * k3 + k4)
+            return y1, None, dict(y0=y, y1=y1), aux
         else:
             k1 = func(t, y, args)
             k2 = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k1, args)
             k3 = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k2, args)
             k4 = func(t + dt, y + dt * k3, args)
-            return y + 1 / 6 * dt * (k1 + 2 * k2 + 2 * k3 + k4), None
+            y1 = y + 1 / 6 * dt * (k1 + 2 * k2 + 2 * k3 + k4)
+            return y1, None, dict(y0=y, y1=y1), None
+
+    def build_interpolation(
+        self, t0, t1, dense_info
+    ) -> FirstOrderPolynomialInterpolation:
+        return FirstOrderPolynomialInterpolation(t0, t1, dense_info)

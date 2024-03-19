@@ -15,7 +15,7 @@ def test_very_simple_system(solver):
 
         def init_weight(self):
             with torch.no_grad():
-                self.params.weight = nn.Parameter(-torch.abs(torch.rand((1,))))
+                self.params.weight = nn.Parameter(-torch.tensor([1.0]))
 
         def forward(self, t, z, args):
             return self.params.weight * z
@@ -26,7 +26,17 @@ def test_very_simple_system(solver):
     ts = torch.linspace(0, 10, 101)
     y0 = torch.rand((2, 3))
     with torch.no_grad():
-        ys = integrate(simple_ode, RK2(), ts, y0, None, discretize_then_optimize=True)
+        ys = integrate(
+            simple_ode,
+            solver,
+            ts[0],
+            ts[-1],
+            ts,
+            y0,
+            None,
+            dt0=ts[1] - ts[0],
+            discretize_then_optimize=True,
+        )
 
     model = SimpleNODE()
     lossfunc = nn.MSELoss()
@@ -34,7 +44,7 @@ def test_very_simple_system(solver):
 
     for _ in range(2000):
         opt.zero_grad()
-        ret = integrate(model, solver, ts, y0, None)
+        ret = integrate(model, solver, ts[0], ts[-1], ts, y0, None, dt0=ts[1] - ts[0])
         loss = lossfunc(ret, ys)
 
         loss.backward()
@@ -42,5 +52,4 @@ def test_very_simple_system(solver):
         if loss < 10e-8:
             break
 
-
-# #     assert torch.allclose(ys, ret, atol=0.01, rtol=0.01)
+    assert torch.allclose(ys, ret, atol=0.01, rtol=0.01)  # type: ignore
