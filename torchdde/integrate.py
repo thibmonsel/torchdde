@@ -190,7 +190,7 @@ def _integrate_dde(
         torch.tensor(0),
     )
     ys = torch.empty((y0.shape[0], ts.shape[0], *(y0.shape[1:])))
-    ys_interpolation = TorchLinearInterpolator([], [])
+    ys_interpolation = TorchLinearInterpolator(t0[None], y0.unsqueeze(1))
 
     cond = state.tprev < t1 if (t1 > t0) else state.tprev > t1
     while cond:
@@ -223,8 +223,8 @@ def _integrate_dde(
         tnext = torch.where(too_large, tprev + torch.min(delays), tnext)
         dt = torch.where(too_large, torch.min(delays), dt)
 
+        step_save_idx = 0
         if keep_step:
-            step_save_idx = 0
             interp = solver.build_interpolation(state.tprev, state.tnext, dense_info)
             while torch.any(state.tnext >= ts[state.save_idx + step_save_idx :]):
                 idx = state.save_idx + step_save_idx
@@ -242,13 +242,13 @@ def _integrate_dde(
         y = torch.where(keep_step, y, state.y)
         num_accepted_steps = torch.where(
             keep_step, state.num_accepted_steps + 1, state.num_accepted_steps
-        )
+        )[0]
         num_rejected_steps = torch.where(
             keep_step, state.num_rejected_steps, state.num_rejected_steps + 1
-        )
+        )[0]
         save_idx = torch.where(
             keep_step, state.save_idx + step_save_idx, state.save_idx
-        )
+        )[0]
 
         state = State(
             y,
@@ -339,13 +339,13 @@ def _integrate_ode(
         y = torch.where(keep_step, y, state.y)
         num_accepted_steps = torch.where(
             keep_step, state.num_accepted_steps + 1, state.num_accepted_steps
-        )
+        )[0]
         num_rejected_steps = torch.where(
             keep_step, state.num_rejected_steps, state.num_rejected_steps + 1
-        )
+        )[0]
         save_idx = torch.where(
             keep_step, state.save_idx + step_save_idx, state.save_idx
-        )
+        )[0]
 
         state = State(
             y,

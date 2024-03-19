@@ -17,20 +17,17 @@ class TorchLinearInterpolator:
         ts: Float[torch.Tensor, " time"],
         ys: Float[torch.Tensor, "batch time ..."],
     ) -> None:
-        if ts == [] and ys == []:
-            pass
-        else:
-            if ts.ndim != 1:
-                raise ValueError("`ts` must be one dimensional.")
+        if ts.ndim != 1:
+            raise ValueError("`ts` must be one dimensional.")
 
-            if ys.shape[1] != ts.shape[0]:
-                raise ValueError(
-                    "Must have ts.shape[0] == ys.shape[0], that is to say the same "
-                    "number of entries along the timelike dimension."
-                )
+        if ys.shape[1] != ts.shape[0]:
+            raise ValueError(
+                "Must have ts.shape[0] == ys.shape[0], that is to say the same "
+                "number of entries along the timelike dimension."
+            )
 
-            if not torch.all(torch.diff(ts) > 0):
-                raise ValueError("`ts` must be monotonically increasing.")
+        if not torch.all(torch.diff(ts) > 0):
+            raise ValueError("`ts` must be monotonically increasing.")
 
         self.ts = ts
         self.ys = ys
@@ -77,39 +74,35 @@ class TorchLinearInterpolator:
         new_t: Float[torch.Tensor, ""],
         new_y: Float[torch.Tensor, "batch ..."],
     ) -> None:
-        if self.ts == [] and self.ys == []:
-            self.ys = torch.unsqueeze(new_y, dim=1)
-            self.ts = torch.unsqueeze(new_t.clone(), dim=0)
+        if new_t in self.ts:
+            warnings.warn(
+                f"already have new_t={new_t} point in interpolation, overwriting it"
+            )
+
+        new_y = torch.unsqueeze(new_y, dim=1)
+        new_t = torch.unsqueeze(new_t.clone(), dim=0)
+
+        if self.ys.shape[-1] != new_y.shape[-1]:
+            raise ValueError(
+                "You tried to add a new value that doesn't fit self.ys's shape."
+            )
+        rel_position = self.ts < new_t
+        last_insertion = torch.sum(rel_position)
+        if last_insertion == len(rel_position):
+            new_ys = torch.concat((self.ys, new_y), dim=1)
+            new_ts = torch.concat((self.ts, new_t))
+        elif last_insertion == 0:
+            new_ys = torch.concat((new_y, self.ys), dim=1)
+            new_ts = torch.concat((new_t, self.ts))
         else:
-            if new_t in self.ts:
-                warnings.warn(
-                    f"already have new_t={new_t} point in interpolation, overwriting it"
-                )
+            index = rel_position.nonzero()[-1] - 1
+            new_ys = torch.concat(
+                (self.ys[:, :index], new_y, self.ys[:, index:]), dim=1
+            )
+            new_ts = torch.concat((self.ts[:index], new_t, self.ts[index:]))
 
-            new_y = torch.unsqueeze(new_y, dim=1)
-            new_t = torch.unsqueeze(new_t.clone(), dim=0)
-
-            if self.ys.shape[-1] != new_y.shape[-1]:
-                raise ValueError(
-                    "You tried to add a new value that doesn't fit self.ys's shape."
-                )
-            rel_position = self.ts < new_t
-            last_insertion = torch.sum(rel_position)
-            if last_insertion == len(rel_position):
-                new_ys = torch.concat((self.ys, new_y), dim=1)
-                new_ts = torch.concat((self.ts, new_t))
-            elif last_insertion == 0:
-                new_ys = torch.concat((new_y, self.ys), dim=1)
-                new_ts = torch.concat((new_t, self.ts))
-            else:
-                index = rel_position.nonzero()[-1] - 1
-                new_ys = torch.concat(
-                    (self.ys[:, :index], new_y, self.ys[:, index:]), dim=1
-                )
-                new_ts = torch.concat((self.ts[:index], new_t, self.ts[index:]))
-
-            self.ys = new_ys
-            self.ts = new_ts
+        self.ys = new_ys
+        self.ts = new_ts
 
 
 TorchLinearInterpolator.__init__.__doc__ = """**Arguments:**

@@ -33,7 +33,17 @@ def test_learning_delay_in_convex_case(solver):
 
     ts = torch.linspace(0, 10, 101)
     list_delays = torch.tensor([1.0])
-    ys = integrate(simple_dde, solver, ts, history_function, None, delays=list_delays)
+    ys = integrate(
+        simple_dde,
+        solver,
+        ts[0],
+        ts[-1],
+        ts,
+        history_function,
+        None,
+        delays=list_delays,
+        dt0=ts[1] - ts[0],
+    )
 
     learnable_delays = torch.abs(torch.randn((len(list_delays),)))
     model = SimpleNDDE(dim=1, list_delays=learnable_delays)
@@ -43,7 +53,17 @@ def test_learning_delay_in_convex_case(solver):
     for _ in range(2000):
         model.linear.weight.requires_grad = False
         opt.zero_grad()
-        ret = integrate(model, solver, ts, history_function, None, delays=model.delays)
+        ret = integrate(
+            model,
+            solver,
+            ts[0],
+            ts[-1],
+            ts,
+            history_function,
+            None,
+            dt0=ts[1] - ts[0],
+            delays=model.delays,
+        )
         loss = lossfunc(ret, ys)
         loss.backward()
         opt.step()

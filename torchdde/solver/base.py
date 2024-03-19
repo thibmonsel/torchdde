@@ -27,7 +27,7 @@ class AbstractOdeSolver(ABC):
         func: Union[torch.nn.Module, Callable],
         t: Float[torch.Tensor, ""],
         y: Float[torch.Tensor, "batch ..."],
-        dt: Union[Float[torch.Tensor, ""], float],
+        dt: Float[torch.Tensor, ""],
         args: Any,
         has_aux=False,
     ) -> tuple[

@@ -45,7 +45,7 @@ def test_add_point_y_mishape():
     inter = TorchLinearInterpolator(ts, ys)
     with pytest.raises(
         ValueError,
-        match=r"You tried to add a new value that doesn't fit the shape of self.ys ",
+        match=r"You tried to add a new value that doesn't fit self.ys's shape.",
     ):
         inter.add_point(torch.tensor(11.0), torch.tensor([[2.0, 1.0]]))
 
@@ -57,7 +57,7 @@ def test_add_point_warning():
     new_t = ts[0]
     with pytest.warns(
         UserWarning,
-        match=f"already have new_t={new_t} point in interpolation, overwriting it ",
+        match=f"already have new_t={new_t} point in interpolation, overwriting it",
     ):
         inter.add_point(new_t, torch.tensor([[2.0]]))
 
