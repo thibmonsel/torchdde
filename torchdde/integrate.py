@@ -148,7 +148,7 @@ def _integrate_dde(
     dt0: Optional[Float[torch.Tensor, ""]] = None,
 ) -> tuple[
     Float[torch.Tensor, "batch time ..."],
-    Callable[[Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]],
+    Optional[Callable[[Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]]],
 ]:
     if dt0 is None and isinstance(stepsize_controller, ConstantStepSizeController):
         raise ValueError(
@@ -190,11 +190,10 @@ def _integrate_dde(
         torch.tensor(0),
     )
     ys = torch.empty((y0.shape[0], ts.shape[0], *(y0.shape[1:])))
-    ys_interpolation = TorchLinearInterpolator(t0[None], y0.unsqueeze(1))
+    ys_interpolation = None
 
     cond = state.tprev < t1 if (t1 > t0) else state.tprev > t1
     while cond:
-        # print(state.tprev, state.tnext, state.dt, delays)
         y, y_error, dense_info, _ = solver.step(
             ode_func, state.tprev, state.y, state.dt, args, has_aux=False
         )
@@ -229,7 +228,12 @@ def _integrate_dde(
             while torch.any(state.tnext >= ts[state.save_idx + step_save_idx :]):
                 idx = state.save_idx + step_save_idx
                 out = interp.evaluate(ts[idx])
-                ys_interpolation.add_point(ts[idx].squeeze(0), out)
+                if ys_interpolation is None:
+                    ys_interpolation = TorchLinearInterpolator(
+                        ts[idx][None], out.unsqueeze(1)
+                    )
+                else:
+                    ys_interpolation.add_point(ts[idx].squeeze(0), out)
                 ys[:, idx] = (
                     out.unsqueeze(1) if len(out.shape) != len(ys[:, idx].shape) else out
                 )
@@ -261,8 +265,7 @@ def _integrate_dde(
             save_idx,
         )
         cond = tprev < t1 if (t1 > t0) else tprev > t1
-
-    return ys, ys_interpolation
+    return ys, ys_interpolation 
 
 
 def _integrate_ode(
