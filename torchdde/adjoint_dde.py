@@ -59,7 +59,7 @@ class nddeint_ACA(torch.autograd.Function):
         return ys
 
     @staticmethod
-    def backward(ctx, *grad_y):  # type: ignore
+    def backward(ctx, *grad_y) -> Any:  # type: ignore
         # http://www.cs.utoronto.ca/~calver/papers/adjoint_paper.pdf
         # This function implements the adjoint gradient
         # estimation method for NDDEs with constant delays
@@ -67,7 +67,6 @@ class nddeint_ACA(torch.autograd.Function):
         grad_output = grad_y[0]
 
         args = ctx.args
-        T = ctx.ts[-1]
         dt = ctx.ts[1] - ctx.ts[0]
         solver = ctx.solver
         stepsize_controller = ctx.stepsize_controller
@@ -100,7 +99,7 @@ class nddeint_ACA(torch.autograd.Function):
         adjoint_ys_final = -grad_output[:, -1].reshape(
             adjoint_state.shape[0], 1, *adjoint_state.shape[1:]
         )
-        add_t = torch.tensor([ctx.ts[-1], ctx.ts[-1] + dt], device=ctx.ts.device)
+        add_t = torch.tensor([ctx.t1, ctx.t1 + dt], device=ctx.ts.device)
 
         adjoint_interpolator = TorchLinearInterpolator(
             add_t,
@@ -132,7 +131,7 @@ class nddeint_ACA(torch.autograd.Function):
             # we need to add the second term of rhs too in rhs_adjoint computation
             delay_derivative_inc = torch.zeros_like(ctx.func.delays)[..., None]
             for idx, tau_i in enumerate(ctx.func.delays):
-                if t < T - tau_i:
+                if t < ctx.t1 - tau_i:
                     adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
                     h_t_plus_tau = state_interpolator(t + tau_i)
                     history = [
@@ -174,16 +173,16 @@ class nddeint_ACA(torch.autograd.Function):
 
         # computing the adjoint dynamics
         out2, out3 = None, None
-        # last_out2, last_out3 = None, None
         delay_derivative_inc = torch.zeros_like(ctx.func.delays)[..., None]
-
         tnext, controller_state = stepsize_controller.init(
-            adjoint_dyn, T, ctx.ts[0], adjoint_state, -dt, args, solver.order
+            adjoint_dyn, ctx.t1, ctx.ts[-1], adjoint_state, -dt, args, solver.order
         )
-        tprev = T
-        for j, current_t in enumerate(reversed(ctx.ts)):
+
+        for j in range(len(ctx.ts) - 1, 0, -1):
+            tprev, tnext = ctx.ts[j], ctx.ts[j - 1]
+            dt = tnext - tprev
             with torch.enable_grad():
-                adjoint_state = adjoint_state - grad_output[:, -j - 1]
+                adjoint_state = adjoint_state - grad_output[:, j]
                 adjoint_interpolator.add_point(tprev, adjoint_state)
                 (
                     adj_candidate,
@@ -191,7 +190,7 @@ class nddeint_ACA(torch.autograd.Function):
                     _,
                     (param_derivative_inc, delay_derivative_inc),
                 ) = solver.step(
-                    adjoint_dyn, current_t, adjoint_state, -dt, args, has_aux=True
+                    adjoint_dyn, tprev, adjoint_state, dt, args, has_aux=True
                 )
                 (
                     keep_step,
@@ -209,11 +208,10 @@ class nddeint_ACA(torch.autograd.Function):
                     adj_error,
                     controller_state,
                 )
-                if keep_step:
-                    adjoint_state = adj_candidate
+                adjoint_state = torch.where(keep_step, adj_candidate, adjoint_state)
 
+                if keep_step:
                     if out2 is None:
-                        # out2 = tuple([dt / 2 * p for p in param_derivative_inc])
                         out2 = tuple([dt.abs() * p for p in param_derivative_inc])
                     else:
                         for _1, _2 in zip([*out2], [*param_derivative_inc]):
@@ -221,15 +219,11 @@ class nddeint_ACA(torch.autograd.Function):
                                 _1 += dt.abs() * _2
 
                     if out3 is None:
-                        # out3 = tuple([-dt / 2 * p for p in delay_derivative_inc])
                         out3 = tuple([dt.abs() * p for p in delay_derivative_inc])
                     else:
                         for _1, _2 in zip([*out3], [*delay_derivative_inc]):
                             if _2 is not None:
                                 _1 += -dt.abs() * _2
-
-                    # if current_t == T:
-                    #     last_out2 = tuple([p for p in param_derivative_inc])
 
         # adding the last contribution of the delay
         # parameters in the loss w.r.t. the parameters
@@ -237,77 +231,51 @@ class nddeint_ACA(torch.autograd.Function):
         # from t = 0 to t = -tau
         for idx, tau_i in enumerate(ctx.func.delays):
             ts_history_i = torch.linspace(
-                ctx.t0 - tau_i.item(), ctx.t0, int(tau_i.item() / dt)
+                ctx.t0 - tau_i.item(), ctx.t0, int(tau_i.item() / dt.abs())
             ).to(ctx.ts.device)
-            for k, t in enumerate(reversed(ts_history_i)):
+            # print(ts_history_i)
+            for k in range(len(ts_history_i) - 1, 0, -1):
+                # for k, t in enumerate(reversed(ts_history_i)):
+                t = ts_history_i[k]
                 with torch.enable_grad():
                     h_t = torch.autograd.Variable(
                         (state_interpolator(t) if t >= ctx.t0 else ctx.history_func(t)),
                         requires_grad=True,
                     )
-                    # print(state_interpolator.ys[:, 0])
                     adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
                     h_t_plus_tau = state_interpolator(t + tau_i)
                     history = [
                         (
                             state_interpolator(t + tau_i - tau_j)
-                            if t + tau_i - tau_j >= ctx.ts[0]
+                            if t + tau_i - tau_j >= ctx.t0
                             else ctx.history_func(t + tau_i - tau_j)
                         )
                         for tau_j in ctx.func.delays
                     ]
                     history[idx] = h_t
                     out_other = ctx.func(t + tau_i, h_t_plus_tau, args, history=history)
-                    # print("out_other", out_other)
-                    # print("adjoint_t_plus_tau", adjoint_t_plus_tau)
                     rhs_adjoint_inc = torch.autograd.grad(
                         out_other, h_t, -adjoint_t_plus_tau
                     )[0]
-                    # print("rhs_adjoint_inc", rhs_adjoint_inc)
                     # remaining contribution of the delay in the gradient's
                     # loss ie int_{-\tau}^{0} \pdv{f(x_{t+\tau}, x_{t})}{x_t} x'(t) dt
-                    # print(" grad_ys[:, k]",  grad_ys[:, k])
                     delay_derivative_inc[idx] += torch.sum(
                         rhs_adjoint_inc * grad_ys[:, k],
                         dim=(tuple(range(len(rhs_adjoint_inc.shape)))),
                     )
-                    # print("delay_derivative_inc", delay_derivative_inc)
-
-                    # if k == len(ts_history_i) - 1:
-                    #     last_out3 = delay_derivative_inc
 
         if out3 is not None:
             for _1, _2 in zip([*out3], [*delay_derivative_inc]):
                 if _2 is not None:
                     _1 += -dt.abs() * _2
 
-        # Adding last term in order to get a trapz rule
-        # estimate of the grad wtr to the parameters
-        # trapezoid is h/2 * (f(a) + f(b) + 2 (f(x1) + ... + f(xn-1)))
-        # compared to rectangle rule is h * (f(a) + f(b) + f(x1) + ... + f(xn-1))
-        # if out2 is not None:
-        #     if last_out2 is not None:
-        #         for _1, _2 in zip([*out2], [*last_out2]):
-        #             if _2 is not None:
-        #                 _1 += dt / 2 * _2
-
-        # if out3 is not None:
-        #     if last_out3 is not None:
-        #         for _1, _2 in zip([*out3], [*last_out3]):
-        #             if _2 is not None:
-        #                 _1 -= -dt / 2 * _2
-        return (
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            *(out3[0] + out2[0], *out2[1:]),
-        )  # type: ignore
+        tuple_nones = (None, None, None, None, None, None, None, None, None)
+        if out3 is not None and out2 is not None:
+            return *tuple_nones, *(out3[0] + out2[0], *out2[1:])  # type: ignore
+        elif out3 is None and out2 is not None:
+            return *tuple_nones, *(out2[0], *out2[1:])  # type: ignore
+        else:
+            return *tuple_nones, *(out2[0], *out2[1:])  # type: ignore
 
 
 def ddesolve_adjoint(

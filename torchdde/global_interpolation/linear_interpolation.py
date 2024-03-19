@@ -1,5 +1,5 @@
 import warnings
-from typing import Optional, Union
+from typing import Union
 
 import torch
 from jaxtyping import Float, Integer
@@ -14,10 +14,10 @@ class TorchLinearInterpolator:
 
     def __init__(
         self,
-        ts: Optional[Float[torch.Tensor, " time"]] = None,
-        ys: Optional[Float[torch.Tensor, "batch time ..."]] = None,
+        ts: Float[torch.Tensor, " time"],
+        ys: Float[torch.Tensor, "batch time ..."],
     ) -> None:
-        if ts is None and ys is None:
+        if ts == [] and ys == []:
             pass
         else:
             if ts.ndim != 1:
@@ -77,7 +77,7 @@ class TorchLinearInterpolator:
         new_t: Float[torch.Tensor, ""],
         new_y: Float[torch.Tensor, "batch ..."],
     ) -> None:
-        if self.ts is None and self.ys is None:
+        if self.ts == [] and self.ys == []:
             self.ys = torch.unsqueeze(new_y, dim=1)
             self.ts = torch.unsqueeze(new_t.clone(), dim=0)
         else:

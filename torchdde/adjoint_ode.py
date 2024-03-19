@@ -66,8 +66,6 @@ class odeint_ACA(torch.autograd.Function):
                 adj_dyn = lambda t, adj_y, args: torch.autograd.grad(
                     out, y_t, -adj_y, retain_graph=True
                 )[0]
-                # print("tprev tnext", t0, t1)
-                # print('dt',dt)
                 adjoint_state = _integrate_ode(
                     adj_dyn,
                     t0,
