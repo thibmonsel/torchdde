@@ -19,21 +19,31 @@ class FourthOrderPolynomialInterpolation:
     increasing order, i.e. `cofficients[i]` belongs to `x**i`.
     """
 
-    def __init__(self, t0, t1, y0, y1, k, c_mid):
+    def __init__(self, t0, t1, dense_info, c_mid):
         self.t0 = t0
         self.t1 = t1
-        self.coeffs = self._calculate(y0, y1, k, c_mid)
+        self.dt = t1 - t0
+        self.coeffs = self._calculate(dense_info, c_mid)
 
-    def _calculate(self, _y0, _y1, _k, c_mid):
-        dt = self.t1 - self.t0
-        _ymid = _y0 + dt * torch.einsum("c, cbf -> bf", c_mid, _k)
-        _f0 = dt * _k[0]
-        _f1 = dt * _k[-1]
+    def _calculate(self, dense_info, c_mid):
+        _ymid = dense_info["y0"] + self.dt * torch.einsum(
+            "c, cbf -> bf", c_mid, dense_info["k"]
+        )
+        _f0 = self.dt * dense_info["k"][0]
+        _f1 = self.dt * dense_info["k"][-1]
 
-        _a = 2 * (_f1 - _f0) - 8 * (_y1 + _y0) + 16 * _ymid
-        _b = 5 * _f0 - 3 * _f1 + 18 * _y0 + 14 * _y1 - 32 * _ymid
-        _c = _f1 - 4 * _f0 - 11 * _y0 - 5 * _y1 + 16 * _ymid
-        return torch.stack([_a, _b, _c, _f0, _y0], dim=1).type(torch.float32)
+        _a = 2 * (_f1 - _f0) - 8 * (dense_info["y1"] + dense_info["y0"]) + 16 * _ymid
+        _b = (
+            5 * _f0
+            - 3 * _f1
+            + 18 * dense_info["y0"]
+            + 14 * dense_info["y1"]
+            - 32 * _ymid
+        )
+        _c = _f1 - 4 * _f0 - 11 * dense_info["y0"] - 5 * dense_info["y1"] + 16 * _ymid
+        return torch.stack([_a, _b, _c, _f0, dense_info["y0"]], dim=1).type(
+            torch.float32
+        )
 
     def evaluate(self, t, t1=None, left: bool = True):
         del left
@@ -45,9 +55,7 @@ class FourthOrderPolynomialInterpolation:
             t * torch.ones((5,)),
             exponent=torch.flip(torch.arange(5), dims=(0,)),  # pyright : ignore
         )
-        # print("t_po", t_polynomial.shape, self.coeffs.shape)
         return torch.einsum("c, bcf -> bf", t_polynomial, self.coeffs)
-        # return torch.einsum("cp, cbf -> bpf", t_polynomial, self.coeffs)
 
     def __repr__(self):
         return (

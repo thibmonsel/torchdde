@@ -33,6 +33,7 @@ class nddeint_ACA(torch.autograd.Function):
         ctx.stepsize_controller = stepsize_controller
         ctx.solver = solver
         ctx.func = func
+        ctx.args = args
         ctx.ts = ts
         ctx.t0 = t0
         ctx.t1 = t1
@@ -55,7 +56,6 @@ class nddeint_ACA(torch.autograd.Function):
 
         ctx.ys_interpolator = ys_interpolator
         ctx.ys = ys
-        ctx.args = args
         return ys
 
     @staticmethod

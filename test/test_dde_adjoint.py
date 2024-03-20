@@ -45,7 +45,7 @@ def test_learning_delay_in_convex_case(solver):
         dt0=ts[1] - ts[0],
     )
 
-    learnable_delays = torch.abs(torch.randn((len(list_delays),)))
+    learnable_delays = torch.abs(torch.randn((len(list_delays),))) + (ts[1] - ts[0])
     model = SimpleNDDE(dim=1, list_delays=learnable_delays)
     lossfunc = nn.MSELoss()
     opt = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0)
@@ -65,7 +65,10 @@ def test_learning_delay_in_convex_case(solver):
             delays=model.delays,
         )
         loss = lossfunc(ret, ys)
-        loss.backward()
+        if isinstance(solver, ImplicitEuler):
+            loss.backward(retain_graph=True)
+        else:
+            loss.backward()
         opt.step()
         if loss < 1e-4:
             break
