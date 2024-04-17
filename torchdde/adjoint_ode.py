@@ -100,7 +100,19 @@ class odeint_ACA(torch.autograd.Function):
             else:
                 for _1, _2 in zip([*out2], [*param_inc]):
                     _1 += dt.abs() * _2
-        return None, None, None, None, adjoint_state, None, None, None, None, *out2  # type: ignore
+        return (  # type: ignore
+            None,
+            None,
+            None,
+            None,
+            adjoint_state,
+            None,
+            None,
+            None,
+            None,
+            None,
+            *out2,  # type: ignore
+        )
 
 
 def odesolve_adjoint(
