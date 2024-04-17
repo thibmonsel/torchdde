@@ -23,6 +23,7 @@ class odeint_ACA(torch.autograd.Function):
         solver: AbstractOdeSolver,
         stepsize_controller: AbstractStepSizeController,
         dt0: Optional[Float[torch.Tensor, ""]] = None,
+        max_steps: Optional[int] = 1000,
         *params,  # type: ignore
     ) -> Float[torch.Tensor, "batch time ..."]:
         # Saving parameters for backward()
@@ -31,11 +32,21 @@ class odeint_ACA(torch.autograd.Function):
         ctx.y0 = y0
         ctx.solver = solver
         ctx.stepsize_controller = stepsize_controller
+        ctx.max_steps = max_steps
 
         with torch.no_grad():
             ctx.save_for_backward(*params)
             ys = _integrate_ode(
-                func, t0, t1, ts, y0, args, solver, stepsize_controller, dt0
+                func,
+                t0,
+                t1,
+                ts,
+                y0,
+                args,
+                solver,
+                stepsize_controller,
+                dt0,
+                max_steps=max_steps,
             )
         ctx.ys = ys
         ctx.args = args
@@ -76,6 +87,7 @@ class odeint_ACA(torch.autograd.Function):
                     solver,
                     stepsize_controller,
                     dt,
+                    ctx.max_steps,
                 ).squeeze(dim=1)
                 adjoint_state = adjoint_state - grad_output[:, i]
                 param_inc = torch.autograd.grad(
@@ -101,6 +113,7 @@ def odesolve_adjoint(
     solver: AbstractOdeSolver,
     stepsize_controller: AbstractStepSizeController = ConstantStepSizeController(),
     dt0: Optional[Float[torch.Tensor, ""]] = None,
+    max_steps: Optional[int] = 1000,
 ) -> Union[Float[torch.Tensor, "batch time ..."], Any]:
     # Main function to be called to integrate the NODE
 
@@ -116,7 +129,7 @@ def odesolve_adjoint(
 
     # Forward integrating the NODE and returning the state at each evaluation step
     zs = odeint_ACA.apply(
-        func, t0, t1, ts, y0, args, solver, stepsize_controller, dt0, *params
+        func, t0, t1, ts, y0, args, solver, stepsize_controller, dt0, max_steps, *params
     )
     return zs
 

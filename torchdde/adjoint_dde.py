@@ -26,6 +26,7 @@ class nddeint_ACA(torch.autograd.Function):
         solver: AbstractOdeSolver,
         stepsize_controller: AbstractStepSizeController = ConstantStepSizeController(),
         dt0: Optional[Float[torch.Tensor, ""]] = None,
+        max_steps: Optional[int] = 1000,
         *params,  # type: ignore
     ) -> Float[torch.Tensor, "batch time ..."]:
         # Saving parameters for backward()
@@ -37,6 +38,7 @@ class nddeint_ACA(torch.autograd.Function):
         ctx.ts = ts
         ctx.t0 = t0
         ctx.t1 = t1
+        ctx.max_steps = max_steps
 
         with torch.no_grad():
             ctx.save_for_backward(*params)
@@ -52,6 +54,7 @@ class nddeint_ACA(torch.autograd.Function):
                 solver,
                 stepsize_controller,
                 dt0=dt0,
+                max_steps=max_steps,
             )
 
         ctx.ys_interpolator = ys_interpolator
@@ -178,7 +181,12 @@ class nddeint_ACA(torch.autograd.Function):
             adjoint_dyn, ctx.t1, ctx.ts[-1], adjoint_state, -dt, args, solver.order
         )
 
+        current_num_steps = 0
         for j in range(len(ctx.ts) - 1, 0, -1):
+            current_num_steps += 1
+            if current_num_steps > ctx.max_steps:
+                raise RuntimeError("Maximum number of steps reached")
+
             tprev, tnext = ctx.ts[j], ctx.ts[j - 1]
             dt = tnext - tprev
             with torch.enable_grad():
@@ -204,8 +212,8 @@ class nddeint_ACA(torch.autograd.Function):
                     adjoint_state,
                     adj_candidate,
                     args,
-                    solver.order,
                     adj_error,
+                    solver.order(),
                     controller_state,
                 )
                 adjoint_state = torch.where(keep_step, adj_candidate, adjoint_state)
@@ -288,6 +296,7 @@ def ddesolve_adjoint(
     solver: AbstractOdeSolver,
     stepsize_controller: AbstractStepSizeController = ConstantStepSizeController(),
     dt0: Optional[Float[torch.Tensor, ""]] = None,
+    max_steps: Optional[int] = 1000,
 ) -> Union[Float[torch.Tensor, "batch time ..."], Any]:
     r"""Main function to integrate a constant time delay DDE with the adjoint method
 
@@ -304,7 +313,17 @@ def ddesolve_adjoint(
     """
     params = find_parameters(func)
     ys = nddeint_ACA.apply(
-        func, t0, t1, ts, history_func, args, solver, stepsize_controller, dt0, *params
+        func,
+        t0,
+        t1,
+        ts,
+        history_func,
+        args,
+        solver,
+        stepsize_controller,
+        dt0,
+        max_steps,
+        *params,
     )
     return ys
 
