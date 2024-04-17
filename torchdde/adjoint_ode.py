@@ -23,7 +23,7 @@ class odeint_ACA(torch.autograd.Function):
         solver: AbstractOdeSolver,
         stepsize_controller: AbstractStepSizeController,
         dt0: Optional[Float[torch.Tensor, ""]] = None,
-        max_steps: Optional[int] = 1000,
+        max_steps: Optional[int] = 2048,
         *params,  # type: ignore
     ) -> Float[torch.Tensor, "batch time ..."]:
         # Saving parameters for backward()
@@ -113,7 +113,7 @@ def odesolve_adjoint(
     solver: AbstractOdeSolver,
     stepsize_controller: AbstractStepSizeController = ConstantStepSizeController(),
     dt0: Optional[Float[torch.Tensor, ""]] = None,
-    max_steps: Optional[int] = 1000,
+    max_steps: Optional[int] = 2048,
 ) -> Union[Float[torch.Tensor, "batch time ..."], Any]:
     # Main function to be called to integrate the NODE
 

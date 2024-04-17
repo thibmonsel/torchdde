@@ -296,7 +296,7 @@ def ddesolve_adjoint(
     solver: AbstractOdeSolver,
     stepsize_controller: AbstractStepSizeController = ConstantStepSizeController(),
     dt0: Optional[Float[torch.Tensor, ""]] = None,
-    max_steps: Optional[int] = 1000,
+    max_steps: Optional[int] = 2048,
 ) -> Union[Float[torch.Tensor, "batch time ..."], Any]:
     r"""Main function to integrate a constant time delay DDE with the adjoint method
 
