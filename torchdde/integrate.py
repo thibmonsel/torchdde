@@ -53,7 +53,7 @@ def integrate(
     dt0: Optional[Float[torch.Tensor, ""]] = None,
     delays: Optional[Float[torch.Tensor, " delays"]] = None,
     discretize_then_optimize: bool = False,
-    max_steps: int = 1000,
+    max_steps: int = 2048,
 ) -> Float[torch.Tensor, "batch time ..."]:
     # imported here to handle circular dependencies
     # this surely isn't the best...

@@ -26,7 +26,7 @@ class nddeint_ACA(torch.autograd.Function):
         solver: AbstractOdeSolver,
         stepsize_controller: AbstractStepSizeController = ConstantStepSizeController(),
         dt0: Optional[Float[torch.Tensor, ""]] = None,
-        max_steps: Optional[int] = 1000,
+        max_steps: Optional[int] = 2048,
         *params,  # type: ignore
     ) -> Float[torch.Tensor, "batch time ..."]:
         # Saving parameters for backward()
