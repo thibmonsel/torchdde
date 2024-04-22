@@ -8,6 +8,7 @@ from .solver import (
     AbstractOdeSolver as AbstractOdeSolver,
     Dopri5 as Dopri5,
     Euler as Euler,
+    Heun as Heun,
     ImplicitEuler as ImplicitEuler,
     Ralston as Ralston,
     RK2 as RK2,

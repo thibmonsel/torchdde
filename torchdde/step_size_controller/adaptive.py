@@ -97,7 +97,6 @@ def _optimal_step_size_with_pid(
     beta1 = (pcoeff + icoeff + dcoeff) / order
     beta2 = -(pcoeff + 2 * dcoeff) / order
     beta3 = dcoeff / order
-
     zero_coeff_or_inv_error = (
         lambda coeff, inv_error: coeff == 0 or torch.zeros_like(inv_error) == inv_error
     )
@@ -172,7 +171,7 @@ class AdaptiveStepSizeController(AbstractStepSizeController):
         _nan = torch.any(torch.isnan(y1_candidate))
         y1_candidate = y0 if _nan else y1_candidate
         error_tol = self.atol + self.rtol * torch.max(y0.abs(), y1_candidate.abs())
-        return norm(y_error / error_tol).abs()
+        return norm(y_error / error_tol).abs().max()
 
     def update_scaled_error(self, current_scaled_error):
         if not torch.isfinite(self.scaled_error):
@@ -213,7 +212,7 @@ class AdaptiveStepSizeController(AbstractStepSizeController):
             self.prev_scaled_error,
             self.prev_prev_scaled_error,
         ]
-        dt = _optimal_step_size_with_pid(
+        new_dt = _optimal_step_size_with_pid(
             dt,
             scaled_errors,
             self.safety,
@@ -224,11 +223,13 @@ class AdaptiveStepSizeController(AbstractStepSizeController):
             factormin,
             self.factormax,
         )
+        if torch.isinf(new_dt):
+            raise ValueError("dt computed is inf")
         if self.dtmin is not None:
-            dt = torch.max(dt, torch.tensor(self.dtmin))
+            new_dt = torch.max(new_dt, torch.tensor(self.dtmin))
         if self.dtmax is not None:
-            dt = torch.min(dt, torch.tensor(self.dtmax))
+            new_dt = torch.min(new_dt, torch.tensor(self.dtmax))
 
         t0 = torch.where(keep_step, t1, t0)
-        t1 = torch.where(keep_step, t1 + dt, t0 + dt)
-        return keep_step, t0, t1, dt
+        t1 = torch.where(keep_step, t1 + new_dt, t0 + new_dt)
+        return keep_step, t0, t1, new_dt

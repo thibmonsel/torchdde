@@ -2,10 +2,12 @@ import pytest
 import torch
 import torch.nn as nn
 from torchdde import integrate
-from torchdde.solver import Euler, ImplicitEuler, Ralston, RK2, RK4
+from torchdde.solver import Dopri5, Euler, Heun, ImplicitEuler, Ralston, RK2, RK4
 
 
-@pytest.mark.parametrize("solver", [Euler(), RK2(), Ralston(), RK4(), ImplicitEuler()])
+@pytest.mark.parametrize(
+    "solver", [Euler(), RK2(), Ralston(), RK4(), ImplicitEuler(), Heun(), Dopri5()]
+)
 def test_very_simple_system(solver):
     class SimpleNODE(nn.Module):
         def __init__(self):

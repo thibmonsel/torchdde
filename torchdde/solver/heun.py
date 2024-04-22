@@ -5,52 +5,17 @@ from jaxtyping import Float
 
 from torchdde.solver.base import AbstractOdeSolver
 
-from ..local_interpolation import FourthOrderPolynomialInterpolation
+from ..local_interpolation import FirstOrderPolynomialInterpolation
 
 
-class Dopri5(AbstractOdeSolver):
-    """5th order order explicit Runge-Kutta method"""
+class Heun(AbstractOdeSolver):
+    """2th order order explicit Runge-Kutta method"""
 
-    a_lower = (
-        (
-            torch.tensor([1 / 5]),
-            torch.tensor([3 / 40, 9 / 40]),
-            torch.tensor([44 / 45, -56 / 15, 32 / 9]),
-            torch.tensor([19372 / 6561, -25360 / 2187, 64448 / 6561, -212 / 729]),
-            torch.tensor(
-                [9017 / 3168, -355 / 33, 46732 / 5247, 49 / 176, -5103 / 18656]
-            ),
-            torch.tensor([35 / 384, 0, 500 / 1113, 125 / 192, -2187 / 6784, 11 / 84]),
-        ),
-    )
-    b_sol = (
-        torch.tensor([35 / 384, 0, 500 / 1113, 125 / 192, -2187 / 6784, 11 / 84, 0]),
-    )
-    b_error = (
-        torch.tensor(
-            [
-                35 / 384 - 1951 / 21600,
-                0,
-                500 / 1113 - 22642 / 50085,
-                125 / 192 - 451 / 720,
-                -2187 / 6784 - -12231 / 42400,
-                11 / 84 - 649 / 6300,
-                -1.0 / 60.0,
-            ],
-        ),
-    )
-    c = (torch.tensor([1 / 5, 3 / 10, 4 / 5, 8 / 9, 1.0, 1.0]),)
-    c_mid = torch.tensor(
-        [
-            6025192743 / 30085553152 / 2,
-            0,
-            51252292925 / 65400821598 / 2,
-            -2691868925 / 45128329728 / 2,
-            187940372067 / 1594534317056 / 2,
-            -1776094331 / 19743644256 / 2,
-            11237099 / 235043384 / 2,
-        ],
-    )
+    # add another dim to a_lower to make einsum work on ki
+    a_lower = (torch.tensor([[1.0]]),)
+    b_sol = (torch.tensor([0.5, 0.5]),)
+    b_error = (torch.tensor([0.5, -0.5]),)
+    c = (torch.tensor([1.0]),)
 
     def __init__(self):
         super().__init__()
@@ -59,7 +24,7 @@ class Dopri5(AbstractOdeSolver):
         pass
 
     def order(self):
-        return 5
+        return 2
 
     def step(
         self,
@@ -108,4 +73,4 @@ class Dopri5(AbstractOdeSolver):
             return y1, y_error, dense_info, None
 
     def build_interpolation(self, t0, t1, dense_info):
-        return FourthOrderPolynomialInterpolation(t0, t1, dense_info, self.c_mid)
+        return FirstOrderPolynomialInterpolation(t0, t1, dense_info)
