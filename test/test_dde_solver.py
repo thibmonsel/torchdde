@@ -1,6 +1,6 @@
 import pytest
 import torch
-from torchdde import integrate
+from torchdde import AdaptiveStepSizeController, integrate
 from torchdde.solver import Dopri5, Euler, Heun, ImplicitEuler, Ralston, RK2, RK4
 
 
@@ -30,6 +30,10 @@ def test_explicit_solver_adaptive(solver):
     vf = lambda t, y, args, history: -history[0]
     ts = torch.linspace(0, 2, 200)
     y0 = torch.rand((10, 1))
+    rtol, atol, pcoeff, icoeff, dcoeff = 1e-3, 1e-6, 0.0, 1.0, 0.0
+    controller = AdaptiveStepSizeController(
+        rtol=rtol, atol=atol, pcoeff=pcoeff, icoeff=icoeff, dcoeff=dcoeff
+    )
     ys = integrate(
         vf,
         solver,
@@ -38,6 +42,7 @@ def test_explicit_solver_adaptive(solver):
         ts,
         lambda t: y0,
         None,
+        stepsize_controller=controller,
         delays=torch.tensor([1.0]),
         discretize_then_optimize=True,
         dt0=ts[1] - ts[0],

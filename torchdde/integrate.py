@@ -22,10 +22,10 @@ class State:
     # solver_state: PyTree[ArrayLike]
     dt: Float[torch.Tensor, ""]
     # result: RESULTS
-    num_steps: Int[torch.Tensor, ""]
-    num_accepted_steps: Int[torch.Tensor, ""]
-    num_rejected_steps: Int[torch.Tensor, ""]
-    save_idx: Int[torch.Tensor, ""]
+    num_steps: Int[torch.Tensor, " 1"]
+    num_accepted_steps: Int[torch.Tensor, " 1"]
+    num_rejected_steps: Int[torch.Tensor, " 1"]
+    save_idx: Int[torch.Tensor, " 1"]
 
     def __repr__(self) -> str:
         return f"""State(
@@ -212,10 +212,10 @@ def _integrate_dde(
         t0,
         tnext,
         dt,
-        torch.tensor(0),
-        torch.tensor(0),
-        torch.tensor(0),
-        torch.tensor(0),
+        torch.tensor([0]),
+        torch.tensor([0]),
+        torch.tensor([0]),
+        torch.tensor([0]),
     )
     ys = torch.empty((y0.shape[0], ts.shape[0], *(y0.shape[1:])))
     ys_interpolation = None
@@ -252,19 +252,28 @@ def _integrate_dde(
         if keep_step:
             interp = solver.build_interpolation(state.tprev, state.tnext, dense_info)
             while torch.any(state.tnext >= ts[state.save_idx + step_save_idx :]):
+                #### Bookkeeping, saving values ####
                 idx = state.save_idx + step_save_idx
                 out = interp.evaluate(ts[idx])
-                if ys_interpolation is None:
-                    ys_interpolation = TorchLinearInterpolator(
-                        ts[idx][None], out.unsqueeze(1)
-                    )
-                else:
-                    ys_interpolation.add_point(ts[idx].squeeze(0), out)
                 ys[:, idx] = (
                     out.unsqueeze(1) if len(out.shape) != len(ys[:, idx].shape) else out
                 )
                 step_save_idx += 1
-                ys_interpolation.add_point(tprev, interp.evaluate(tprev))
+                #### Updating interpolators ####
+                if ys_interpolation is None:
+                    ys_interpolation = TorchLinearInterpolator(
+                        ts[idx], out.unsqueeze(1)
+                    )
+                    if tprev > ts[state.save_idx + step_save_idx - 1]:
+                        ys_interpolation.add_point(tprev, interp.evaluate(tprev))
+                else:
+                    ys_interpolation.add_point(ts[idx].squeeze(0), out)
+                    if tprev > ts[state.save_idx + step_save_idx - 1]:
+                        ys_interpolation.add_point(tprev, interp.evaluate(tprev))
+            # Adding the last point to the interpolator that is in btw
+            # ts[state.save_idx + step_save_idx ] and
+            # ts[state.save_idx + step_save_idx +1]
+            # necessary for accurate estimation of y(t-tau) on the next step
 
         ########################################
         ##### Updating State for next step #####
@@ -327,10 +336,10 @@ def _integrate_ode(
         t0,
         tnext,
         dt,
-        torch.tensor(0),
-        torch.tensor(0),
-        torch.tensor(0),
-        torch.tensor(0),
+        torch.tensor([0]),
+        torch.tensor([0]),
+        torch.tensor([0]),
+        torch.tensor([0]),
     )
     ys = torch.empty((y0.shape[0], ts.shape[0], *(y0.shape[1:])))
     cond = state.tprev < t1 if (t1 > t0) else state.tprev > t1
@@ -394,5 +403,9 @@ def _integrate_ode(
 
         cond = tprev < t1 if (t1 > t0) else tprev > t1
     if state.num_steps >= max_steps:
-        raise RuntimeError("Maximum number of steps reached")
+        raise RuntimeError(
+            f"Maximum number of steps reached \
+            with solver (max_steps={state.num_steps} \
+            {state.num_accepted_steps} accepted)"
+        )
     return ys, aux  # type: ignore
