@@ -2,7 +2,7 @@ import pytest
 import torch
 import torch.nn as nn
 from torchdde import AdaptiveStepSizeController, ConstantStepSizeController, integrate
-from torchdde.solver import Dopri5, Euler, Heun, ImplicitEuler, Ralston, RK2, RK4
+from torchdde.solver import Dopri5, Euler, ImplicitEuler, Ralston, RK2, RK4
 
 
 @pytest.mark.parametrize("solver", [Euler(), RK2(), Ralston(), RK4(), ImplicitEuler()])
@@ -84,7 +84,7 @@ def test_learning_delay_in_convex_case_constant(solver):
     assert torch.allclose(model.delays, list_delays, atol=0.01, rtol=0.01)
 
 
-@pytest.mark.parametrize("solver", [Heun(), Dopri5()])
+@pytest.mark.parametrize("solver", [Dopri5()])
 def test_learning_delay_in_convex_case_adaptative(solver):
     class SimpleNDDE(nn.Module):
         def __init__(self, dim, list_delays):

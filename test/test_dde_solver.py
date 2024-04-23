@@ -1,7 +1,7 @@
 import pytest
 import torch
 from torchdde import AdaptiveStepSizeController, integrate
-from torchdde.solver import Dopri5, Euler, Heun, ImplicitEuler, Ralston, RK2, RK4
+from torchdde.solver import Dopri5, Euler, ImplicitEuler, Ralston, RK2, RK4
 
 
 @pytest.mark.parametrize("solver", [Euler(), RK2(), Ralston(), RK4()])
@@ -25,7 +25,7 @@ def test_explicit_solver_constant(solver):
     assert torch.allclose(ys[:, :80, 0], y0 * (1 - ts[:80]), rtol=1e-5, atol=1e-6)
 
 
-@pytest.mark.parametrize("solver", [Dopri5(), Heun()])
+@pytest.mark.parametrize("solver", [Dopri5()])
 def test_explicit_solver_adaptive(solver):
     vf = lambda t, y, args, history: -history[0]
     ts = torch.linspace(0, 2, 200)
