@@ -56,7 +56,7 @@ def test_learning_delay_in_convex_case_constant(solver):
     learnable_delays = torch.abs(torch.randn((len(list_delays),))) + (ts[1] - ts[0])
     model = SimpleNDDE(dim=1, list_delays=learnable_delays)
     lossfunc = nn.MSELoss()
-    opt = torch.optim.Adam(model.parameters(), lr=0.1, weight_decay=0)
+    opt = torch.optim.Adam(model.parameters(), lr=0.05, weight_decay=0)
 
     for _ in range(3000):
         model.linear.weight.requires_grad = False
@@ -132,7 +132,7 @@ def test_learning_delay_in_convex_case_adaptative(solver):
     learnable_delays = torch.abs(torch.randn((len(list_delays),))) + (ts[1] - ts[0])
     model = SimpleNDDE(dim=1, list_delays=learnable_delays)
     lossfunc = nn.MSELoss()
-    opt = torch.optim.Adam(model.parameters(), lr=0.1, weight_decay=0)
+    opt = torch.optim.Adam(model.parameters(), lr=0.05, weight_decay=0)
 
     for _ in range(2000):
         model.linear.weight.requires_grad = False
