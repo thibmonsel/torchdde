@@ -87,7 +87,7 @@ class Dopri5(AbstractOdeSolver):
                 )
                 k.append(ki)
             y1 = y + dt * torch.einsum("k, kbf -> bf", self.b_sol[0], torch.stack(k))
-            y_error = torch.einsum("k, kbf -> bf", self.b_error[0], dt * torch.stack(k))
+            y_error = dt * torch.einsum("k, kbf -> bf", self.b_error[0], torch.stack(k))
             dense_info = dict(y0=y, y1=y1, k=torch.stack(k))
             return y1, y_error, dense_info, aux
         else:
@@ -101,7 +101,7 @@ class Dopri5(AbstractOdeSolver):
                 )
                 k.append(ki)
             y1 = y + dt * torch.einsum("k, kbf -> bf", self.b_sol[0], torch.stack(k))
-            y_error = torch.einsum("k, kbf -> bf", self.b_error[0], dt * torch.stack(k))
+            y_error = dt * torch.einsum("k, kbf -> bf", self.b_error[0], torch.stack(k))
             dense_info = dict(y0=y, y1=y1, k=torch.stack(k))
             return y1, y_error, dense_info, None
 

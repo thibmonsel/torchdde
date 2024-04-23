@@ -9,7 +9,11 @@ from ..local_interpolation import FirstOrderPolynomialInterpolation
 
 
 class Heun(AbstractOdeSolver):
-    """2th order order explicit Runge-Kutta method Euler-Heun"""
+    """Heun's method.
+
+    2nd order explicit Runge--Kutta method. Has an embedded
+    Euler method for adaptive step sizing. Uses 2 stages.
+    """
 
     # add another dim to a_lower to make einsum work on ki
     a_lower = (torch.tensor([[1.0]]),)
@@ -52,7 +56,7 @@ class Heun(AbstractOdeSolver):
                 )
                 k.append(ki)
             y1 = y + dt * torch.einsum("k, kbf -> bf", self.b_sol[0], torch.stack(k))
-            y_error = torch.einsum("k, kbf -> bf", self.b_error[0], dt * torch.stack(k))
+            y_error = dt * torch.einsum("k, kbf -> bf", self.b_error[0], torch.stack(k))
             dense_info = dict(y0=y, y1=y1, k=torch.stack(k))
             return y1, y_error, dense_info, aux
         else:
@@ -66,9 +70,7 @@ class Heun(AbstractOdeSolver):
                 )
                 k.append(ki)
             y1 = y + dt * torch.einsum("k, kbf -> bf", self.b_sol[0], torch.stack(k))
-            y_error = torch.einsum(
-                "k, kbf -> bf", self.b_error[0], dt * torch.stack(k)
-            ).abs()
+            y_error = dt * torch.einsum("k, kbf -> bf", self.b_error[0], torch.stack(k))
             dense_info = dict(y0=y, y1=y1, k=torch.stack(k))
             return y1, y_error, dense_info, None
 

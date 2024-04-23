@@ -36,7 +36,7 @@ class odeint_ACA(torch.autograd.Function):
 
         with torch.no_grad():
             ctx.save_for_backward(*params)
-            ys = _integrate_ode(
+            ys, _ = _integrate_ode(
                 func,
                 t0,
                 t1,
@@ -77,7 +77,7 @@ class odeint_ACA(torch.autograd.Function):
                 adj_dyn = lambda t, adj_y, args: torch.autograd.grad(
                     out, y_t, -adj_y, retain_graph=True
                 )[0]
-                adjoint_state = _integrate_ode(
+                adjoint_state, _ = _integrate_ode(
                     adj_dyn,
                     t0,
                     t1,
@@ -88,7 +88,8 @@ class odeint_ACA(torch.autograd.Function):
                     stepsize_controller,
                     dt,
                     ctx.max_steps,
-                ).squeeze(dim=1)
+                )
+                adjoint_state = adjoint_state.squeeze(dim=1)
                 adjoint_state = adjoint_state - grad_output[:, i]
                 param_inc = torch.autograd.grad(
                     out, params, -adjoint_state, retain_graph=True
