@@ -19,6 +19,7 @@ test1.py
 test2.py
 brusselator.py
 node.py
+diffrax_*
 # C extensions
 *.so
 
