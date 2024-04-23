@@ -212,12 +212,12 @@ def _integrate_dde(
         t0,
         tnext,
         dt,
-        torch.tensor([0]),
-        torch.tensor([0]),
-        torch.tensor([0]),
-        torch.tensor([0]),
+        torch.tensor([0], device=y0.device),
+        torch.tensor([0], device=y0.device),
+        torch.tensor([0], device=y0.device),
+        torch.tensor([0], device=y0.device),
     )
-    ys = torch.empty((y0.shape[0], ts.shape[0], *(y0.shape[1:])))
+    ys = torch.empty((y0.shape[0], ts.shape[0], *(y0.shape[1:])), device=y0.device)
     ys_interpolation = None
 
     cond = state.tprev < t1 if (t1 > t0) else state.tprev > t1
@@ -278,7 +278,6 @@ def _integrate_dde(
         ########################################
         ##### Updating State for next step #####
         ########################################
-
         y = torch.where(keep_step, y, state.y)
         num_accepted_steps = torch.where(
             keep_step, state.num_accepted_steps + 1, state.num_accepted_steps
@@ -336,12 +335,12 @@ def _integrate_ode(
         t0,
         tnext,
         dt,
-        torch.tensor([0]),
-        torch.tensor([0]),
-        torch.tensor([0]),
-        torch.tensor([0]),
+        torch.tensor([0], device=y0.device),
+        torch.tensor([0], device=y0.device),
+        torch.tensor([0], device=y0.device),
+        torch.tensor([0], device=y0.device),
     )
-    ys = torch.empty((y0.shape[0], ts.shape[0], *(y0.shape[1:])))
+    ys = torch.empty((y0.shape[0], ts.shape[0], *(y0.shape[1:])), device=y0.device)
     cond = state.tprev < t1 if (t1 > t0) else state.tprev > t1
     while cond and state.num_steps < max_steps:
         y, y_error, dense_info, aux = solver.step(
