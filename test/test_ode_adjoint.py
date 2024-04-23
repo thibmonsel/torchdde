@@ -28,7 +28,7 @@ def test_very_simple_system(solver):
     ts = torch.linspace(0, 10, 101)
     y0 = torch.rand((2, 3))
     rtol, atol, pcoeff, icoeff, dcoeff = 1e-3, 1e-6, 0.0, 1.0, 0.0
-    if solver.__class__.__name__ == "Dopri5" or solver.__class__.__name__ == "Heun":
+    if solver.__class__.__name__ == "Dopri5":
         controller = AdaptiveStepSizeController(
             rtol=rtol, atol=atol, pcoeff=pcoeff, icoeff=icoeff, dcoeff=dcoeff
         )
