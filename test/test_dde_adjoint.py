@@ -149,10 +149,7 @@ def test_learning_delay_in_convex_case_adaptative(solver):
             delays=model.delays,
         )
         loss = lossfunc(ret, ys)
-        if isinstance(solver, ImplicitEuler):
-            loss.backward(retain_graph=True)
-        else:
-            loss.backward()
+        loss.backward()
         opt.step()
         if loss < 1e-4:
             break
