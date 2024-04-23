@@ -176,7 +176,10 @@ def _integrate_dde(
     has_aux: bool = False,
 ) -> tuple[
     Float[torch.Tensor, "batch time ..."],
-    Optional[Callable[[Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]]],
+    tuple[
+        Optional[Callable[[Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]]],
+        Any,
+    ],
 ]:
     if dt0 is None and isinstance(stepsize_controller, ConstantStepSizeController):
         raise ValueError(
