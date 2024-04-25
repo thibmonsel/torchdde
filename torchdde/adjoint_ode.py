@@ -95,7 +95,6 @@ class odeint_ACA(torch.autograd.Function):
                     out, params, -adjoint_state, retain_graph=True
                 )
 
-            dt = ts[i - 1] - ts[i]
             if out2 is None:
                 out2 = tuple([dt.abs() * p for p in param_inc])
             else:

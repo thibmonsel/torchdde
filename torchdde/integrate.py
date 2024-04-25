@@ -272,11 +272,11 @@ def _integrate_dde(
                 else:
                     ys_interpolation.add_point(ts[idx].squeeze(0), out)
                     if tprev > ts[state.save_idx + step_save_idx - 1]:
+                        # Adding the last point to the interpolator that is in btw
+                        # ts[state.save_idx + step_save_idx ] and
+                        # ts[state.save_idx + step_save_idx +1]
+                        # necessary for accurate estimation of y(t-tau) on the next step
                         ys_interpolation.add_point(tprev, interp.evaluate(tprev))
-            # Adding the last point to the interpolator that is in btw
-            # ts[state.save_idx + step_save_idx ] and
-            # ts[state.save_idx + step_save_idx +1]
-            # necessary for accurate estimation of y(t-tau) on the next step
 
         ########################################
         ##### Updating State for next step #####
