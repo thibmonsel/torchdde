@@ -19,9 +19,9 @@ test1.py
 test2.py
 brusselator.py
 node.py
+diffrax_*
 torchode.py
 test3.py
-
 # C extensions
 *.so
 

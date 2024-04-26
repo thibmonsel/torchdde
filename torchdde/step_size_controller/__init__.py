@@ -1,2 +1,3 @@
+from .adaptive import AdaptiveStepSizeController as AdaptiveStepSizeController
 from .base import AbstractStepSizeController as AbstractStepSizeController
 from .constant import ConstantStepSizeController as ConstantStepSizeController

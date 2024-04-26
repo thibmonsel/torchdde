@@ -23,6 +23,7 @@ class odeint_ACA(torch.autograd.Function):
         solver: AbstractOdeSolver,
         stepsize_controller: AbstractStepSizeController,
         dt0: Optional[Float[torch.Tensor, ""]] = None,
+        max_steps: Optional[int] = 2048,
         *params,  # type: ignore
     ) -> Float[torch.Tensor, "batch time ..."]:
         # Saving parameters for backward()
@@ -31,11 +32,21 @@ class odeint_ACA(torch.autograd.Function):
         ctx.y0 = y0
         ctx.solver = solver
         ctx.stepsize_controller = stepsize_controller
+        ctx.max_steps = max_steps
 
         with torch.no_grad():
             ctx.save_for_backward(*params)
-            ys = _integrate_ode(
-                func, t0, t1, ts, y0, args, solver, stepsize_controller, dt0
+            ys, _ = _integrate_ode(
+                func,
+                t0,
+                t1,
+                ts,
+                y0,
+                args,
+                solver,
+                stepsize_controller,
+                dt0,
+                max_steps=max_steps,
             )
         ctx.ys = ys
         ctx.args = args
@@ -66,7 +77,7 @@ class odeint_ACA(torch.autograd.Function):
                 adj_dyn = lambda t, adj_y, args: torch.autograd.grad(
                     out, y_t, -adj_y, retain_graph=True
                 )[0]
-                adjoint_state = _integrate_ode(
+                adjoint_state, _ = _integrate_ode(
                     adj_dyn,
                     t0,
                     t1,
@@ -76,19 +87,32 @@ class odeint_ACA(torch.autograd.Function):
                     solver,
                     stepsize_controller,
                     dt,
-                ).squeeze(dim=1)
+                    ctx.max_steps,
+                )
+                adjoint_state = adjoint_state.squeeze(dim=1)
                 adjoint_state = adjoint_state - grad_output[:, i]
                 param_inc = torch.autograd.grad(
                     out, params, -adjoint_state, retain_graph=True
                 )
 
-            dt = ts[i - 1] - ts[i]
             if out2 is None:
                 out2 = tuple([dt.abs() * p for p in param_inc])
             else:
                 for _1, _2 in zip([*out2], [*param_inc]):
                     _1 += dt.abs() * _2
-        return None, None, None, None, adjoint_state, None, None, None, None, *out2  # type: ignore
+        return (  # type: ignore
+            None,
+            None,
+            None,
+            None,
+            adjoint_state,
+            None,
+            None,
+            None,
+            None,
+            None,
+            *out2,  # type: ignore
+        )
 
 
 def odesolve_adjoint(
@@ -101,6 +125,7 @@ def odesolve_adjoint(
     solver: AbstractOdeSolver,
     stepsize_controller: AbstractStepSizeController = ConstantStepSizeController(),
     dt0: Optional[Float[torch.Tensor, ""]] = None,
+    max_steps: Optional[int] = 2048,
 ) -> Union[Float[torch.Tensor, "batch time ..."], Any]:
     # Main function to be called to integrate the NODE
 
@@ -116,7 +141,7 @@ def odesolve_adjoint(
 
     # Forward integrating the NODE and returning the state at each evaluation step
     zs = odeint_ACA.apply(
-        func, t0, t1, ts, y0, args, solver, stepsize_controller, dt0, *params
+        func, t0, t1, ts, y0, args, solver, stepsize_controller, dt0, max_steps, *params
     )
     return zs
 

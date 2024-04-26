@@ -22,20 +22,21 @@ class State:
     # solver_state: PyTree[ArrayLike]
     dt: Float[torch.Tensor, ""]
     # result: RESULTS
-    num_steps: Int[torch.Tensor, ""]
-    num_accepted_steps: Int[torch.Tensor, ""]
-    num_rejected_steps: Int[torch.Tensor, ""]
-    save_idx: Int[torch.Tensor, ""]
+    num_steps: Int[torch.Tensor, " 1"]
+    num_accepted_steps: Int[torch.Tensor, " 1"]
+    num_rejected_steps: Int[torch.Tensor, " 1"]
+    save_idx: Int[torch.Tensor, " 1"]
 
     def __repr__(self) -> str:
-        return f"""State(\n y={self.y},"
-            \n tprev={self.tprev}, 
-            \n tnext={self.tnext}, 
-            \n dt={self.dt}, 
-            \n num_step={self.num_steps.item()},
-            \n num_accepted_steps={self.num_accepted_steps.item()}, 
-            \n num_rejected_steps={self.num_rejected_steps.item()}, 
-            \n save_idx={self.save_idx.item()}\n)"""
+        return f"""State(
+            y={self.y},
+            tprev={self.tprev}, 
+            tnext={self.tnext}, 
+            dt={self.dt}, 
+            num_step={self.num_steps.item()},
+            num_accepted_steps={self.num_accepted_steps.item()}, 
+            num_rejected_steps={self.num_rejected_steps.item()}, 
+            save_idx={self.save_idx.item()}\n)"""
 
 
 def integrate(
@@ -53,6 +54,7 @@ def integrate(
     dt0: Optional[Float[torch.Tensor, ""]] = None,
     delays: Optional[Float[torch.Tensor, " delays"]] = None,
     discretize_then_optimize: bool = False,
+    max_steps: int = 2048,
 ) -> Float[torch.Tensor, "batch time ..."]:
     # imported here to handle circular dependencies
     # this surely isn't the best...
@@ -61,7 +63,17 @@ def integrate(
 
     if discretize_then_optimize or not isinstance(func, torch.nn.Module):
         return _integrate(
-            func, solver, t0, t1, ts, y0, args, stepsize_controller, dt0, delays
+            func,
+            solver,
+            t0,
+            t1,
+            ts,
+            y0,
+            args,
+            stepsize_controller,
+            dt0,
+            delays,
+            max_steps,
         )[0]
     else:
         if delays is not None:
@@ -71,12 +83,12 @@ def integrate(
             # history_func(ts[0]) = y0 in _integrate
             assert isinstance(y0, Callable)
             return ddesolve_adjoint(
-                func, t0, t1, ts, y0, args, solver, stepsize_controller, dt0
+                func, t0, t1, ts, y0, args, solver, stepsize_controller, dt0, max_steps
             )
         else:
             assert isinstance(y0, torch.Tensor)
             return odesolve_adjoint(
-                func, t0, t1, ts, y0, args, solver, stepsize_controller, dt0
+                func, t0, t1, ts, y0, args, solver, stepsize_controller, dt0, max_steps
             )
 
 
@@ -94,6 +106,8 @@ def _integrate(
     stepsize_controller: AbstractStepSizeController,
     dt0: Optional[Float[torch.Tensor, ""]] = None,
     delays: Optional[Float[torch.Tensor, " delays"]] = None,
+    max_steps: int = 100,
+    has_aux: bool = False,
 ) -> tuple[
     Float[torch.Tensor, "batch time ..."],
     Union[Callable[[Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]], Any],
@@ -126,12 +140,24 @@ def _integrate(
             solver,
             stepsize_controller,
             dt0,
+            max_steps=max_steps,
+            has_aux=has_aux,
         )
     else:
         assert isinstance(y0, torch.Tensor)
         return _integrate_ode(
-            func, t0, t1, ts, y0, args, solver, stepsize_controller, dt0
-        ), None
+            func,
+            t0,
+            t1,
+            ts,
+            y0,
+            args,
+            solver,
+            stepsize_controller,
+            dt0,
+            max_steps=max_steps,
+            has_aux=has_aux,
+        )
 
 
 def _integrate_dde(
@@ -146,9 +172,14 @@ def _integrate_dde(
     solver: AbstractOdeSolver,
     stepsize_controller: AbstractStepSizeController,
     dt0: Optional[Float[torch.Tensor, ""]] = None,
+    max_steps: Optional[int] = 100,
+    has_aux: bool = False,
 ) -> tuple[
     Float[torch.Tensor, "batch time ..."],
-    Optional[Callable[[Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]]],
+    tuple[
+        Optional[Callable[[Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]]],
+        Any,
+    ],
 ]:
     if dt0 is None and isinstance(stepsize_controller, ConstantStepSizeController):
         raise ValueError(
@@ -171,7 +202,7 @@ def _integrate_dde(
         # otherwise we are making a prediction with
         # an unknown ys_interpolation ...
         history = [
-            (ys_interpolation(t - tau) if t - tau >= t0 else history_func(t - tau))
+            (ys_interpolation(t - tau) if t - tau >= t0 else history_func(t - tau))  # type: ignore
             for tau in delays
         ]
         return func(t, y, args, history=history)
@@ -184,18 +215,18 @@ def _integrate_dde(
         t0,
         tnext,
         dt,
-        torch.tensor(0),
-        torch.tensor(0),
-        torch.tensor(0),
-        torch.tensor(0),
+        torch.tensor([0], device=y0.device),
+        torch.tensor([0], device=y0.device),
+        torch.tensor([0], device=y0.device),
+        torch.tensor([0], device=y0.device),
     )
-    ys = torch.empty((y0.shape[0], ts.shape[0], *(y0.shape[1:])))
+    ys = torch.empty((y0.shape[0], ts.shape[0], *(y0.shape[1:])), device=y0.device)
     ys_interpolation = None
 
     cond = state.tprev < t1 if (t1 > t0) else state.tprev > t1
-    while cond:
-        y, y_error, dense_info, _ = solver.step(
-            ode_func, state.tprev, state.y, state.dt, args, has_aux=False
+    while cond and state.num_steps < max_steps:
+        y, y_error, dense_info, aux = solver.step(
+            ode_func, state.tprev, state.y, state.dt, args, has_aux=has_aux
         )
         (
             keep_step,
@@ -213,7 +244,6 @@ def _integrate_dde(
             solver.order(),
             state.dt,
         )
-
         tprev = torch.clamp(tprev, max=t1)
         # if the next step going beyond the smallest delay
         # then our ys_interpolation isn't defined
@@ -221,38 +251,46 @@ def _integrate_dde(
         too_large = (tnext - tprev) > torch.min(delays)
         tnext = torch.where(too_large, tprev + torch.min(delays), tnext)
         dt = torch.where(too_large, torch.min(delays), dt)
-
         step_save_idx = 0
         if keep_step:
             interp = solver.build_interpolation(state.tprev, state.tnext, dense_info)
             while torch.any(state.tnext >= ts[state.save_idx + step_save_idx :]):
+                #### Bookkeeping, saving values ####
                 idx = state.save_idx + step_save_idx
                 out = interp.evaluate(ts[idx])
-                if ys_interpolation is None:
-                    ys_interpolation = TorchLinearInterpolator(
-                        ts[idx][None], out.unsqueeze(1)
-                    )
-                else:
-                    ys_interpolation.add_point(ts[idx].squeeze(0), out)
                 ys[:, idx] = (
                     out.unsqueeze(1) if len(out.shape) != len(ys[:, idx].shape) else out
                 )
                 step_save_idx += 1
+                #### Updating interpolators ####
+                if ys_interpolation is None:
+                    ys_interpolation = TorchLinearInterpolator(
+                        ts[idx], out.unsqueeze(1)
+                    )
+                    if tprev > ts[state.save_idx + step_save_idx - 1]:
+                        ys_interpolation.add_point(tprev, interp.evaluate(tprev))
+                else:
+                    ys_interpolation.add_point(ts[idx].squeeze(0), out)
+                    if tprev > ts[state.save_idx + step_save_idx - 1]:
+                        # Adding the last point to the interpolator that is in btw
+                        # ts[state.save_idx + step_save_idx ] and
+                        # ts[state.save_idx + step_save_idx +1]
+                        # necessary for accurate estimation of y(t-tau) on the next step
+                        ys_interpolation.add_point(tprev, interp.evaluate(tprev))
 
         ########################################
         ##### Updating State for next step #####
         ########################################
-
         y = torch.where(keep_step, y, state.y)
         num_accepted_steps = torch.where(
             keep_step, state.num_accepted_steps + 1, state.num_accepted_steps
-        )[0]
+        )
         num_rejected_steps = torch.where(
             keep_step, state.num_rejected_steps, state.num_rejected_steps + 1
-        )[0]
+        )
         save_idx = torch.where(
             keep_step, state.save_idx + step_save_idx, state.save_idx
-        )[0]
+        )
 
         state = State(
             y,
@@ -265,7 +303,9 @@ def _integrate_dde(
             save_idx,
         )
         cond = tprev < t1 if (t1 > t0) else tprev > t1
-    return ys, ys_interpolation 
+    if state.num_steps >= max_steps:
+        raise RuntimeError("Maximum number of steps reached")
+    return ys, (ys_interpolation, aux)  # type: ignore
 
 
 def _integrate_ode(
@@ -278,7 +318,9 @@ def _integrate_ode(
     solver: AbstractOdeSolver,
     stepsize_controller: AbstractStepSizeController,
     dt0: Optional[Float[torch.Tensor, ""]] = None,
-) -> Float[torch.Tensor, "batch time ..."]:
+    max_steps: Optional[int] = 100,
+    has_aux: bool = False,
+) -> tuple[Float[torch.Tensor, "batch time ..."], Any]:
     if dt0 is None and isinstance(stepsize_controller, ConstantStepSizeController):
         raise ValueError(
             "Please give a value to dt0 since the stepsize"
@@ -296,16 +338,16 @@ def _integrate_ode(
         t0,
         tnext,
         dt,
-        torch.tensor(0),
-        torch.tensor(0),
-        torch.tensor(0),
-        torch.tensor(0),
+        torch.tensor([0], device=y0.device),
+        torch.tensor([0], device=y0.device),
+        torch.tensor([0], device=y0.device),
+        torch.tensor([0], device=y0.device),
     )
-    ys = torch.empty((y0.shape[0], ts.shape[0], *(y0.shape[1:])))
+    ys = torch.empty((y0.shape[0], ts.shape[0], *(y0.shape[1:])), device=y0.device)
     cond = state.tprev < t1 if (t1 > t0) else state.tprev > t1
-    while cond:
-        y, y_error, dense_info, _ = solver.step(
-            func, state.tprev, state.y, state.dt, args, has_aux=False
+    while cond and state.num_steps < max_steps:
+        y, y_error, dense_info, aux = solver.step(
+            func, state.tprev, state.y, state.dt, args, has_aux=has_aux
         )
         (
             keep_step,
@@ -342,13 +384,13 @@ def _integrate_ode(
         y = torch.where(keep_step, y, state.y)
         num_accepted_steps = torch.where(
             keep_step, state.num_accepted_steps + 1, state.num_accepted_steps
-        )[0]
+        )
         num_rejected_steps = torch.where(
             keep_step, state.num_rejected_steps, state.num_rejected_steps + 1
-        )[0]
+        )
         save_idx = torch.where(
             keep_step, state.save_idx + step_save_idx, state.save_idx
-        )[0]
+        )
 
         state = State(
             y,
@@ -362,4 +404,10 @@ def _integrate_ode(
         )
 
         cond = tprev < t1 if (t1 > t0) else tprev > t1
-    return ys
+    if state.num_steps >= max_steps:
+        raise RuntimeError(
+            f"Maximum number of steps reached \
+            with solver (max_steps={state.num_steps} \
+            {state.num_accepted_steps} accepted)"
+        )
+    return ys, aux  # type: ignore
