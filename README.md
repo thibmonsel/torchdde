@@ -27,14 +27,6 @@ mkdocs build
 mkdocs serve 
 ```
 
-To open the url please, use on of the following command depending on your OS :
-
-```bash
-open http://127.0.0.1:8000/
-firefox http://127.0.0.1:8000/
-xdg-open http://127.0.0.1:8000/
-```
-
 ## Quick example
 
 ```python
