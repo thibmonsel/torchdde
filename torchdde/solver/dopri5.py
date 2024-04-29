@@ -12,7 +12,6 @@ class Dopri5(AbstractOdeSolver):
     """5th order order explicit Runge-Kutta method"""
 
     a_lower = (
-        (
             torch.tensor([1 / 5]),
             torch.tensor([3 / 40, 9 / 40]),
             torch.tensor([44 / 45, -56 / 15, 32 / 9]),
@@ -21,8 +20,7 @@ class Dopri5(AbstractOdeSolver):
                 [9017 / 3168, -355 / 33, 46732 / 5247, 49 / 176, -5103 / 18656]
             ),
             torch.tensor([35 / 384, 0, 500 / 1113, 125 / 192, -2187 / 6784, 11 / 84]),
-        ),
-    )
+        )
     b_sol = (
         torch.tensor([35 / 384, 0, 500 / 1113, 125 / 192, -2187 / 6784, 11 / 84, 0]),
     )
@@ -61,6 +59,13 @@ class Dopri5(AbstractOdeSolver):
     def order(self):
         return 5
 
+    def to(self, device):
+        self.a_lower = tuple([ai.to(device) for ai in self.a_lower])
+        self.b_sol = tuple([bi.to(device) for bi in self.b_sol]) 
+        self.b_error =  tuple([be.to(device) for be in self.b_error]) 
+        self.c = tuple([ci.to(device) for ci in self.c])
+        self.c_mid = self.c_mid.to(device)
+
     def step(
         self,
         func: Union[torch.nn.Module, Callable],
@@ -79,7 +84,7 @@ class Dopri5(AbstractOdeSolver):
             k = []
             k1, aux = func(t, y, args)
             k.append(k1)
-            for ci, ai in zip(self.c[0], self.a_lower[0]):
+            for ci, ai in zip(self.c[0], self.a_lower):
                 ki, _ = func(
                     t + dt * ci,
                     y + dt * torch.einsum("k, kbf -> bf", ai, torch.stack(k)),
@@ -93,7 +98,7 @@ class Dopri5(AbstractOdeSolver):
         else:
             k = []
             k.append(func(t, y, args))
-            for ci, ai in zip(self.c[0], self.a_lower[0]):
+            for ci, ai in zip(self.c[0], self.a_lower):
                 ki = func(
                     t + dt * ci,
                     y + dt * torch.einsum("k, kbf -> bf", ai, torch.stack(k)),

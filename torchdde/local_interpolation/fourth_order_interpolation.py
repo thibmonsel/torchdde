@@ -52,8 +52,8 @@ class FourthOrderPolynomialInterpolation:
 
         t = linear_rescale(self.t0, t, self.t1)
         t_polynomial = torch.pow(
-            t * torch.ones((5,)),
-            exponent=torch.flip(torch.arange(5), dims=(0,)),  # pyright : ignore
+            t * torch.ones((5,), device=t.device, dtype=t.dtype),
+            exponent=torch.flip(torch.arange(5, device=t.device), dims=(0,)),  # pyright : ignore
         )
         return torch.einsum("c, bcf -> bf", t_polynomial, self.coeffs)
 
