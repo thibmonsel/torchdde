@@ -229,7 +229,6 @@ class nddeint_ACA(torch.autograd.Function):
                 ctx.t0 - tau_i.item(), ctx.t0, int(tau_i.item() / dt.abs())
             ).to(ctx.ts.device)
             for k in range(len(ts_history_i) - 1, 0, -1):
-                # for k, t in enumerate(reversed(ts_history_i)):
                 t = ts_history_i[k]
                 with torch.enable_grad():
                     h_t = torch.autograd.Variable(
