@@ -14,8 +14,8 @@ class AbstractStepSizeController(ABC):
 
         A 2-tuple of:
 
-        - The endpoint $\tau$ for the initial first step: the first step will be made
-            over the interval $[t_0, \tau]$. If `dt0` is specified (not `None`) then
+        - The endpoint $t0+dt0$ for the initial first step: the first step will be made
+            over the interval $[t_0, t1]$. If `dt0` is specified (not `None`) then
             this is typically `t0 + dt0`. (Although in principle the step size
             controller doesn't have to respect this if it doesn't want to.)
         - The initial hidden state for the step size controller, which is used the

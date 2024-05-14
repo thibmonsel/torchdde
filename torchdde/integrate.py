@@ -56,6 +56,41 @@ def integrate(
     discretize_then_optimize: bool = False,
     max_steps: int = 2048,
 ) -> Float[torch.Tensor, "batch time ..."]:
+    """Solves a system of ODEs or DDEs.
+    See the [Getting started](../usage/getting-started.md) page for example usage.
+
+    **Main arguments:**
+
+    These are the arguments most commonly used day-to-day.
+
+    - `func`: The terms of the differential equation. This specifies the vector field.
+    - `solver`: The solver for the differential equation. See the
+        available [solvers](../usage/solvers.md).
+    - `t0`: The start of the region of integration.
+    - `t1`: The end of the region of integration.
+    - `ts` : The time points at which to return the solution.
+    - `y0`: The initial value.
+    - `args`: Any additional arguments to pass to the vector field.
+    - `stepsize_controller`: How to change the step size as the integration progresses.
+        See the [list of stepsize controllers](../usage/stepsize-controller.md).
+        Defaults set to `ConstantStepSizeController`.
+    - `dt0`: The step size to use for the first step. If using fixed step sizes then
+        this will also be the step size for all other steps. If set as `None` then the
+        initial step size will be determined automatically,
+        only available for `diffrax.AdaptiveStepSizeController`.
+    - `delays`: The initial values given to the constant delays for the DDE.
+        If set to `None` then the system is treated as an ODE.
+    - `discretize_then_optimize` : If set to `False`, the adjoint method
+        will be used for training.
+        If set to `True`, regular backpropagation will be used for training.
+    - `max_steps` : The maximum number of steps to take before
+    quitting the computation unconditionally.
+
+    **Returns:**
+
+    Returns the solution to the differential equation.
+    """
+
     # imported here to handle circular dependencies
     # this surely isn't the best...
     from torchdde.adjoint_dde import ddesolve_adjoint
@@ -222,7 +257,6 @@ def _integrate_dde(
     )
     ys = torch.empty((y0.shape[0], ts.shape[0], *(y0.shape[1:])), device=y0.device)
     ys_interpolation = None
-
     cond = state.tprev < t1 if (t1 > t0) else state.tprev > t1
     while cond and state.num_steps < max_steps:
         y, y_error, dense_info, aux = solver.step(

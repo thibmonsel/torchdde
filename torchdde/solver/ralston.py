@@ -9,7 +9,7 @@ from ..local_interpolation import FirstOrderPolynomialInterpolation
 
 
 class Ralston(AbstractOdeSolver):
-    """Ralston's method (2nd order)"""
+    """2nd order Ralston's method"""
 
     def __init__(self):
         super().__init__()

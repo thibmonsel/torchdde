@@ -98,8 +98,8 @@ nav:
       - 'usage/getting-started.md'
       - 'usage/neural-dde.md'
       - 'usage/solvers.md'
-      - 'usage/training-dde.md'
-      - 'usage/training-ode.md'
+      - 'usage/training-de.md'
+      - 'usage/stepsize-controller.md'
       - 'usage/faq.md'
   - Interpolators : 
       - 'interpolators/linear-interpolator.md'

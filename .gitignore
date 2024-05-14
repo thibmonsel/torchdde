@@ -22,6 +22,9 @@ node.py
 diffrax_*
 torchode.py
 test3.py
+any_delays.py
+vmap*
+learn_time_dependent_delays.py
 # C extensions
 *.so
 

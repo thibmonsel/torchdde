@@ -4,7 +4,7 @@
 
     This library only supports constant lag DDEs. Therefore we are unable to model state dependent DDEs.
 
-This examples trains a Neural DDE to reproduce a simple dataset of a delay logistic equation. The backward pass is compute with the adjoint method i.e `ddesolve_adjoint`.
+This examples trains a Neural DDE to reproduce a simple dataset of a delay logistic equation. The backward pass is computed with the adjoint method.
 
 ```python
 import time
@@ -13,9 +13,8 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
-from torchdde import ddesolve_adjoint, DDESolver, Euler
+from torchdde import integrate, Euler
 from torchvision.ops import MLP
-
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ```
@@ -46,7 +45,6 @@ class NDDE(nn.Module):
 
     def forward(self, t, z, args, *, history):
         return self.mlp(torch.cat([z, *history], dim=-1))
-
 ```
 
 We generate the toy dataset of the [delayed logistic equation](https://www.math.miami.edu/~ruan/MyPapers/Ruan-nato.pdf) (Equation 2.1).
@@ -56,8 +54,8 @@ def get_data(y0, ts, tau=torch.tensor([1.0])):
     def f(t, y, args, history):
         return y * (1 - history[0])
 
-    solver = DDESolver(Euler(), tau)
-    ys, _ = solver.integrate(f, ts, lambda t: torch.unsqueeze(y0, dim=1), None)
+    history_function = lambda t: torch.unsqueeze(y0, dim=1)
+    ys = integrate(f, Euler(), ts[0], ts[-1], ts, history_function, args=None, dt0=ts[1]-ts[0], delays=tau)
     return ys
 
 
@@ -86,6 +84,7 @@ def main(
     seed=5678,
     plot=True,
     print_every=5,
+    device=device,
 ):
     torch.manual_seed(seed)
     ts = torch.linspace(0, 10, 101)
@@ -93,21 +92,19 @@ def main(
     y0 = (y0_min - y0_max) * torch.rand((dataset_size,)) + y0_max
     ys = get_data(y0, ts)
     ts, ys = ts.to(device), ys.to(device)
-
     delay_min, delay_max = 0.7, 1.3
     value = (delay_max - delay_min) * torch.rand((1,)) + delay_min
-    list_delays = torch.tensor([value])
-    list_delays = list_delays.to(device)
+    tau = torch.tensor([value], device=device)
+    tau = tau.to(device)
 
     state_dim = ys.shape[-1]
-    model = NDDE(list_delays, state_dim, state_dim, width_size, depth)
+    model = NDDE(tau, state_dim, state_dim, width_size, depth)
     model = model.to(device)
 
     dataset = MyDataset(ys)
     train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     # Training loop like normal.
-
     model.train()
     loss_fn = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -117,7 +114,7 @@ def main(
             optimizer.zero_grad()
             data = data.to(device)
             history_fn = lambda t: data[:, 0]
-            ys_pred = ddesolve_adjoint(history_fn, model, ts, None, Euler())
+            ys_pred = integrate(model, Euler(), ts[0], ts[-1], ts, history_fn, args=None, dt0=ts[1]-ts[0], delays=tau)
             loss = loss_fn(ys_pred, data)
             loss.backward()
             optimizer.step()
@@ -136,7 +133,7 @@ def main(
         plt.plot(ts.cpu(), data[0].cpu(), c="dodgerblue", label="Real")
         history_values = data[0, 0][..., None]
         history_fn = lambda t: history_values
-        ys_pred = ddesolve_adjoint(history_fn, model, ts, Euler())
+        ys_pred = integrate(model, Euler(), ts[0], ts[-1], ts, history_fn, args=None, dt0=ts[1]-ts[0], delays=tau)
         plt.plot(
             ts.cpu(),
             ys_pred[0].cpu().detach(),
@@ -150,7 +147,6 @@ def main(
         plt.close()
 
     return ts, ys, model
-
 
 ts, ys, model = main()
 ```

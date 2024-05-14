@@ -1,6 +1,6 @@
 # Getting Started
 
-An illustrative example which solves the following DDE
+An illustrative example which solves the following DDE :
 
 $\frac{dy}{dt}= -y(t-2), \quad \psi(t<0) = 2$ over the interval $[0, 5]$.
 
@@ -21,8 +21,8 @@ ts = torch.linspace(0, 5, 51)
 ts = ts.to(device)
 
 # Define the delays, here there is only one tau=2.0
-list_delays = torch.tensor([2.0])
-list_delays = list_delays.to(device)
+delays = torch.tensor([2.0])
+delays = delays.to(device)
 
 # Defining a constant history function for the DDE
 history_values = torch.tensor([3.0])
@@ -31,8 +31,8 @@ history_values = history_values.to(device)
 history_function = lambda t: history_values
 
 # Solve the DDE by using the RK4 method
-dde_solver = DDESolver(RK4(), list_delays)
-ys, _ = dde_solver.integrate(simple_dde, ts, history_function, None)
+solver = RK4()
+solution = torchdde.integrate(f, solver, ts[0], ts[-1], ts, history_function, None, dt0=ts[1]-ts[0], delays=delays)
 ```
 
 - The numerical solver used is `RK4` is the 4th Runge Kutta method.

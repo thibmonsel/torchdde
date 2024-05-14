@@ -15,10 +15,16 @@ class AbstractOdeSolver(ABC):
 
     @abstractmethod
     def init(self):
+        """
+        Initialize the solver. This method is called before the integration starts.
+        """
         pass
 
     @abstractmethod
     def order(self) -> int:
+        """
+        Return the order of the solver.
+        """
         pass
 
     @abstractmethod
@@ -36,32 +42,26 @@ class AbstractOdeSolver(ABC):
         dict[str, Float[torch.Tensor, "batch order"]],
         Union[Float[torch.Tensor, " batch"], Any],
     ]:
-        """
+        """ODE's stepping method
+
+        **Arguments:**
+
+        - `func`: Pytorch model, i.e vector field
+        - `t`: Current time step `t`
+        - `y`: Current state `y`
+        - `dt`: Step size `dt`
+        - `has_aux`: Whether the model has an auxiliary output.
         **Returns:**
 
         A tuple of several objects:
 
         - The value of the solution at `t+dt`.
-        - A local error estimate made during the step. (Used by adaptive step size
-            controllers to change the step size.) May be `None` if no estimate was
-            made.
-        - The value of the solver state at `t+dt`.
-        - `has_aux`: Whether the model has an auxiliary output.
-        """
-
-        r"""ODE's stepping definition
-
-        **Arguments:**
-
-        - `func`: Pytorch model, i.e vector field
-        - `t`: Current time step t
-        - `y`: Current state y
-        - `dt`: Stepsize dt
-        - `has_aux`: Whether the model has an auxiliary output.
-
-        **Returns:**
-
-        Integration result at time `t+dt`
+        - A local error estimate made during the step. (Used by
+        `diffrax.AdaptiveStepSizeController` controllers to change the step size.)
+        It may be `None` for constant stepsize solver for example.
+        - Dictionary that hold all the information needed to properly
+        build the interpolation between `t` and `t+dt`.
+        - None if the model doesn't have an auxiliary output.
         """
         pass
 

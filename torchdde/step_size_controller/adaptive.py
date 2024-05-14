@@ -131,6 +131,22 @@ def _optimal_step_size_with_pid(
 
 
 class AdaptiveStepSizeController(AbstractStepSizeController):
+    """Adapts the step size to produce a solution accurate to a given tolerance.
+    The tolerance is calculated as `atol + rtol * y` for the evolving solution `y`.
+
+    ??? tip "Choosing tolerances"
+
+        The choice of `rtol` and `atol` are used to determine how accurately you would
+        like the numerical approximation to your equation. If you are solving a problem
+        "harder" problem then you probably need to raise the tolerances to get an
+        appropriate solution.
+
+    ??? tip "Choosing PID coefficients"
+
+        We refer the reader to `Diffrax` clear explanation
+        [here](https://docs.kidger.site/diffrax/api/stepsize_controller/).
+    """
+
     def __init__(
         self,
         atol,
@@ -233,3 +249,19 @@ class AdaptiveStepSizeController(AbstractStepSizeController):
         t0 = torch.where(keep_step, t1, t0)
         t1 = torch.where(keep_step, t1 + new_dt, t0 + new_dt)
         return keep_step, t0, t1, new_dt
+
+
+AdaptiveStepSizeController.__init__.__doc__ = """**Arguments:**
+
+- `atol`: Absolute tolerance.
+- `rtol`: Relative tolerance.
+- `safety`: Multiplicative safety factor.
+- `pcoeff`: The coefficient of the proportional part of the step size control.
+- `icoeff`: The coefficient of the integral part of the step size control.
+- `dcoeff`: The coefficient of the derivative part of the step size control.
+- `factormax`: Maximum amount a step size can be increased relative to the previous
+    step.
+- `dtmin`: Minimum step size. The step size is either clipped to this value, or an
+    error raised if the step size decreases below this, depending on `force_dtmin`.
+- `dtmax`: Maximum step size; the step size is clipped to this value.
+"""

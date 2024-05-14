@@ -16,16 +16,29 @@ cd torchdde/
 pip install .
 ```
 
-## Quick example
+## Quick examples
 
+`torchdde` can solve constant lag DDEs :
 ```python
+import torchdde
+import torch
+
 def f(t, y, args, history):
     return y * (1 - history[0])
 
-
 delays = torch.tensor([1.0])
-solver = DDESolver(RK2(), delays)
 history_values = torch.arange(1, 5).reshape(-1, 1)
 history_function = lambda t: history_values
-solution, _ = solver.integrate(f, torch.linspace(0, 20, 201), history_function, None)
+ts = torch.linspace(0, 20, 201)
+solution = torchdde.integrate(
+    f,
+    torchdde.RK2(),
+    ts[0],
+    ts[-1],
+    ts,
+    history_function,
+    None,
+    dt0=ts[1] - ts[0],
+    delays=delays,
+)
 ```

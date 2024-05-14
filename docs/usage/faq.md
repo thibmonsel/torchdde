@@ -14,8 +14,7 @@ def simple_dde(t, y, args, *, history):
     # this correspond to y'(t) = -y(t-1) - y(t-2)
     return - history[0] - history[1]
 
-dde_solver = DDESolver(solver, delays)
-ys, _ = dde_solver.integrate(simple_dde, ts, history_function)
+ys = torchdde.integrate(f, solver, ts[0], ts[-1], ts, history_function, args=None, dt0=ts[1]-ts[0], delays=delays)
 ```
 
 ## How about if I want a neural network to have also several delays ?
