@@ -16,14 +16,14 @@ class AbstractOdeSolver(ABC):
     @abstractmethod
     def init(self):
         """
-        Initialize the solver. This method is called before the integration starts.
+        Initializes the solver. This method is called before the integration starts.
         """
         pass
 
     @abstractmethod
     def order(self) -> int:
         """
-        Return the order of the solver.
+        Returns the order of the solver.
         """
         pass
 
@@ -51,6 +51,7 @@ class AbstractOdeSolver(ABC):
         - `y`: Current state `y`
         - `dt`: Step size `dt`
         - `has_aux`: Whether the model has an auxiliary output.
+
         **Returns:**
 
         A tuple of several objects:
@@ -67,4 +68,17 @@ class AbstractOdeSolver(ABC):
 
     @abstractmethod
     def build_interpolation(self, t0, t1, dense_info) -> Any:
+        """Interpolator building method based on the solver's order.
+
+        **Arguments:**
+
+        - `t0`: The start of the interval over which the interpolation is defined.
+        - `t1`: The end of the interval over which the interpolation is defined.
+        - `dense_info`: Dictionary that hold all the information needed to properly
+        build the interpolation between `t` and `t+dt`.
+
+        **Returns:**
+
+        A `Callable` that can be used to interpolate the solution between `t0` and `t1`.
+        """
         pass

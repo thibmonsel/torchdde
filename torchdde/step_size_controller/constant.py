@@ -4,7 +4,9 @@ from .base import AbstractStepSizeController
 
 
 class ConstantStepSizeController(AbstractStepSizeController):
-    """Constant step size controller that always returns the same step size."""
+    """Constant step size controller that always returns the same step size.
+
+    The user must define `dt0` via [`torchdde.integrate.integrate`][]"""
 
     def init(self, func, t0, t1, y0, dt0, args, error_order):
         del func, t1, y0, args, error_order

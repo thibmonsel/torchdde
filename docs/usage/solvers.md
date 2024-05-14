@@ -10,13 +10,14 @@ Only some explicit solvers are available to use but adding new ones is rather si
             - init
             - order
             - step
+            - build_interpolation
 
 ### Explicit Solvers
 
 ::: torchdde.Euler
     selection:
         members: false
-        
+
 ::: torchdde.Ralston
     selection:
         members: false

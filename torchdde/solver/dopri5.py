@@ -9,18 +9,16 @@ from ..local_interpolation import FourthOrderPolynomialInterpolation
 
 
 class Dopri5(AbstractOdeSolver):
-    """5th order order explicit Runge-Kutta method"""
+    """5th order order explicit Runge-Kutta method Dormand Prince"""
 
     a_lower = (
-            torch.tensor([1 / 5]),
-            torch.tensor([3 / 40, 9 / 40]),
-            torch.tensor([44 / 45, -56 / 15, 32 / 9]),
-            torch.tensor([19372 / 6561, -25360 / 2187, 64448 / 6561, -212 / 729]),
-            torch.tensor(
-                [9017 / 3168, -355 / 33, 46732 / 5247, 49 / 176, -5103 / 18656]
-            ),
-            torch.tensor([35 / 384, 0, 500 / 1113, 125 / 192, -2187 / 6784, 11 / 84]),
-        )
+        torch.tensor([1 / 5]),
+        torch.tensor([3 / 40, 9 / 40]),
+        torch.tensor([44 / 45, -56 / 15, 32 / 9]),
+        torch.tensor([19372 / 6561, -25360 / 2187, 64448 / 6561, -212 / 729]),
+        torch.tensor([9017 / 3168, -355 / 33, 46732 / 5247, 49 / 176, -5103 / 18656]),
+        torch.tensor([35 / 384, 0, 500 / 1113, 125 / 192, -2187 / 6784, 11 / 84]),
+    )
     b_sol = (
         torch.tensor([35 / 384, 0, 500 / 1113, 125 / 192, -2187 / 6784, 11 / 84, 0]),
     )
@@ -61,8 +59,8 @@ class Dopri5(AbstractOdeSolver):
 
     def to(self, device):
         self.a_lower = tuple([ai.to(device) for ai in self.a_lower])
-        self.b_sol = tuple([bi.to(device) for bi in self.b_sol]) 
-        self.b_error =  tuple([be.to(device) for be in self.b_error]) 
+        self.b_sol = tuple([bi.to(device) for bi in self.b_sol])
+        self.b_error = tuple([be.to(device) for be in self.b_error])
         self.c = tuple([ci.to(device) for ci in self.c])
         self.c_mid = self.c_mid.to(device)
 

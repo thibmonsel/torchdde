@@ -133,6 +133,7 @@ def _optimal_step_size_with_pid(
 class AdaptiveStepSizeController(AbstractStepSizeController):
     """Adapts the step size to produce a solution accurate to a given tolerance.
     The tolerance is calculated as `atol + rtol * y` for the evolving solution `y`.
+    Steps are adapted using a PID controller.
 
     ??? tip "Choosing tolerances"
 
