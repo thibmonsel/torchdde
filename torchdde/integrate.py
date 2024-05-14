@@ -77,7 +77,7 @@ def integrate(
     - `dt0`: The step size to use for the first step. If using fixed step sizes then
         this will also be the step size for all other steps. If set as `None` then the
         initial step size will be determined automatically,
-        only available for `diffrax.AdaptiveStepSizeController`.
+        only available for `torchdde.AdaptiveStepSizeController`.
     - `delays`: The initial values given to the constant delays for the DDE.
         If set to `None` then the system is treated as an ODE.
     - `discretize_then_optimize` : If set to `False`, the adjoint method

@@ -1,6 +1,8 @@
 # Getting Started
 
-An illustrative example which solves the following DDE :
+## DDES
+
+We provide an illustrative example which solves the following DDE :
 
 $\frac{dy}{dt}= -y(t-2), \quad \psi(t<0) = 2$ over the interval $[0, 5]$.
 
@@ -31,7 +33,37 @@ history_function = lambda t: history_values
 
 # Solve the DDE by using the RK4 method
 solver = RK4()
-solution = torchdde.integrate(f, solver, ts[0], ts[-1], ts, history_function, None, dt0=ts[1]-ts[0], delays=delays)
+solution = torchdde.integrate(simple_dde, solver, ts[0], ts[-1], ts, history_function, None, dt0=ts[1]-ts[0], delays=delays)
+```
+
+- The numerical solver used is `RK4` is the 4th Runge Kutta method.
+- The solution is saved at each time stamp in `ts`.
+- The initial step size is equal to `ts[1]-ts[0]`.
+
+## ODEs
+
+We provide an illustrative example which solves the following ODE :
+
+$\frac{dy}{dt}= -y(t)^{2}, \quad y(0) = 2$ over the interval $[0, 5]$.
+
+```python
+import matplotlib.pyplot as plt
+from torchdde import RK4
+import torch
+
+def simple_ode(t, y, args):
+    return -y**2
+
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+# Define the time span of the ODE
+ts = torch.linspace(0, 5, 51)
+ts = ts.to(device)
+
+# Solve the ODE by using the RK4 method
+solver = RK4()
+solution = torchdde.integrate(simple_ode, solver, ts[0], ts[-1], ts, history_function, None, dt0=ts[1]-ts[0], delays=None)
 ```
 
 - The numerical solver used is `RK4` is the 4th Runge Kutta method.

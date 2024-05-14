@@ -2,7 +2,7 @@
 
 ## ODE Solvers
 
-Only some explicit solvers are available to use but adding new ones is rather simple with `AbstractOdeSolver`.
+Only some explicit solvers are available to use but adding new ones is rather simple with [`torchdde.AbstractOdeSolver`][].
 
 ::: torchdde.AbstractOdeSolver
     selection:

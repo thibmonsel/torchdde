@@ -96,10 +96,11 @@ nav:
   - 'index.md'
   - Usage:  
       - 'usage/getting-started.md'
-      - 'usage/neural-dde.md'
       - 'usage/solvers.md'
-      - 'usage/training-de.md'
+      - 'usage/integration-de.md'
       - 'usage/stepsize-controller.md'
+      - 'usage/training-de.md'
+      - 'usage/neural-dde.md'
       - 'usage/faq.md'
   - Interpolators : 
       - 'interpolators/linear-interpolator.md'

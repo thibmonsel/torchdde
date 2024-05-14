@@ -10,7 +10,7 @@ from jaxtyping import Float
 
 class AbstractOdeSolver(ABC):
     """Base class for creating ODE solvers. All solvers should inherit from it.
-    To create new solvers users must implement the step method.
+    To create new solvers users must implement the `init`, `step` and `order` method.
     """
 
     @abstractmethod
@@ -42,7 +42,7 @@ class AbstractOdeSolver(ABC):
         dict[str, Float[torch.Tensor, "batch order"]],
         Union[Float[torch.Tensor, " batch"], Any],
     ]:
-        """ODE's stepping method
+        """ODE's solver stepping method
 
         **Arguments:**
 
@@ -52,15 +52,22 @@ class AbstractOdeSolver(ABC):
         - `dt`: Step size `dt`
         - `has_aux`: Whether the model has an auxiliary output.
 
-        **Returns:**
+        ??? tip "has_aux ?"
 
-        A tuple of several objects:
+            A function with an auxiliary output can look like
+            ```python
+            def f(t,y,args):
+                return -y, ("Hello World",1)
+            ```
+            This `kwargs` argument is used to compute the adjoint method
+
+        **Returns:**
 
         - The value of the solution at `t+dt`.
         - A local error estimate made during the step. (Used by
-        `diffrax.AdaptiveStepSizeController` controllers to change the step size.)
-        It may be `None` for constant stepsize solver for example.
-        - Dictionary that hold all the information needed to properly
+        [`torchdde.AdaptiveStepSizeController`][] controllers to change the step size.)
+        It may be `None` for constant stepsize solvers for example.
+        - Dictionary that holds all the information needed to properly
         build the interpolation between `t` and `t+dt`.
         - None if the model doesn't have an auxiliary output.
         """
