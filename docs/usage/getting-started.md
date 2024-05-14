@@ -6,9 +6,8 @@ $\frac{dy}{dt}= -y(t-2), \quad \psi(t<0) = 2$ over the interval $[0, 5]$.
 
 ```python
 import matplotlib.pyplot as plt
+from torchdde import RK4
 import torch
-from torchdde import DDESolver, RK4
-
 
 def simple_dde(t, y, args, *, history):
     return -history[0]

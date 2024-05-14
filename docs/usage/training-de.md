@@ -18,3 +18,4 @@ Regarless, the only entry point to integrate ODEs/DDEs is the `integrate` functi
 !!! warning
 
     You are unable to learn the DDE's delays if using the `discretize_then_optimize=True`.
+
