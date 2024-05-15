@@ -12,6 +12,7 @@ site/
 .pymon
 .idea/
 
+*.pdf
 docs_test.py
 ode_test.py
 *.png
