@@ -20,6 +20,8 @@ What essentially differentiates a DDE with an ODE are :
         return ...
     ```
 
+    and your ODE's initial condition `y0` will become a history function `history_fn = lambda t : ...`
+
 
 ::: torchdde.integrate.integrate
     selection:

@@ -61,9 +61,14 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 ts = torch.linspace(0, 5, 51)
 ts = ts.to(device)
 
+# Initial condition 
+y0 = torch.tensor([3.0])
+y0 = y0.reshape(-1, 1)
+y0 = y0.to(device)
+
 # Solve the ODE by using the RK4 method
 solver = RK4()
-solution = torchdde.integrate(simple_ode, solver, ts[0], ts[-1], ts, history_function, None, dt0=ts[1]-ts[0], delays=None)
+solution = torchdde.integrate(simple_ode, solver, ts[0], ts[-1], ts, y0, None, dt0=ts[1]-ts[0], delays=None)
 ```
 
 - The numerical solver used is `RK4` is the 4th Runge Kutta method.
