@@ -88,7 +88,7 @@ plugins:
                     show_source: false  # don't include source code
                     members_order: source  # order methods according to their order of definition in the source code, not alphabetical order
                     heading_level: 4  # Makes everything top-level be <h4>. Child entries will be <h5> etc., but because of toc_depth, above, (deliberately) won't appear in the TOC.
-    - with-pdf
+    # - with-pdf
 
 site_url: ""
 site_name: torchdde
