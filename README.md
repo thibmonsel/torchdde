@@ -19,13 +19,7 @@ pip install .
 
 ## Documentation
 
-To generate the documentation :
-
-```bash
-mkdocs build
-mkdocs build 
-mkdocs serve 
-```
+To generate the documentation, please look at `CONTRIBUTING.MD`.
 
 ## Quick example
 
