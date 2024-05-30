@@ -27,7 +27,7 @@ To generate the documentation, please look at `CONTRIBUTING.MD`.
 import torch
 from torchdde import DDESolver, RK2
 
-def f(t, y, history):
+def f(t, y, args, history):
     return y * (1 - history[0])
 
 solver = RK2()
