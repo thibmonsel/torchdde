@@ -237,7 +237,7 @@ def _integrate_dde(
         # otherwise we are making a prediction with
         # an unknown ys_interpolation ...
         history = [
-            (ys_interpolation(t - tau) if t - tau >= t0 else history_func(t - tau))  # type: ignore
+            (ys_interpolation(t - tau) if t - tau > t0 else history_func(t - tau))  # type: ignore
             for tau in delays
         ]
         return func(t, y, args, history=history)
