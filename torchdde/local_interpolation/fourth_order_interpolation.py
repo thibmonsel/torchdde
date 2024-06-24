@@ -1,4 +1,7 @@
+from typing import Dict, Optional
+
 import torch
+from jaxtyping import Float
 
 
 def linear_rescale(t0, t, t1):
@@ -19,15 +22,24 @@ class FourthOrderPolynomialInterpolation:
     increasing order, i.e. `cofficients[i]` belongs to `x**i`.
     """
 
-    def __init__(self, t0, t1, dense_info, c_mid):
+    def __init__(
+        self,
+        t0: Float[torch.Tensor, ""],
+        t1: Float[torch.Tensor, ""],
+        dense_info: Dict[str, Float[torch.Tensor, "? batch ..."]],
+        c_mid: Float[torch.Tensor, " 7"],
+    ):
         self.t0 = t0
         self.t1 = t1
         self.dt = t1 - t0
-        self.coeffs = self._calculate(dense_info, c_mid)
+        self.c_mid = c_mid
+        self.coeffs = self._calculate(dense_info)
 
-    def _calculate(self, dense_info, c_mid):
+    def _calculate(
+        self, dense_info: Dict[str, Float[torch.Tensor, "? batch ..."]]
+    ) -> Float[torch.Tensor, "7 batch ..."]:
         _ymid = dense_info["y0"] + self.dt * torch.einsum(
-            "c, cbf -> bf", c_mid, dense_info["k"]
+            "c, cbf -> bf", self.c_mid, dense_info["k"]
         )
         _f0 = self.dt * dense_info["k"][0]
         _f1 = self.dt * dense_info["k"][-1]
@@ -45,15 +57,22 @@ class FourthOrderPolynomialInterpolation:
             torch.float32
         )
 
-    def evaluate(self, t, t1=None, left: bool = True):
+    def __call__(
+        self,
+        t: Float[torch.Tensor, ""],
+        t1: Optional[Float[torch.Tensor, ""]] = None,
+        left: Optional[bool] = True,
+    ) -> Float[torch.Tensor, "batch ..."]:
         del left
         if t1 is not None:
-            return self.evaluate(t1) - self.evaluate(t)
+            return self(t1) - self(t)
 
         t = linear_rescale(self.t0, t, self.t1)
         t_polynomial = torch.pow(
             t * torch.ones((5,), device=t.device, dtype=t.dtype),
-            exponent=torch.flip(torch.arange(5, device=t.device), dims=(0,)),  # pyright : ignore
+            exponent=torch.flip(
+                torch.arange(5, device=t.device), dims=(0,)
+            ),  # pyright : ignore
         )
         return torch.einsum("c, bcf -> bf", t_polynomial, self.coeffs)
 

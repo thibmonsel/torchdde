@@ -1,14 +1,22 @@
+from typing import Dict
+
 import torch
+from jaxtyping import Float
 
 
 class FirstOrderPolynomialInterpolation:
-    def __init__(self, t0, t1, dense_info):
+    def __init__(
+        self,
+        t0: Float[torch.Tensor, ""],
+        t1: Float[torch.Tensor, ""],
+        dense_info: Dict[str, Float[torch.Tensor, "batch ..."]],
+    ):
         self.t0 = t0
         self.t1 = t1
         self.y0 = dense_info["y0"]
         self.y1 = dense_info["y1"]
 
-    def evaluate(self, t):
+    def __call__(self, t: Float[torch.Tensor, ""], left=True):
         dt = self.t1 - self.t0
         dt = torch.where(dt.abs() > 0.0, dt, 1.0)
         coeff = (self.y1 - self.y0) / dt

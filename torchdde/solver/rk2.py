@@ -11,6 +11,8 @@ from ..local_interpolation import FirstOrderPolynomialInterpolation
 class RK2(AbstractOdeSolver):
     """2nd order explicit Runge-Kutta method"""
 
+    interpolation_cls = FirstOrderPolynomialInterpolation
+
     def __init__(self):
         super().__init__()
 
@@ -48,4 +50,4 @@ class RK2(AbstractOdeSolver):
     def build_interpolation(
         self, t0, t1, dense_info
     ) -> FirstOrderPolynomialInterpolation:
-        return FirstOrderPolynomialInterpolation(t0, t1, dense_info)
+        return self.interpolation_cls(t0, t1, dense_info)

@@ -11,6 +11,8 @@ from ..local_interpolation import FirstOrderPolynomialInterpolation
 class Euler(AbstractOdeSolver):
     """Euler's method"""
 
+    interpolation_cls = FirstOrderPolynomialInterpolation
+
     def __init__(self):
         super().__init__()
 
@@ -43,4 +45,4 @@ class Euler(AbstractOdeSolver):
             return y1, None, dict(y0=y, y1=y1), None
 
     def build_interpolation(self, t0, t1, dense_info):
-        return FirstOrderPolynomialInterpolation(t0, t1, dense_info)
+        return self.interpolation_cls(t0, t1, dense_info)

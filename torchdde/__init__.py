@@ -1,8 +1,12 @@
-from .global_interpolation import TorchLinearInterpolator as TorchLinearInterpolator
+from .global_interpolation import (
+    DenseInterpolation as DenseInterpolation,
+    TorchLinearInterpolator as TorchLinearInterpolator,
+)
 from .integrate import integrate as integrate
 from .local_interpolation import (
     FirstOrderPolynomialInterpolation as FirstOrderPolynomialInterpolation,
     FourthOrderPolynomialInterpolation as FourthOrderPolynomialInterpolation,
+    ThirdOrderPolynomialInterpolation as ThirdOrderPolynomialInterpolation,
 )
 from .solver import (
     AbstractOdeSolver as AbstractOdeSolver,

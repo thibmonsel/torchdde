@@ -5,11 +5,13 @@ from jaxtyping import Float
 
 from torchdde.solver.base import AbstractOdeSolver
 
-from ..local_interpolation import FirstOrderPolynomialInterpolation
+from ..local_interpolation import ThirdOrderPolynomialInterpolation
 
 
 class Ralston(AbstractOdeSolver):
     """2nd order Ralston's method"""
+
+    interpolation_cls = ThirdOrderPolynomialInterpolation
 
     def __init__(self):
         super().__init__()
@@ -38,14 +40,14 @@ class Ralston(AbstractOdeSolver):
             k1, aux = func(t, y, args)
             k2, _ = func(t + 2 / 3 * dt, y + 2 / 3 * dt * k1, args)
             y1 = y + dt * (1 / 4 * k1 + 3 / 4 * k2)
-            return y1, None, dict(y0=y, y1=y1), aux
+            return y1, None, dict(y0=y, y1=y1, k=torch.stack([k1, k2])), aux
         else:
             k1 = func(t, y, args)
             k2 = func(t + 2 / 3 * dt, y + 2 / 3 * dt * k1, args)
             y1 = y + dt * (1 / 4 * k1 + 3 / 4 * k2)
-            return y1, None, dict(y0=y, y1=y1), None
+            return y1, None, dict(y0=y, y1=y1, k=torch.stack([k1, k2])), None
 
     def build_interpolation(
         self, t0, t1, dense_info
-    ) -> FirstOrderPolynomialInterpolation:
-        return FirstOrderPolynomialInterpolation(t0, t1, dense_info)
+    ) -> ThirdOrderPolynomialInterpolation:
+        return self.interpolation_cls(t0, t1, dense_info)

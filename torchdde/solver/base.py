@@ -13,6 +13,8 @@ class AbstractOdeSolver(ABC):
     To create new solvers users must implement the `init`, `step` and `order` method.
     """
 
+    interpolation_cls: Any
+
     @abstractmethod
     def init(self):
         """

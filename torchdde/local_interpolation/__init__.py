@@ -4,3 +4,6 @@ from .first_order_interpolation import (
 from .fourth_order_interpolation import (
     FourthOrderPolynomialInterpolation as FourthOrderPolynomialInterpolation,
 )
+from .third_order_interpolation import (
+    ThirdOrderPolynomialInterpolation as ThirdOrderPolynomialInterpolation,
+)

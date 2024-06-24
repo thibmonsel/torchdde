@@ -8,8 +8,27 @@ from torchdde.solver.base import AbstractOdeSolver
 from ..local_interpolation import FourthOrderPolynomialInterpolation
 
 
+class _Dopri5Interpolation(FourthOrderPolynomialInterpolation):
+    c_mid = torch.tensor(
+        [
+            6025192743 / 30085553152 / 2,
+            0,
+            51252292925 / 65400821598 / 2,
+            -2691868925 / 45128329728 / 2,
+            187940372067 / 1594534317056 / 2,
+            -1776094331 / 19743644256 / 2,
+            11237099 / 235043384 / 2,
+        ],
+    )
+
+    def __init__(self, t0, t1, dense_info):
+        super().__init__(t0, t1, dense_info, self.c_mid)
+
+
 class Dopri5(AbstractOdeSolver):
     """5th order order explicit Runge-Kutta method Dormand Prince"""
+
+    interpolation_cls = _Dopri5Interpolation
 
     a_lower = (
         torch.tensor([1 / 5]),
@@ -36,17 +55,6 @@ class Dopri5(AbstractOdeSolver):
         ),
     )
     c = (torch.tensor([1 / 5, 3 / 10, 4 / 5, 8 / 9, 1.0, 1.0]),)
-    c_mid = torch.tensor(
-        [
-            6025192743 / 30085553152 / 2,
-            0,
-            51252292925 / 65400821598 / 2,
-            -2691868925 / 45128329728 / 2,
-            187940372067 / 1594534317056 / 2,
-            -1776094331 / 19743644256 / 2,
-            11237099 / 235043384 / 2,
-        ],
-    )
 
     def __init__(self):
         super().__init__()
@@ -62,7 +70,7 @@ class Dopri5(AbstractOdeSolver):
         self.b_sol = tuple([bi.to(device) for bi in self.b_sol])
         self.b_error = tuple([be.to(device) for be in self.b_error])
         self.c = tuple([ci.to(device) for ci in self.c])
-        self.c_mid = self.c_mid.to(device)
+        self.interpolation_cls.c_mid = self.interpolation_cls.c_mid.to(device)
 
     def step(
         self,
@@ -109,4 +117,4 @@ class Dopri5(AbstractOdeSolver):
             return y1, y_error, dense_info, None
 
     def build_interpolation(self, t0, t1, dense_info):
-        return FourthOrderPolynomialInterpolation(t0, t1, dense_info, self.c_mid)
+        return self.interpolation_cls(t0, t1, dense_info)

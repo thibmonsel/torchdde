@@ -155,7 +155,6 @@ def test_learning_delay_in_convex_case_adaptative(solver):
         )
         loss = lossfunc(ret, ys)
         loss.backward()
-        print(f"delays {model.delays[0]} , loss : {loss.item()}")
         opt.step()
         if loss < 1e-610:
             break
