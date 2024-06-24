@@ -17,9 +17,11 @@ class DenseInterpolation:
         self.infos = infos
         self.interpolation_cls = interpolation_cls
 
-    # def __check_init__(self):
-    #     if self.ts is not None and self.infos is not None:
-    #         assert self.ts.shape[0] == list(self.infos.values()[0]).shape[0]
+    def __check_init__(self):
+        if self.ts is not None and self.infos is not None:
+            assert (
+                self.ts.shape[0] == self.infos[list(self.infos.keys())[0]].shape[0] + 1
+            )
 
     def _interpret_t(
         self, t: Union[Float[torch.Tensor, ""], float], left: bool
@@ -65,7 +67,7 @@ class DenseInterpolation:
                     [dense_info[key].unsqueeze(0), self.infos[key]], dim=0
                 )
 
-        # self.__check_init__()
+        self.__check_init__()
 
     # @property
     # def t0(self):
