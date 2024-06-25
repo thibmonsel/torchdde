@@ -4,13 +4,9 @@ from typing import Any, Dict, Optional
 import torch
 from jaxtyping import Float
 
-from torchdde.local_interpolation.base import AbstractInterpolation
-
 
 class AbstractInterpolation(ABC):
     """Abstract class for creating new interpolation classes."""
-
-    interpolation_cls: AbstractInterpolation
 
     @abstractmethod
     def init(
