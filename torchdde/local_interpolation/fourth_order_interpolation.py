@@ -26,7 +26,7 @@ class FourthOrderPolynomialInterpolation:
         self,
         t0: Float[torch.Tensor, ""],
         t1: Float[torch.Tensor, ""],
-        dense_info: Dict[str, Float[torch.Tensor, "? batch ..."]],
+        dense_info: Dict[str, Float[torch.Tensor, "nb_stages batch ..."]],
         c_mid: Float[torch.Tensor, " nb_stages"],
     ):
         self.t0 = t0
