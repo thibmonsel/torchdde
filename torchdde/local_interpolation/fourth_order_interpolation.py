@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 
 import torch
 from jaxtyping import Float
@@ -26,7 +26,7 @@ class FourthOrderPolynomialInterpolation:
         self,
         t0: Float[torch.Tensor, ""],
         t1: Float[torch.Tensor, ""],
-        dense_info: Dict[str, Float[torch.Tensor, "nb_stages batch ..."]],
+        dense_info: Dict[str, Float[torch.Tensor, "..."]],
         c_mid: Float[torch.Tensor, " nb_stages"],
     ):
         self.t0 = t0
@@ -36,7 +36,7 @@ class FourthOrderPolynomialInterpolation:
         self.coeffs = self._calculate(dense_info)
 
     def _calculate(
-        self, dense_info: Dict[str, Float[torch.Tensor, "nb_stages batch ..."]]
+        self, dense_info: Dict[str, Float[torch.Tensor, "..."]]
     ) -> Float[torch.Tensor, "nb_stages batch ..."]:
         _ymid = dense_info["y0"] + self.dt * torch.einsum(
             "c, cbf -> bf", self.c_mid, dense_info["k"]
@@ -59,8 +59,8 @@ class FourthOrderPolynomialInterpolation:
 
     def __call__(
         self,
-        t: Float[torch.Tensor, ""],
-        t1: Optional[Float[torch.Tensor, ""]] = None,
+        t: Union[Float[torch.Tensor, " 1"], Float[torch.Tensor, ""]],
+        t1: Optional[Union[Float[torch.Tensor, " 1"], Float[torch.Tensor, ""]]] = None,
         left: Optional[bool] = True,
     ) -> Float[torch.Tensor, "batch ..."]:
         del left

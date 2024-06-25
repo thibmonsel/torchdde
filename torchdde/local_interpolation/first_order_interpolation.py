@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 
 import torch
 from jaxtyping import Float
@@ -17,7 +17,9 @@ class FirstOrderPolynomialInterpolation:
         self.y1 = dense_info["y1"]
 
     def __call__(
-        self, t: Float[torch.Tensor, ""], left: Optional[bool] = True
+        self,
+        t: Union[Float[torch.Tensor, " 1"], Float[torch.Tensor, ""]],
+        left: Optional[bool] = True,
     ) -> Float[torch.Tensor, "batch ..."]:
         dt = self.t1 - self.t0
         dt = torch.where(dt.abs() > 0.0, dt, 1.0)

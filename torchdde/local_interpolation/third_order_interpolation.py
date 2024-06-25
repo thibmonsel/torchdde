@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 
 import torch
 from jaxtyping import Float
@@ -17,16 +17,14 @@ class ThirdOrderPolynomialInterpolation:
         self,
         t0: Float[torch.Tensor, ""],
         t1: Float[torch.Tensor, ""],
-        dense_info: Dict[str, Float[torch.Tensor, "nb_stages batch ..."]],
+        dense_info: Dict[str, Float[torch.Tensor, "..."]],
     ):
         self.t0 = t0
         self.t1 = t1
         self.dt = t1 - t0
         self.coeffs = self._calculate(dense_info)
 
-    def _calculate(
-        self, dense_info: Dict[str, Float[torch.Tensor, "nb_stages batch ..."]]
-    ) -> Float[torch.Tensor, "batch 4"]:
+    def _calculate(self, dense_info: Dict[str, Float[torch.Tensor, "..."]]):
         _k0, _k1 = dense_info["k"][0], dense_info["k"][-1]
         _a = _k0 + _k1 + 2 * dense_info["y0"] - 2 * dense_info["y1"]
         _b = -2 * _k0 - _k1 - 3 * dense_info["y0"] + 3 * dense_info["y1"]
@@ -34,8 +32,8 @@ class ThirdOrderPolynomialInterpolation:
 
     def __call__(
         self,
-        t: Float[torch.Tensor, ""],
-        t1: Optional[Float[torch.Tensor, ""]] = None,
+        t: Union[Float[torch.Tensor, " 1"], Float[torch.Tensor, ""]],
+        t1: Optional[Union[Float[torch.Tensor, " 1"], Float[torch.Tensor, ""]]] = None,
         left: Optional[bool] = True,
     ) -> Float[torch.Tensor, "batch ..."]:
         del left
