@@ -47,11 +47,8 @@ class DenseInterpolation:
         if t1 is not None:
             return self.__call__(t1, left=left) - self.__call__(t0, left=left)
         t = t0 * self.direction
-        # t_bounded = self._nan_if_out_of_bounds(t)
         out = self._get_local_interpolation(t, left).__call__(t, left=left)
         return out
-        # keep = ft.partial(jnp.where, (t == self.t0_if_trivial) & (self.ts_size == 1))
-        # return jtu.tree_map(keep, self.y0_if_trivial, out)
 
     def add_point(self, t, dense_info):
         if self.direction:
@@ -68,19 +65,3 @@ class DenseInterpolation:
                 )
 
         self.__check_init__()
-
-    # @property
-    # def t0(self):
-    #     # Note that len(self.ts) == max_steps + 1 > 0 so the indexing is always valid,
-    #     # even if we throw it away because self.ts_size == 0.
-    #     ts_0 = jnp.where(self.ts_size == 1, self.t0_if_trivial, self.ts[0])
-    #     return ts_0 * self.direction
-
-    # @property
-    # def t1(self):
-    #     # Note that len(self.ts) == max_steps + 1 > 0 so the indexing is always valid,
-    #     # even if we throw it away because self.ts_size == 0.
-    #     ts_1 = jnp.where(
-    #         self.ts_size == 1, self.t0_if_trivial, self.ts[self.ts_size - 1]
-    #     )
-    #     return ts_1 * self.direction
