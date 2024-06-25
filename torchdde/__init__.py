@@ -4,6 +4,7 @@ from .global_interpolation import (
 )
 from .integrate import integrate as integrate
 from .local_interpolation import (
+    AbstractInterpolation as AbstractInterpolation,
     FirstOrderPolynomialInterpolation as FirstOrderPolynomialInterpolation,
     FourthOrderPolynomialInterpolation as FourthOrderPolynomialInterpolation,
     ThirdOrderPolynomialInterpolation as ThirdOrderPolynomialInterpolation,

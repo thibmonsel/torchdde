@@ -1,3 +1,4 @@
+from .base import AbstractInterpolation as AbstractInterpolation
 from .first_order_interpolation import (
     FirstOrderPolynomialInterpolation as FirstOrderPolynomialInterpolation,
 )
