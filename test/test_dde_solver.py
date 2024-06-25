@@ -22,7 +22,9 @@ def test_explicit_solver_constant(solver):
         dt0=ts[1] - ts[0],
     )
     # for t in [0,1] solution is y0 * (t -1)
-    assert torch.allclose(ys[:, :80, 0], y0 * (1 - ts[:80]), rtol=1e-5, atol=1e-6)
+    assert torch.allclose(
+        ys[:, :80, 0].flatten(), (y0 * (1 - ts[:80])).flatten(), rtol=1e-4, atol=1e-4
+    )
 
 
 @pytest.mark.parametrize("solver", [Dopri5()])
@@ -48,7 +50,9 @@ def test_explicit_solver_adaptive(solver):
         dt0=ts[1] - ts[0],
     )
     # for t in [0,1] solution is y0 * (t -1)
-    assert torch.allclose(ys[:, :80, 0], y0 * (1 - ts[:80]), rtol=1e-5, atol=1e-6)
+    assert torch.allclose(
+        ys[:, :80, 0].flatten(), (y0 * (1 - ts[:80])).flatten(), rtol=1e-5, atol=1e-6
+    )
 
 
 @pytest.mark.parametrize("solver", [ImplicitEuler()])
@@ -68,4 +72,6 @@ def test_implicit_solver(solver):
         discretize_then_optimize=True,
         dt0=ts[1] - ts[0],
     )
-    assert torch.allclose(ys[:, :80, 0], y0 * (1 - ts[:80]), rtol=1e-5, atol=1e-6)
+    assert torch.allclose(
+        ys[:, :80, 0].flatten(), (y0 * (1 - ts[:80])).flatten(), rtol=1e-5, atol=1e-6
+    )

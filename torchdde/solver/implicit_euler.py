@@ -15,6 +15,8 @@ class ImplicitEuler(AbstractOdeSolver):
     # of the implicit Euler method, adapted from:
     # https://github.com/DiffEqML/torchdyn/blob/95cc74b0e35330b03d2cd4d875df362a93e1b5ea/torchdyn/numerics/solvers/ode.py#L181
 
+    interpolation_cls = FirstOrderPolynomialInterpolation
+
     def __init__(self, max_iters=100):
         super().__init__()
         self.opt = torch.optim.LBFGS
@@ -89,4 +91,4 @@ class ImplicitEuler(AbstractOdeSolver):
     def build_interpolation(
         self, t0, t1, dense_info
     ) -> FirstOrderPolynomialInterpolation:
-        return FirstOrderPolynomialInterpolation(t0, t1, dense_info)
+        return self.interpolation_cls(t0, t1, dense_info)

@@ -4,7 +4,7 @@ from typing import Any, Callable, Optional, Union
 import torch
 from jaxtyping import Float, Int
 
-from torchdde.global_interpolation.linear_interpolation import TorchLinearInterpolator
+from torchdde.global_interpolation.dense_interpolation import DenseInterpolation
 from torchdde.solver.base import AbstractOdeSolver
 from torchdde.step_size_controller import (
     AbstractStepSizeController,
@@ -236,8 +236,13 @@ def _integrate_dde(
         # we have to make sur that t - tau > dt
         # otherwise we are making a prediction with
         # an unknown ys_interpolation ...
+        def cond(t, tau):
+            in_history_domain = (t - tau).item() <= t0
+            very_close_to_t0 = torch.allclose(t - tau, t0)
+            return in_history_domain or very_close_to_t0
+
         history = [
-            (ys_interpolation(t - tau) if t - tau > t0 else history_func(t - tau))  # type: ignore
+            history_func(t - tau) if cond(t, tau) else ys_interpolation(t - tau)  # type: ignore
             for tau in delays
         ]
         return func(t, y, args, history=history)
@@ -288,29 +293,30 @@ def _integrate_dde(
         step_save_idx = 0
         if keep_step:
             interp = solver.build_interpolation(state.tprev, state.tnext, dense_info)
+            #### Updating interpolators ####
+            if ys_interpolation is None:
+                ys_interpolation = DenseInterpolation(
+                    ts[1] - ts[0] > 0,
+                    solver.interpolation_cls,
+                    torch.tensor([t0, state.tnext], device=y.device),
+                    dict(
+                        zip(
+                            dense_info.keys(),
+                            [dense_info[key].unsqueeze(0) for key in dense_info.keys()],
+                        )
+                    ),
+                )
+            else:
+                ys_interpolation.add_point(state.tnext.reshape(1), dense_info)
+
             while torch.any(state.tnext >= ts[state.save_idx + step_save_idx :]):
                 #### Bookkeeping, saving values ####
                 idx = state.save_idx + step_save_idx
-                out = interp.evaluate(ts[idx])
+                out = interp(ts[idx])
                 ys[:, idx] = (
                     out.unsqueeze(1) if len(out.shape) != len(ys[:, idx].shape) else out
                 )
                 step_save_idx += 1
-                #### Updating interpolators ####
-                if ys_interpolation is None:
-                    ys_interpolation = TorchLinearInterpolator(
-                        ts[idx], out.unsqueeze(1)
-                    )
-                    if tprev > ts[state.save_idx + step_save_idx - 1]:
-                        ys_interpolation.add_point(tprev, interp.evaluate(tprev))
-                else:
-                    ys_interpolation.add_point(ts[idx].squeeze(0), out)
-                    if tprev > ts[state.save_idx + step_save_idx - 1]:
-                        # Adding the last point to the interpolator that is in btw
-                        # ts[state.save_idx + step_save_idx ] and
-                        # ts[state.save_idx + step_save_idx +1]
-                        # necessary for accurate estimation of y(t-tau) on the next step
-                        ys_interpolation.add_point(tprev, interp.evaluate(tprev))
 
         ########################################
         ##### Updating State for next step #####
@@ -405,7 +411,7 @@ def _integrate_ode(
             interp = solver.build_interpolation(state.tprev, state.tnext, dense_info)
             while torch.any(state.tnext >= ts[state.save_idx + step_save_idx :]):
                 idx = state.save_idx + step_save_idx
-                out = interp.evaluate(ts[idx])
+                out = interp(ts[idx])
                 ys[:, idx] = (
                     out.unsqueeze(1) if len(out.shape) != len(ys[:, idx].shape) else out
                 )

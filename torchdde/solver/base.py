@@ -4,14 +4,15 @@ from typing import Any, Callable, Union
 import torch
 from jaxtyping import Float
 
-
-## Great ressource : https://handwiki.org/wiki/List_of_Runge%E2%80%93Kutta_methods#Ralston's_method
+from torchdde.local_interpolation.base import AbstractInterpolation
 
 
 class AbstractOdeSolver(ABC):
     """Base class for creating ODE solvers. All solvers should inherit from it.
     To create new solvers users must implement the `init`, `step` and `order` method.
     """
+
+    interpolation_cls: AbstractInterpolation
 
     @abstractmethod
     def init(self):

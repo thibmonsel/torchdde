@@ -78,7 +78,7 @@ class nddeint_ACA(torch.autograd.Function):
 
         # computing y'(t-tau) for the contribution of
         # delay parameters in the loss w.r.t to the parameters
-        grad_ys = torch.gradient(ctx.ys, dim=1)[0] / dt
+        grad_ys = torch.gradient(ctx.ys, dim=1, spacing=(ctx.ts,))[0]
         ts_history = torch.linspace(
             ctx.ts[0] - max(ctx.func.delays).item(),
             ctx.ts[0],
@@ -91,7 +91,9 @@ class nddeint_ACA(torch.autograd.Function):
         )
         if len(ys_history_eval.shape) == 2:
             ys_history_eval = ys_history_eval[..., None]
-        grad_ys_history_func = torch.gradient(ys_history_eval, dim=1)[0] / dt
+        grad_ys_history_func = torch.gradient(
+            ys_history_eval, spacing=(ts_history,), dim=1
+        )[0]
         grad_ys = torch.cat((grad_ys_history_func, grad_ys), dim=1)
 
         # adjoint history shape [N, N_t=1, D]
