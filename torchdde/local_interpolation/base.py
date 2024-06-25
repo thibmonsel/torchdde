@@ -13,7 +13,7 @@ class AbstractInterpolation(ABC):
         self,
         t0: Float[torch.Tensor, ""],
         t1: Float[torch.Tensor, ""],
-        dense_info: Dict[str, Float[torch.Tensor, "? batch ..."]],
+        dense_info: Dict[str, Float[torch.Tensor, "nb_stages batch ..."]],
         *args: Any,
     ):
         """
