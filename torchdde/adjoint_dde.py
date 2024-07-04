@@ -104,7 +104,7 @@ class nddeint_ACA(torch.autograd.Function):
         adjoint_ys_final = -grad_output[:, -1].reshape(
             adjoint_state.shape[0], 1, *adjoint_state.shape[1:]
         )
-        add_t = torch.tensor([ctx.t1, ctx.t1 + dt], device=ctx.ts.device)
+        add_t = torch.tensor([ctx.t1, 10 * ctx.t1], device=ctx.ts.device)
 
         adjoint_interpolator = TorchLinearInterpolator(
             add_t,
@@ -222,42 +222,52 @@ class nddeint_ACA(torch.autograd.Function):
                         if _2 is not None:
                             _1 += -dt.abs() * _2
 
-        # adding the last contribution of the delay
-        # parameters in the loss w.r.t. the parameters
-        # ie which is the last part of the integration
-        # from t = 0 to t = -tau
-        for idx, tau_i in enumerate(ctx.func.delays):
-            ts_history_i = torch.linspace(
-                ctx.t0 - tau_i.item(), ctx.t0, int(tau_i.item() / dt.abs())
-            ).to(ctx.ts.device)
-            for k in range(len(ts_history_i) - 1, 0, -1):
-                t = ts_history_i[k]
-                with torch.enable_grad():
-                    h_t = torch.autograd.Variable(
-                        (state_interpolator(t) if t > ctx.t0 else ctx.history_func(t)),
-                        requires_grad=True,
-                    )
-                    adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
-                    h_t_plus_tau = state_interpolator(t + tau_i)
-                    history = [
-                        (
-                            state_interpolator(t + tau_i - tau_j)
-                            if t + tau_i - tau_j >= ctx.t0
-                            else ctx.history_func(t + tau_i - tau_j)
+        # Checking if the history function is a nn.Module
+        # If it is, we need to compute the last contribution
+        # of the dL/dtheta
+        if isinstance(ctx.history_func, nn.Module):
+            # adding the last contribution of the delay
+            # parameters in the loss w.r.t. the parameters
+            # ie which is the last part of the integration
+            # from t = 0 to t = -tau
+            for idx, tau_i in enumerate(ctx.func.delays):
+                ts_history_i = torch.linspace(
+                    ctx.t0 - tau_i.item(), ctx.t0, int(tau_i.item() / dt.abs())
+                ).to(ctx.ts.device)
+                for k in range(len(ts_history_i) - 1, 0, -1):
+                    t = ts_history_i[k]
+                    with torch.enable_grad():
+                        h_t = torch.autograd.Variable(
+                            (
+                                state_interpolator(t)
+                                if t > ctx.t0
+                                else ctx.history_func(t)
+                            ),
+                            requires_grad=True,
                         )
-                        for tau_j in ctx.func.delays
-                    ]
-                    history[idx] = h_t
-                    out_other = ctx.func(t + tau_i, h_t_plus_tau, args, history=history)
-                    rhs_adjoint_inc = torch.autograd.grad(
-                        out_other, h_t, -adjoint_t_plus_tau
-                    )[0]
-                    # remaining contribution of the delay in the gradient's
-                    # loss ie int_{-\tau}^{0} \pdv{f(x_{t+\tau}, x_{t})}{x_t} x'(t) dt
-                    delay_derivative_inc[idx] += torch.sum(
-                        rhs_adjoint_inc * grad_ys[:, k],
-                        dim=(tuple(range(len(rhs_adjoint_inc.shape)))),
-                    )
+                        adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
+                        h_t_plus_tau = state_interpolator(t + tau_i)
+                        history = [
+                            (
+                                state_interpolator(t + tau_i - tau_j)
+                                if t + tau_i - tau_j >= ctx.t0
+                                else ctx.history_func(t + tau_i - tau_j)
+                            )
+                            for tau_j in ctx.func.delays
+                        ]
+                        history[idx] = h_t
+                        out_other = ctx.func(
+                            t + tau_i, h_t_plus_tau, args, history=history
+                        )
+                        rhs_adjoint_inc = torch.autograd.grad(
+                            out_other, h_t, -adjoint_t_plus_tau
+                        )[0]
+                        # remaining contribution of the delay in the gradient's loss
+                        # int_{-\tau}^{0} \pdv{f(x_{t+\tau}, x_{t})}{x_t} x'(t) dt
+                        delay_derivative_inc[idx] += torch.sum(
+                            rhs_adjoint_inc * grad_ys[:, k],
+                            dim=(tuple(range(len(rhs_adjoint_inc.shape)))),
+                        )
 
         if out3 is not None:
             for _1, _2 in zip([*out3], [*delay_derivative_inc]):
