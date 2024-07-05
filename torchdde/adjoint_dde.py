@@ -104,7 +104,9 @@ class nddeint_ACA(torch.autograd.Function):
         adjoint_ys_final = -grad_output[:, -1].reshape(
             adjoint_state.shape[0], 1, *adjoint_state.shape[1:]
         )
-        add_t = torch.tensor([ctx.t1, 10 * ctx.t1], device=ctx.ts.device)
+        add_t = torch.tensor(
+            [ctx.t1, 2 * max(ctx.func.delays) * ctx.t1], device=ctx.ts.device
+        )
 
         adjoint_interpolator = TorchLinearInterpolator(
             add_t,
@@ -158,7 +160,8 @@ class nddeint_ACA(torch.autograd.Function):
                     rhs_adjoint_1 += rhs_adjoint_2
 
                     # contribution of the delay in the gradient's loss
-                    # ie int_0^{T-\tau} \pdv{f(x_{t+\tau}, x_{t})}{x_t} x'(t) dt
+                    # ie int_0^{T-\tau} - lambda(t+\tau) \
+                    # \pdv{f(x_{t+\tau}, x_{t})}{x_t} x'(t) dt
                     delay_derivative_inc[idx] += torch.sum(
                         rhs_adjoint_2 * grad_ys[:, -1 - j],
                         dim=(tuple(range(len(rhs_adjoint_2.shape)))),
@@ -230,6 +233,15 @@ class nddeint_ACA(torch.autograd.Function):
             # parameters in the loss w.r.t. the parameters
             # ie which is the last part of the integration
             # from t = 0 to t = -tau
+            # we must have that T > tau otherwise
+            # the integral isn't properly defined
+            # There is no mention of this anywhere in
+            # the litterature so this an assumption
+            if (ctx.t1 - ctx.t0) < max(ctx.func.delays):
+                raise ValueError(
+                    "The integration span `t1-t0` must \
+                    be greater than the maximum delay"
+                )
             for idx, tau_i in enumerate(ctx.func.delays):
                 ts_history_i = torch.linspace(
                     ctx.t0 - tau_i.item(), ctx.t0, int(tau_i.item() / dt.abs())
