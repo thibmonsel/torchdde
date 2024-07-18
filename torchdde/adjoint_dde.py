@@ -219,7 +219,7 @@ class nddeint_ACA(torch.autograd.Function):
                             _1 += dt.abs() * _2
 
                 if out3 is None:
-                    out3 = tuple([dt.abs() * p for p in delay_derivative_inc])
+                    out3 = tuple([-dt.abs() * p for p in delay_derivative_inc])
                 else:
                     for _1, _2 in zip([*out3], [*delay_derivative_inc]):
                         if _2 is not None:
