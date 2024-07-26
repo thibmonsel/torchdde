@@ -162,7 +162,7 @@ def _integrate(
     if delays is not None:
         assert isinstance(y0, Callable)
         history_func = y0
-        y0_ = history_func(ts[0])
+        y0_ = history_func(t0)
         return _integrate_dde(
             func,
             t0,
@@ -260,7 +260,9 @@ def _integrate_dde(
         torch.tensor([0], device=y0.device),
         torch.tensor([0], device=y0.device),
     )
-    ys = torch.empty((y0.shape[0], ts.shape[0], *(y0.shape[1:])), device=y0.device)
+    ys = torch.empty(
+        (y0.shape[0], ts.shape[0], *(y0.shape[1:])), device=y0.device, dtype=y0.dtype
+    )
     ys_interpolation = None
     cond = state.tprev < t1 if (t1 > t0) else state.tprev > t1
     while cond and state.num_steps < max_steps:
@@ -383,7 +385,9 @@ def _integrate_ode(
         torch.tensor([0], device=y0.device),
         torch.tensor([0], device=y0.device),
     )
-    ys = torch.empty((y0.shape[0], ts.shape[0], *(y0.shape[1:])), device=y0.device)
+    ys = torch.empty(
+        (y0.shape[0], ts.shape[0], *(y0.shape[1:])), device=y0.device, dtype=y0.dtype
+    )
     cond = state.tprev < t1 if (t1 > t0) else state.tprev > t1
     while cond and state.num_steps < max_steps:
         y, y_error, dense_info, aux = solver.step(
