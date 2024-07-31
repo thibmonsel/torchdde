@@ -105,7 +105,7 @@ class nddeint_ACA(torch.autograd.Function):
             adjoint_state.shape[0], 1, *adjoint_state.shape[1:]
         )
         add_t = torch.tensor(
-            [ctx.t1, 2 * max(ctx.func.delays) * ctx.t1], device=ctx.ts.device
+            [ctx.t1, 2 * max(ctx.func.delays) + ctx.t1], device=ctx.ts.device
         )
 
         adjoint_interpolator = TorchLinearInterpolator(
