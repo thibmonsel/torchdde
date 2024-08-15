@@ -22,7 +22,7 @@ class TorchLinearInterpolator:
 
         if ys.shape[1] != ts.shape[0]:
             raise ValueError(
-                "Must have ts.shape[0] == ys.shape[0], that is to say the same "
+                "Must have ts.shape[0] == ys.shape[1], that is to say the same "
                 "number of entries along the timelike dimension."
             )
 
