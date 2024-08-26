@@ -133,6 +133,7 @@ class nddeint_ACA(torch.autograd.Function):
                 h_t,
                 -adjoint_y,
                 retain_graph=True,
+                allow_unused=True,
             )[0]
 
             # we need to add the second term of rhs too in rhs_adjoint computation
