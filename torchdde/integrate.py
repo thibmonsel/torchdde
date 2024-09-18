@@ -78,7 +78,7 @@ def integrate(
     - `dt0`: The step size to use for the first step. If you are
         using a fixed step sizes then this will also be the step size
         for all other steps. If set as `None` then the
-        initial  step size will be determined automatically,
+        initial  step  size will be determined automatically,
         only available for `torchdde.AdaptiveStepSizeController`.
     - `delays`: The initial values given to the constant delays for the DDE.
         If set to `None` then the system is treated as an ODE.
