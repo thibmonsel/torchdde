@@ -1,20 +1,20 @@
 <h1 align='center'>torchdde</h1>
 <!-- <h2 align='center'> Constant lag delay differential equations solver</h2> -->
 
-`torchdde` is a [Pytorch](https://github.com/pytorch/pytorch)-based library providing Constant Lag Delay Differential Equations (DDEs) training neural networks via the adjoint method.
+`torchdde` is a library that provides numerical solvers in [Pytorch](https://github.com/pytorch/pytorch) for Delay Differential Equations (DDEs) with constant delays.
+
 
 ## Installation
 
 ```bash
-pip install git@github.com:usr/torchdde.git
+pip install git@github.com:thibmonsel/torchdde.git
 ```
 
 or locally
 
 ```bash
-git clone https://github.com/usr/torchdde.git
-cd torchdde/
-pip install .
+git clone https://github.com/thibmonsel/torchdde.git
+pip install torchdde/
 ```
 
 ## Documentation
