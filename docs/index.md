@@ -1,44 +1,39 @@
-# torchdde
+<h1 align='center'>torchdde</h1>
+<!-- <h2 align='center'> Constant lag delay differential equations solver</h2> -->
 
-`torchdde` is a library providing Constant Lag Delay Differential Equations (DDEs) training neural networks via the adjoint method compatible with [Pytorch](https://github.com/pytorch/pytorch).
+`torchdde` is a library that provides numerical solvers in [Pytorch](https://github.com/pytorch/pytorch) for Delay Differential Equations (DDEs) with constant delays.
+
 
 ## Installation
 
 ```bash
-pip install git@github.com:usr/torchdde.git
+pip install git@github.com:thibmonsel/torchdde.git
 ```
 
 or locally
 
 ```bash
-git clone https://github.com/usr/torchdde.git
-cd torchdde/
-pip install .
+git clone https://github.com/thibmonsel/torchdde.git
+pip install torchdde/
 ```
 
-## Quick examples
+## Documentation
 
-`torchdde` can solve constant lag DDEs :
+To generate the documentation locally, please look at `CONTRIBUTING.MD`.
+
+## Quick example
+
 ```python
-import torchdde
 import torch
+from torchdde import integrate, RK2
 
 def f(t, y, args, history):
     return y * (1 - history[0])
 
+solver = RK2()
 delays = torch.tensor([1.0])
 history_values = torch.arange(1, 5).reshape(-1, 1)
 history_function = lambda t: history_values
-ts = torch.linspace(0, 20, 201)
-solution = torchdde.integrate(
-    f,
-    torchdde.RK2(),
-    ts[0],
-    ts[-1],
-    ts,
-    history_function,
-    None,
-    dt0=ts[1] - ts[0],
-    delays=delays,
-)
+solution = integrate(f, solver, ts[0], ts[-1], ts, y0, None, dt0=ts[1]-ts[0], delays=delays)
+
 ```
