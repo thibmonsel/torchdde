@@ -4,7 +4,7 @@
 
     This library only supports constant lag DDEs. Therefore we are unable to model time and state dependent DDEs.
 
-This examples trains a Neural DDE to reproduce a simple dataset of a delay logistic equation. The backward pass is computed with the adjoint method.
+This examples trains a Neural DDE to reproduce a simple dataset of a delay logistic equation. In this example, the backward pass is computed with the adjoint method.
 
 ```python
 import time
@@ -19,7 +19,7 @@ from torchvision.ops import MLP
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ```
 
-Recalling that a neural DDE is defined as
+Recalling that a Neural DDE is defined as
 
 $$\frac{dy}{dt} = f_{\theta}(t, y(t), y(t-\tau_1), \dots, y(t-\tau_{n})), \quad y(t<0) = \psi(t)$$
 

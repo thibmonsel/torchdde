@@ -1,6 +1,7 @@
 # Getting Started
 
-## DDES
+## Integrating ...
+### ... DDEs
 
 We provide an illustrative example which solves the following DDE :
 
@@ -40,7 +41,7 @@ solution = torchdde.integrate(simple_dde, solver, ts[0], ts[-1], ts, history_fun
 - The solution is saved at each time stamp in `ts`.
 - The initial step size is equal to `ts[1]-ts[0]`.
 
-## ODEs
+### ... ODEs
 
 We provide an illustrative example which solves the following ODE :
 

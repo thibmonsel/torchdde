@@ -22,6 +22,12 @@ pip install torchdde/
 To generate the documentation locally, please look at `CONTRIBUTING.MD`.
 
 ## Quick example
+!!! warning
+
+    This a brand new library, please reach out for feedback, issues !
+
+
+## Quick examples
 
 ```python
 import torch

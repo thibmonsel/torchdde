@@ -69,13 +69,15 @@ def integrate(
     - `t0`: The start of the region of integration.
     - `t1`: The end of the region of integration.
     - `ts` : The time points at which to return the solution.
-    - `y0`: The initial value.
+    - `y0`: The initial value. This is either a tensor (for ODEs) or a
+            history function callable (for DDEs)
     - `args`: Any additional arguments to pass to the vector field.
     - `stepsize_controller`: How to change the step size as the integration progresses.
         See the [list of stepsize controllers](../usage/stepsize-controller.md).
         Defaults set to `ConstantStepSizeController`.
-    - `dt0`: The step size to use for the first step. If using fixed step sizes then
-        this will also be the step size for all other steps. If set as `None` then the
+    - `dt0`: The step size to use for the first step. If you are
+        using a fixed step sizes then this will also be the step size
+        for all other steps. If set as `None` then the
         initial step size will be determined automatically,
         only available for `torchdde.AdaptiveStepSizeController`.
     - `delays`: The initial values given to the constant delays for the DDE.
@@ -88,7 +90,7 @@ def integrate(
 
     **Returns:**
 
-    Returns the solution to the differential equation.
+    Returns the solution of the differential equation.
     """
 
     # imported here to handle circular dependencies
