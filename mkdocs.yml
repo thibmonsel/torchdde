@@ -102,5 +102,6 @@ nav:
       - 'usage/training-de.md'
       - 'usage/neural-dde.md'
       - 'usage/faq.md'
+      - 'usage/contribute.md'
   - Interpolators : 
       - 'interpolators/linear-interpolator.md'

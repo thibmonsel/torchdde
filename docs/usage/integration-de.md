@@ -4,7 +4,7 @@ First, there are a lot of available package to use to train/integrate Neural ODE
 
 Regarless, the only entry point to integrate ODEs/DDEs is the `integrate` function.
 
-What essentially differentiates a DDE with an ODE are :
+What essentially differentiates DDEs with ODEs are :
 
 - the vector field definition.
 - the `delays` argument specification.  
