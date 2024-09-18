@@ -1,7 +1,7 @@
 [project]
 name = "torchdde"
 version = "0.0.1"
-description = "GPU+autodiff-capable ODE/SDE/CDE solvers written in JAX."
+description = "DDE numerical solvers in Python."
 readme = "README.md"
 requires-python ="~=3.9"
 license = {file = "LICENSE"}
@@ -23,7 +23,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Mathematics",
 ]
 urls = {repository = "https://github.com/thibmonsel/torchdde" }
-dependencies = ["torch>=2.1", "matplotlib", "numpy", "scipy", "jaxtyping>=0.2.24", "typing_extensions>=4.5.0"]
+dependencies = ["torch>=2.1", "jaxtyping>=0.2.24", "typing_extensions>=4.5.0"]
 
 [build-system]
 requires = ["hatchling"]
