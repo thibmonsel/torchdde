@@ -47,11 +47,11 @@ class AbstractOdeSolver(ABC):
 
         **Arguments:**
 
-        - `func`: Pytorch model, i.e vector field
+        - `func`: Pytorch model or callable function, i.e vector field
         - `t`: Current time step `t`
         - `y`: Current state `y`
         - `dt`: Step size `dt`
-        - `has_aux`: Whether the model has an auxiliary output.
+        - `has_aux`: Whether the model/callable has an auxiliary output.
 
         ??? tip "has_aux ?"
 
@@ -60,7 +60,7 @@ class AbstractOdeSolver(ABC):
             def f(t,y,args):
                 return -y, ("Hello World",1)
             ```
-            This `kwargs` argument is used to compute the adjoint method
+            The `has_aux` `kwargs` argument is used to compute the adjoint method
 
         **Returns:**
 
