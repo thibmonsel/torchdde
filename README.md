@@ -6,7 +6,7 @@ torchdde is a library that provides numerical solvers in Pytorch for Delay Diffe
 ## Installation
 
 ```bash
-pip install git@github.com:thibmonsel/torchdde.git
+pip install torchdde
 ```
 
 or locally
