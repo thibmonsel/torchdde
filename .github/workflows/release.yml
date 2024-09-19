@@ -47,7 +47,7 @@ jobs:
       id-token: write
 
     steps:
-    - name: Download all the dists
+    - name: Download all the distss
       uses: actions/download-artifact@v4
       with:
         name: python-package-distributions
