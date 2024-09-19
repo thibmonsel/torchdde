@@ -269,13 +269,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#quick-examples" class="md-nav__link">
-    Quick examples
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -499,6 +492,10 @@
 <!-- <h2 align='center'> Constant lag delay differential equations solver</h2> -->
 
 <p><code>torchdde</code> is a library that provides numerical solvers in <a href="https://github.com/pytorch/pytorch">Pytorch</a> for Delay Differential Equations (DDEs) with constant delays.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This a brand new library, please reach out for feedback, issues !</p>
+</div>
 <h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">¤</a></h2>
 <div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>git@github.com:thibmonsel/torchdde.git
 </code></pre></div>
@@ -509,11 +506,6 @@ pip<span class="w"> </span>install<span class="w"> </span>torchdde/
 <h2 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">¤</a></h2>
 <p>To generate the documentation locally, please look at <code>CONTRIBUTING.MD</code>.</p>
 <h2 id="quick-example">Quick example<a class="headerlink" href="#quick-example" title="Permanent link">¤</a></h2>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>This a brand new library, please reach out for feedback, issues !</p>
-</div>
-<h2 id="quick-examples">Quick examples<a class="headerlink" href="#quick-examples" title="Permanent link">¤</a></h2>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">from</span> <span class="nn">torchdde</span> <span class="kn">import</span> <span class="n">integrate</span><span class="p">,</span> <span class="n">RK2</span>
 
