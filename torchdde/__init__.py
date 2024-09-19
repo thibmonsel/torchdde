@@ -1,3 +1,5 @@
+import importlib.metadata
+
 from .global_interpolation import (
     DenseInterpolation as DenseInterpolation,
     TorchLinearInterpolator as TorchLinearInterpolator,
@@ -14,7 +16,6 @@ from .solver import (
     Dopri5 as Dopri5,
     Euler as Euler,
     ImplicitEuler as ImplicitEuler,
-    Ralston as Ralston,
     RK2 as RK2,
     RK4 as RK4,
 )
@@ -25,4 +26,4 @@ from .step_size_controller import (
 )
 
 
-__version__ = "0.1.0"
+__version__ = importlib.metadata.version("torchdde")

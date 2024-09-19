@@ -17,10 +17,6 @@ Only some explicit solvers are available to use but adding new ones is rather si
 ::: torchdde.Euler
     selection:
         members: false
-
-::: torchdde.Ralston
-    selection:
-        members: false
 ::: torchdde.RK2
     selection:
         members: false
