@@ -16,7 +16,7 @@
     
     
       
-        <title>Getting Started - torchdde</title>
+        <title>Stepsize controller - torchdde</title>
       
     
     
@@ -77,7 +77,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#getting-started" class="md-skip">
+        <a href="#torchdde.ConstantStepSizeController" class="md-skip">
           Skip to content
         </a>
       
@@ -108,7 +108,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Getting Started
+              Stepsize controller
             
           </span>
         </div>
@@ -261,73 +261,11 @@
               
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          Getting Started
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
         Getting Started
       </a>
-      
-        
-
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#integrating" class="md-nav__link">
-    Integrating ...
-  </a>
-  
-    <nav class="md-nav" aria-label="Integrating ...">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#ddes" class="md-nav__link">
-    ... DDEs
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#odes" class="md-nav__link">
-    ... ODEs
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -365,11 +303,56 @@
               
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../stepsize-controller/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Stepsize controller
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         Stepsize controller
       </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#torchdde.ConstantStepSizeController" class="md-nav__link">
+    ConstantStepSizeController
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#torchdde.AdaptiveStepSizeController" class="md-nav__link">
+    AdaptiveStepSizeController
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -500,75 +483,120 @@
               
                 
                 
-                <h1 id="getting-started">Getting Started<a class="headerlink" href="#getting-started" title="Permanent link">¤</a></h1>
-<h2 id="integrating">Integrating ...<a class="headerlink" href="#integrating" title="Permanent link">¤</a></h2>
-<h3 id="ddes">... DDEs<a class="headerlink" href="#ddes" title="Permanent link">¤</a></h3>
-<p>We provide an illustrative example which solves the following DDE :</p>
-<p><span class="arithmatex">\(\frac{dy}{dt}= -y(t-2), \quad \psi(t&lt;0) = 2\)</span> over the interval <span class="arithmatex">\([0, 5]\)</span>.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
-<span class="kn">from</span> <span class="nn">torchdde</span> <span class="kn">import</span> <span class="n">RK4</span>
-<span class="kn">import</span> <span class="nn">torch</span>
-
-<span class="k">def</span> <span class="nf">simple_dde</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">history</span><span class="p">):</span>
-    <span class="k">return</span> <span class="o">-</span><span class="n">history</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                  <h1>Stepsize controller</h1>
+                
+                <p>In order to adjust the time stepping during integrating we provide <a class="autorefs autorefs-internal" href="#torchdde.AdaptiveStepSizeController"><code>torchdde.AdaptiveStepSizeController</code></a> for adaptive methods (like <a class="autorefs autorefs-internal" href="../solvers/#torchdde.Dopri5"><code>torchdde.Dopri5</code></a>) and <a class="autorefs autorefs-internal" href="#torchdde.ConstantStepSizeController"><code>torchdde.ConstantStepSizeController</code></a> for constant stepsive methods (like <a class="autorefs autorefs-internal" href="../solvers/#torchdde.RK4"><code>torchdde.RK4</code></a>).</p>
 
 
-<span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cuda:0&quot;</span> <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">()</span> <span class="k">else</span> <span class="s2">&quot;cpu&quot;</span><span class="p">)</span>
+  <div class="doc doc-object doc-class">
 
-<span class="c1"># Define the time span of the DDE</span>
-<span class="n">ts</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">51</span><span class="p">)</span>
-<span class="n">ts</span> <span class="o">=</span> <span class="n">ts</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
 
-<span class="c1"># Define the delays, here there is only one tau=2.0</span>
-<span class="n">delays</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">2.0</span><span class="p">])</span>
-<span class="n">delays</span> <span class="o">=</span> <span class="n">delays</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
 
-<span class="c1"># Defining a constant history function for the DDE</span>
-<span class="n">history_values</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">3.0</span><span class="p">])</span>
-<span class="n">history_values</span> <span class="o">=</span> <span class="n">history_values</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-<span class="n">history_values</span> <span class="o">=</span> <span class="n">history_values</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
-<span class="n">history_function</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="n">history_values</span>
+<h4 id="torchdde.ConstantStepSizeController" class="doc doc-heading">
+        <code>
+torchdde.ConstantStepSizeController        </code>
 
-<span class="c1"># Solve the DDE by using the RK4 method</span>
-<span class="n">solver</span> <span class="o">=</span> <span class="n">RK4</span><span class="p">()</span>
-<span class="n">solution</span> <span class="o">=</span> <span class="n">torchdde</span><span class="o">.</span><span class="n">integrate</span><span class="p">(</span><span class="n">simple_dde</span><span class="p">,</span> <span class="n">solver</span><span class="p">,</span> <span class="n">ts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">ts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">ts</span><span class="p">,</span> <span class="n">history_function</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">dt0</span><span class="o">=</span><span class="n">ts</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">ts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">delays</span><span class="o">=</span><span class="n">delays</span><span class="p">)</span>
-</code></pre></div>
+
+
+<a href="#torchdde.ConstantStepSizeController" class="headerlink" title="Permanent link">¤</a></h4>
+
+    <div class="doc doc-contents first">
+
+      <p>Constant step size controller that always returns the same step size.</p>
+<p>The user must define <code>dt0</code> via <a class="autorefs autorefs-internal" href="../integration-de/#torchdde.integrate.integrate"><code>torchdde.integrate.integrate</code></a></p>
+
+
+
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-class">
+
+
+
+<h4 id="torchdde.AdaptiveStepSizeController" class="doc doc-heading">
+        <code>
+torchdde.AdaptiveStepSizeController        </code>
+
+
+
+<a href="#torchdde.AdaptiveStepSizeController" class="headerlink" title="Permanent link">¤</a></h4>
+
+    <div class="doc doc-contents first">
+
+      <p>Adapts the step size to produce a solution accurate to a given tolerance.
+The tolerance is calculated as <code>atol + rtol * y</code> for the evolving solution <code>y</code>.</p>
+<p>Steps are adapted using a PID controller.</p>
+<details class="tip">
+<summary>Choosing tolerances</summary>
+<p>The choice of <code>rtol</code> and <code>atol</code> are used to determine how accurately you would
+like the numerical approximation to your equation. If you are solving a problem
+"harder" problem then you probably need to raise the tolerances to get an
+appropriate solution.</p>
+<p>Default values usually are <code>rtol=1e-3</code> and <code>atol=1e-6</code>.</p>
+</details>
+<details class="tip">
+<summary>Choosing PID coefficients</summary>
+<p>We refer the reader to <code>Diffrax</code> clear explanation
+<a href="https://docs.kidger.site/diffrax/api/stepsize_controller/">here</a>.</p>
+</details>
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-object doc-method">
+
+
+
+<h5 id="torchdde.AdaptiveStepSizeController.__init__" class="doc doc-heading">
+<code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">atol</span><span class="p">,</span> <span class="n">rtol</span><span class="p">,</span> <span class="n">safety</span> <span class="o">=</span> <span class="mf">0.9</span><span class="p">,</span> <span class="n">pcoeff</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">icoeff</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">dcoeff</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">factormax</span> <span class="o">=</span> <span class="mf">10.0</span><span class="p">,</span> <span class="n">dtmin</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">dtmax</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span></code>
+
+
+<a href="#torchdde.AdaptiveStepSizeController.__init__" class="headerlink" title="Permanent link">¤</a></h5>
+
+    <div class="doc doc-contents ">
+
+      <p><strong>Arguments:</strong></p>
 <ul>
-<li>The numerical solver used is <code>RK4</code> is the 4th Runge Kutta method.</li>
-<li>The solution is saved at each time stamp in <code>ts</code>.</li>
-<li>The initial step size is equal to <code>ts[1]-ts[0]</code>.</li>
+<li><code>atol</code>: Absolute tolerance.</li>
+<li><code>rtol</code>: Relative tolerance.</li>
+<li><code>safety</code>: Multiplicative safety factor.</li>
+<li><code>pcoeff</code>: The coefficient of the proportional part of the step size control.</li>
+<li><code>icoeff</code>: The coefficient of the integral part of the step size control.</li>
+<li><code>dcoeff</code>: The coefficient of the derivative part of the step size control.</li>
+<li><code>factormax</code>: Maximum amount a step size can be increased relative to the previous
+    step.</li>
+<li><code>dtmin</code>: Minimum step size. The step size is either clipped to this value, or an
+    error raised if the step size decreases below this, depending on <code>force_dtmin</code>.</li>
+<li><code>dtmax</code>: Maximum step size; the step size is clipped to this value.</li>
 </ul>
-<h3 id="odes">... ODEs<a class="headerlink" href="#odes" title="Permanent link">¤</a></h3>
-<p>We provide an illustrative example which solves the following ODE :</p>
-<p><span class="arithmatex">\(\frac{dy}{dt}= -y(t)^{2}, \quad y(0) = 2\)</span> over the interval <span class="arithmatex">\([0, 5]\)</span>.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
-<span class="kn">from</span> <span class="nn">torchdde</span> <span class="kn">import</span> <span class="n">RK4</span>
-<span class="kn">import</span> <span class="nn">torch</span>
 
-<span class="k">def</span> <span class="nf">simple_ode</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
-    <span class="k">return</span> <span class="o">-</span><span class="n">y</span><span class="o">**</span><span class="mi">2</span>
+    </div>
+
+  </div>
 
 
-<span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cuda:0&quot;</span> <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">()</span> <span class="k">else</span> <span class="s2">&quot;cpu&quot;</span><span class="p">)</span>
 
-<span class="c1"># Define the time span of the ODE</span>
-<span class="n">ts</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">51</span><span class="p">)</span>
-<span class="n">ts</span> <span class="o">=</span> <span class="n">ts</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
 
-<span class="c1"># Initial condition </span>
-<span class="n">y0</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">3.0</span><span class="p">])</span>
-<span class="n">y0</span> <span class="o">=</span> <span class="n">y0</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-<span class="n">y0</span> <span class="o">=</span> <span class="n">y0</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
 
-<span class="c1"># Solve the ODE by using the RK4 method</span>
-<span class="n">solver</span> <span class="o">=</span> <span class="n">RK4</span><span class="p">()</span>
-<span class="n">solution</span> <span class="o">=</span> <span class="n">torchdde</span><span class="o">.</span><span class="n">integrate</span><span class="p">(</span><span class="n">simple_ode</span><span class="p">,</span> <span class="n">solver</span><span class="p">,</span> <span class="n">ts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">ts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">ts</span><span class="p">,</span> <span class="n">y0</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">dt0</span><span class="o">=</span><span class="n">ts</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">ts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">delays</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
-</code></pre></div>
-<ul>
-<li>The numerical solver used is <code>RK4</code> is the 4th Runge Kutta method.</li>
-<li>The solution is saved at each time stamp in <code>ts</code>.</li>
-<li>The initial step size is equal to <code>ts[1]-ts[0]</code>.</li>
-</ul>
+  </div>
+
+    </div>
+
+  </div>
                 
               
               
@@ -588,7 +616,7 @@
     <nav class="md-footer__inner md-grid" aria-label="Footer">
       
         
-        <a href="../.." class="md-footer__link md-footer__link--prev" aria-label="Previous: Home" rel="prev">
+        <a href="../integration-de/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Integration" rel="prev">
           <div class="md-footer__button md-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
           </div>
@@ -597,20 +625,20 @@
               <span class="md-footer__direction">
                 Previous
               </span>
-              Home
+              Integration
             </div>
           </div>
         </a>
       
       
         
-        <a href="../solvers/" class="md-footer__link md-footer__link--next" aria-label="Next: Numerical Solvers" rel="next">
+        <a href="../training-de/" class="md-footer__link md-footer__link--next" aria-label="Next: Training" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">
                 Next
               </span>
-              Numerical Solvers
+              Training
             </div>
           </div>
           <div class="md-footer__button md-icon">

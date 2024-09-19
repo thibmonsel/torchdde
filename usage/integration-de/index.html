@@ -16,7 +16,7 @@
     
     
       
-        <title>Training a ODE - torchdde</title>
+        <title>Integration - torchdde</title>
       
     
     
@@ -77,7 +77,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#training-a-ode" class="md-skip">
+        <a href="#integration" class="md-skip">
           Skip to content
         </a>
       
@@ -108,7 +108,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Training a ODE
+              Integration
             
           </span>
         </div>
@@ -219,7 +219,7 @@
   
     <li class="md-nav__item">
       <a href="../.." class="md-nav__link">
-        torchdde
+        Home
       </a>
     </li>
   
@@ -277,36 +277,8 @@
   
   
     <li class="md-nav__item">
-      <a href="../neural-dde/" class="md-nav__link">
-        Neural DDE
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../solvers/" class="md-nav__link">
         Numerical Solvers
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../training-dde/" class="md-nav__link">
-        Training a DDE
       </a>
     </li>
   
@@ -329,12 +301,12 @@
       
       
         <label class="md-nav__link md-nav__link--active" for="__toc">
-          Training a ODE
+          Integration
           <span class="md-nav__icon md-icon"></span>
         </label>
       
       <a href="./" class="md-nav__link md-nav__link--active">
-        Training a ODE
+        Integration
       </a>
       
         
@@ -354,28 +326,8 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#optimize-then-discretize" class="md-nav__link">
-    optimize-then-discretize
-  </a>
-  
-    <nav class="md-nav" aria-label="optimize-then-discretize">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#torchdde.odesolve_adjoint" class="md-nav__link">
-    odesolve_adjoint()
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#discretize-then-optimize" class="md-nav__link">
-    discretize-then-optimize
+  <a href="#torchdde.integrate.integrate" class="md-nav__link">
+    integrate()
   </a>
   
 </li>
@@ -395,8 +347,64 @@
   
   
     <li class="md-nav__item">
+      <a href="../stepsize-controller/" class="md-nav__link">
+        Stepsize controller
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../training-de/" class="md-nav__link">
+        Training
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../neural-dde/" class="md-nav__link">
+        Neural DDE
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../faq/" class="md-nav__link">
         FAQ
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contribute/" class="md-nav__link">
+        Contribute
       </a>
     </li>
   
@@ -472,52 +480,75 @@
               
                 
                 
-                <h1 id="training-a-ode">Training a ODE<a class="headerlink" href="#training-a-ode" title="Permanent link">¤</a></h1>
-<p>First, there are a lot of available package to use to train Neural ODEs, <a href="https://github.com/rtqichen/torchdiffeq">torchdiffeq</a> (not maintained anymore) in Pytorch and <a href="https://github.com/patrick-kidger/diffrax">Diffrax</a>. This means that this library doesn't have any many features since it focuses more on DDEs.</p>
-<p>Two following ways are possible to train Neural ODE :</p>
+                <h1 id="integration">Integration<a class="headerlink" href="#integration" title="Permanent link">¤</a></h1>
+<p>First, there are a lot of available package to use to train/integrate Neural ODEs, <a href="https://github.com/rtqichen/torchdiffeq">torchdiffeq</a> (not maintained anymore) in Pytorch and <a href="https://github.com/patrick-kidger/diffrax">Diffrax</a> (which is the gold standard here). This means that this library doesn't have any many features since it focuses more on DDEs.</p>
+<p>Regarless, the only entry point to integrate ODEs/DDEs is the <code>integrate</code> function.</p>
+<p>What essentially differentiates DDEs with ODEs are :</p>
 <ul>
-<li>optimize-then-discretize</li>
-<li>discretize-then-optimize</li>
+<li>the vector field definition.</li>
+<li>the <code>delays</code> argument specification.  </li>
 </ul>
-<p>Please see the doctorial thesis <a href="https://arxiv.org/pdf/2202.02435.pdf">On Neural Differential Equations</a> for more information on both procedures.</p>
-<h2 id="optimize-then-discretize">optimize-then-discretize<a class="headerlink" href="#optimize-then-discretize" title="Permanent link">¤</a></h2>
-<p>If you choose to train with the adjoint method then you only to use <code>odesolve_adjoint</code> :</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">torchdde</span> <span class="kn">import</span> <span class="n">odesolve_adjoint</span>
+<details class="tip">
+<summary>What changes in an ODE compared to a DDE ?</summary>
+<p>In practice, your function will be defined like this :<br />
+<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">f_ode</span><span class="p">(</span><span class="n">t</span><span class="p">,</span><span class="n">y</span><span class="p">,</span><span class="n">args</span><span class="p">):</span>
+    <span class="k">return</span> <span class="o">...</span>
 
-<span class="n">history_function</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">([</span><span class="o">...</span><span class="p">])</span>
-<span class="n">ts</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
-<span class="n">pred</span> <span class="o">=</span> <span class="n">odesolve_adjoint</span><span class="p">(</span><span class="n">y0</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">ts</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">solver</span><span class="p">)</span>
-</code></pre></div>
+<span class="k">def</span> <span class="nf">f_dde</span><span class="p">(</span><span class="n">t</span><span class="p">,</span><span class="n">y</span><span class="p">,</span><span class="n">args</span><span class="p">,</span> <span class="n">history</span><span class="p">):</span>
+    <span class="k">return</span> <span class="o">...</span>
+</code></pre></div></p>
+<p>and your ODE's initial condition <code>y0</code> will become a history function <code>history_fn = lambda t : ...</code></p>
+</details>
 
 
   <div class="doc doc-object doc-function">
 
 
 
-<h4 id="torchdde.odesolve_adjoint" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">torchdde</span><span class="o">.</span><span class="n">odesolve_adjoint</span><span class="p">(</span><span class="n">z0</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch ...&#39;</span><span class="p">],</span> <span class="n">func</span><span class="p">:</span> <span class="n">Module</span><span class="p">,</span> <span class="n">ts</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;time ...&#39;</span><span class="p">],</span> <span class="n">args</span><span class="p">,</span> <span class="n">solver</span><span class="p">:</span> <span class="n">AbstractOdeSolver</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch time ...&#39;</span><span class="p">]</span></code>
+<h4 id="torchdde.integrate.integrate" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">torchdde</span><span class="o">.</span><span class="n">integrate</span><span class="o">.</span><span class="n">integrate</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">module</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">Callable</span><span class="p">],</span> <span class="n">solver</span><span class="p">:</span> <span class="n">AbstractOdeSolver</span><span class="p">,</span> <span class="n">t0</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">],</span> <span class="n">t1</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">],</span> <span class="n">ts</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;time&#39;</span><span class="p">],</span> <span class="n">y0</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch ...&#39;</span><span class="p">],</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]],</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch ...&#39;</span><span class="p">]]],</span> <span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">stepsize_controller</span><span class="p">:</span> <span class="n">AbstractStepSizeController</span> <span class="o">=</span> <span class="o">&lt;</span><span class="n">torchdde</span><span class="o">.</span><span class="n">step_size_controller</span><span class="o">.</span><span class="n">constant</span><span class="o">.</span><span class="n">ConstantStepSizeController</span> <span class="nb">object</span> <span class="n">at</span> <span class="mh">0x7f3ee93ed710</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">dt0</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">delays</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;delays&#39;</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">discretize_then_optimize</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">max_steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2048</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch time ...&#39;</span><span class="p">]</span></code>
 
 
-<a href="#torchdde.odesolve_adjoint" class="headerlink" title="Permanent link">¤</a></h4>
+<a href="#torchdde.integrate.integrate" class="headerlink" title="Permanent link">¤</a></h4>
 
     <div class="doc doc-contents first">
 
+      <p>Solves a system of ODEs or DDEs.
+See the <a href="../getting-started/">Getting started</a> page for example usage.</p>
+<p><strong>Main arguments:</strong></p>
+<p>These are the arguments most commonly used day-to-day.</p>
+<ul>
+<li><code>func</code>: The terms of the differential equation. This specifies the vector field.</li>
+<li><code>solver</code>: The solver for the differential equation. See the
+    available <a href="../solvers/">solvers</a>.</li>
+<li><code>t0</code>: The start of the region of integration.</li>
+<li><code>t1</code>: The end of the region of integration.</li>
+<li><code>ts</code> : The time points at which to return the solution.</li>
+<li><code>y0</code>: The initial value. This is either a tensor (for ODEs) or a
+        history function callable (for DDEs)</li>
+<li><code>args</code>: Any additional arguments to pass to the vector field.</li>
+<li><code>stepsize_controller</code>: How to change the step size as the integration progresses.
+    See the <a href="../stepsize-controller/">list of stepsize controllers</a>.
+    Defaults set to <code>ConstantStepSizeController</code>.</li>
+<li><code>dt0</code>: The step size to use for the first step. If you are
+    using a fixed step sizes then this will also be the step size
+    for all other steps. If set as <code>None</code> then the
+    initial step size will be determined automatically,
+    only available for <code>torchdde.AdaptiveStepSizeController</code>.</li>
+<li><code>delays</code>: The initial values given to the constant delays for the DDE.
+    If set to <code>None</code> then the system is treated as an ODE.</li>
+<li><code>discretize_then_optimize</code> : If set to <code>False</code>, the adjoint method
+    will be used for training.
+    If set to <code>True</code>, regular backpropagation will be used for training.</li>
+<li><code>max_steps</code> : The maximum number of steps to take before
+quitting the computation unconditionally.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p>Returns the solution of the differential equation.</p>
 
     </div>
 
   </div>
-
-<h2 id="discretize-then-optimize">discretize-then-optimize<a class="headerlink" href="#discretize-then-optimize" title="Permanent link">¤</a></h2>
-<p>If you choose to train with the inherent auto differentiation capabilities of Pytorch then you need to use <code>AbstractOdeSolver</code> with specified : initial condition <code>y0</code>, pytorch model <code>model</code> and integration span <code>ts</code>.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">torchdde</span> <span class="kn">import</span> <span class="n">odesolve_adjoint</span>
-
-<span class="n">ode_solver</span> <span class="o">=</span> <span class="o">...</span>
-<span class="n">y0</span> <span class="o">=</span> <span class="o">...</span>
-<span class="n">ts</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
-<span class="n">pred</span> <span class="o">=</span> <span class="n">ode_solver</span><span class="o">.</span><span class="n">integrate</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ts</span><span class="p">,</span> <span class="n">y0</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span>
-</code></pre></div>
                 
               
               
@@ -537,7 +568,7 @@
     <nav class="md-footer__inner md-grid" aria-label="Footer">
       
         
-        <a href="../training-dde/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Training a DDE" rel="prev">
+        <a href="../solvers/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Numerical Solvers" rel="prev">
           <div class="md-footer__button md-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
           </div>
@@ -546,20 +577,20 @@
               <span class="md-footer__direction">
                 Previous
               </span>
-              Training a DDE
+              Numerical Solvers
             </div>
           </div>
         </a>
       
       
         
-        <a href="../faq/" class="md-footer__link md-footer__link--next" aria-label="Next: FAQ" rel="next">
+        <a href="../stepsize-controller/" class="md-footer__link md-footer__link--next" aria-label="Next: Stepsize controller" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">
                 Next
               </span>
-              FAQ
+              Stepsize controller
             </div>
           </div>
           <div class="md-footer__button md-icon">

@@ -219,7 +219,7 @@
   
     <li class="md-nav__item">
       <a href="../.." class="md-nav__link">
-        torchdde
+        Home
       </a>
     </li>
   
@@ -265,20 +265,6 @@
     <li class="md-nav__item">
       <a href="../getting-started/" class="md-nav__link">
         Getting Started
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../neural-dde/" class="md-nav__link">
-        Neural DDE
       </a>
     </li>
   
@@ -341,15 +327,16 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#torchdde.Euler" class="md-nav__link">
-    Euler
+  <a href="#explicit-solvers" class="md-nav__link">
+    Explicit Solvers
   </a>
   
-</li>
+    <nav class="md-nav" aria-label="Explicit Solvers">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#torchdde.Ralston" class="md-nav__link">
-    Ralston
+  <a href="#torchdde.Euler" class="md-nav__link">
+    Euler
   </a>
   
 </li>
@@ -368,23 +355,35 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#torchdde.Dopri5" class="md-nav__link">
+    Dopri5
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#dde-solvers" class="md-nav__link">
-    DDE Solvers
+        
+          <li class="md-nav__item">
+  <a href="#implicit-solvers" class="md-nav__link">
+    Implicit Solvers
   </a>
   
-    <nav class="md-nav" aria-label="DDE Solvers">
+    <nav class="md-nav" aria-label="Implicit Solvers">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#torchdde.DDESolver" class="md-nav__link">
-    DDESolver
+  <a href="#torchdde.ImplicitEuler" class="md-nav__link">
+    ImplicitEuler
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -408,8 +407,8 @@
   
   
     <li class="md-nav__item">
-      <a href="../training-dde/" class="md-nav__link">
-        Training a DDE
+      <a href="../integration-de/" class="md-nav__link">
+        Integration
       </a>
     </li>
   
@@ -422,8 +421,36 @@
   
   
     <li class="md-nav__item">
-      <a href="../training-ode/" class="md-nav__link">
-        Training a ODE
+      <a href="../stepsize-controller/" class="md-nav__link">
+        Stepsize controller
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../training-de/" class="md-nav__link">
+        Training
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../neural-dde/" class="md-nav__link">
+        Neural DDE
       </a>
     </li>
   
@@ -438,6 +465,20 @@
     <li class="md-nav__item">
       <a href="../faq/" class="md-nav__link">
         FAQ
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contribute/" class="md-nav__link">
+        Contribute
       </a>
     </li>
   
@@ -515,11 +556,7 @@
                 
                 <h1 id="numerical-solvers">Numerical Solvers<a class="headerlink" href="#numerical-solvers" title="Permanent link">¤</a></h1>
 <h2 id="ode-solvers">ODE Solvers<a class="headerlink" href="#ode-solvers" title="Permanent link">¤</a></h2>
-<p>Only a few explicit solvers are available to use :</p>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>The following solver are constant step size solvers. This is indeed less flexible than adaptive stepsize method but such an incorporation isn't available at the time.</p>
-</div>
+<p>Only some explicit solvers are available to use but adding new ones is rather simple with <a class="autorefs autorefs-internal" href="#torchdde.AbstractOdeSolver"><code>torchdde.AbstractOdeSolver</code></a>.</p>
 
 
   <div class="doc doc-object doc-class">
@@ -537,7 +574,7 @@ torchdde.AbstractOdeSolver        </code>
     <div class="doc doc-contents first">
 
       <p>Base class for creating ODE solvers. All solvers should inherit from it.
-To create new solvers users must implement the step method.</p>
+To create new solvers users must implement the <code>init</code>, <code>step</code> and <code>order</code> method.</p>
 
 
 
@@ -556,28 +593,18 @@ To create new solvers users must implement the step method.</p>
 
 
 
-<h5 id="torchdde.AbstractOdeSolver.step" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">:</span> <span class="n">Module</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;1&#39;</span><span class="p">],</span> <span class="n">y</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch ...&#39;</span><span class="p">],</span> <span class="n">dt</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;1&#39;</span><span class="p">],</span> <span class="n">args</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">has_aux</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span></code>
+<h5 id="torchdde.AbstractOdeSolver.init" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">init</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span></code>
 
   <span class="doc doc-properties">
       <small class="doc doc-property doc-property-abstractmethod"><code>abstractmethod</code></small>
   </span>
 
-<a href="#torchdde.AbstractOdeSolver.step" class="headerlink" title="Permanent link">¤</a></h5>
+<a href="#torchdde.AbstractOdeSolver.init" class="headerlink" title="Permanent link">¤</a></h5>
 
     <div class="doc doc-contents ">
 
-      <p>ODE's stepping definition</p>
-<p><strong>Arguments:</strong></p>
-<ul>
-<li><code>func</code>: Pytorch model, i.e vector field</li>
-<li><code>t</code>: Current time step t</li>
-<li><code>y</code>: Current state y</li>
-<li><code>dt</code>: Stepsize dt</li>
-<li><code>has_aux</code>: Whether the model has an auxiliary output.</li>
-</ul>
-<p><strong>Returns:</strong></p>
-<p>Integration result at time <code>t+dt</code></p>
+      <p>Initializes the solver. This method is called before the integration starts.</p>
 
     </div>
 
@@ -589,24 +616,99 @@ To create new solvers users must implement the step method.</p>
 
 
 
-<h5 id="torchdde.AbstractOdeSolver.integrate" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">integrate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">:</span> <span class="n">Module</span><span class="p">,</span> <span class="n">ts</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;time&#39;</span><span class="p">],</span> <span class="n">y0</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch ...&#39;</span><span class="p">],</span> <span class="n">args</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">has_aux</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span></code>
+<h5 id="torchdde.AbstractOdeSolver.order" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">order</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span></code>
 
+  <span class="doc doc-properties">
+      <small class="doc doc-property doc-property-abstractmethod"><code>abstractmethod</code></small>
+  </span>
 
-<a href="#torchdde.AbstractOdeSolver.integrate" class="headerlink" title="Permanent link">¤</a></h5>
+<a href="#torchdde.AbstractOdeSolver.order" class="headerlink" title="Permanent link">¤</a></h5>
 
     <div class="doc doc-contents ">
 
-      <p>Integrate a system of ODEs.
-<strong>Arguments:</strong></p>
+      <p>Returns the order of the solver.</p>
+
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-method">
+
+
+
+<h5 id="torchdde.AbstractOdeSolver.step" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">module</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">Callable</span><span class="p">],</span> <span class="n">t</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">],</span> <span class="n">y</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch ...&#39;</span><span class="p">],</span> <span class="n">dt</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">],</span> <span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">has_aux</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch ...&#39;</span><span class="p">],</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch ...&#39;</span><span class="p">],</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch order&#39;</span><span class="p">]],</span> <span class="n">Union</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch&#39;</span><span class="p">],</span> <span class="n">Any</span><span class="p">]]</span></code>
+
+  <span class="doc doc-properties">
+      <small class="doc doc-property doc-property-abstractmethod"><code>abstractmethod</code></small>
+  </span>
+
+<a href="#torchdde.AbstractOdeSolver.step" class="headerlink" title="Permanent link">¤</a></h5>
+
+    <div class="doc doc-contents ">
+
+      <p>ODE's solver stepping method</p>
+<p><strong>Arguments:</strong></p>
 <ul>
-<li><code>func</code>: Pytorch model, i.e vector field</li>
-<li><code>ts</code>: Integration span</li>
-<li><code>y0</code>: Initial condition</li>
-<li><code>has_aux</code>: Whether the model has an auxiliary output.</li>
+<li><code>func</code>: Pytorch model or callable function, i.e vector field</li>
+<li><code>t</code>: Current time step <code>t</code></li>
+<li><code>y</code>: Current state <code>y</code></li>
+<li><code>dt</code>: Step size <code>dt</code></li>
+<li><code>has_aux</code>: Whether the model/callable has an auxiliary output.</li>
+</ul>
+<details class="tip">
+<summary>has_aux ?</summary>
+<p>A function with an auxiliary output can look like
+<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">f</span><span class="p">(</span><span class="n">t</span><span class="p">,</span><span class="n">y</span><span class="p">,</span><span class="n">args</span><span class="p">):</span>
+    <span class="k">return</span> <span class="o">-</span><span class="n">y</span><span class="p">,</span> <span class="p">(</span><span class="s2">&quot;Hello World&quot;</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+</code></pre></div>
+The <code>has_aux</code> <code>kwargs</code> argument is used to compute the adjoint method</p>
+</details>
+<p><strong>Returns:</strong></p>
+<ul>
+<li>The value of the solution at <code>t+dt</code>.</li>
+<li>A local error estimate made during the step. (Used by
+<a class="autorefs autorefs-internal" href="../stepsize-controller/#torchdde.AdaptiveStepSizeController"><code>torchdde.AdaptiveStepSizeController</code></a> controllers to change the step size.)
+It may be <code>None</code> for constant stepsize solvers for example.</li>
+<li>Dictionary that holds all the information needed to properly
+build the interpolation between <code>t</code> and <code>t+dt</code>.</li>
+<li>None if the model doesn't have an auxiliary output.</li>
+</ul>
+
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-method">
+
+
+
+<h5 id="torchdde.AbstractOdeSolver.build_interpolation" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">build_interpolation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t0</span><span class="p">,</span> <span class="n">t1</span><span class="p">,</span> <span class="n">dense_info</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span></code>
+
+  <span class="doc doc-properties">
+      <small class="doc doc-property doc-property-abstractmethod"><code>abstractmethod</code></small>
+  </span>
+
+<a href="#torchdde.AbstractOdeSolver.build_interpolation" class="headerlink" title="Permanent link">¤</a></h5>
+
+    <div class="doc doc-contents ">
+
+      <p>Interpolator building method based on the solver's order.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>t0</code>: The start of the interval over which the interpolation is defined.</li>
+<li><code>t1</code>: The end of the interval over which the interpolation is defined.</li>
+<li><code>dense_info</code>: Dictionary that hold all the information needed to properly
+build the interpolation between <code>t</code> and <code>t+dt</code>.</li>
 </ul>
 <p><strong>Returns:</strong></p>
-<p>Integration result over <code>ts</code></p>
+<p>A <code>Callable</code> that can be used to interpolate the solution between <code>t0</code> and <code>t1</code>.</p>
 
     </div>
 
@@ -622,6 +724,7 @@ To create new solvers users must implement the step method.</p>
 
   </div>
 
+<h3 id="explicit-solvers">Explicit Solvers<a class="headerlink" href="#explicit-solvers" title="Permanent link">¤</a></h3>
 
 
   <div class="doc doc-object doc-class">
@@ -640,31 +743,6 @@ torchdde.Euler            (<a class="autorefs autorefs-internal" title="torchdde
     <div class="doc doc-contents first">
 
       <p>Euler's method</p>
-
-
-
-    </div>
-
-  </div>
-
-
-
-  <div class="doc doc-object doc-class">
-
-
-
-<h4 id="torchdde.Ralston" class="doc doc-heading">
-        <code>
-torchdde.Ralston            (<a class="autorefs autorefs-internal" title="torchdde.AbstractOdeSolver" href="#torchdde.AbstractOdeSolver">AbstractOdeSolver</a>)
-        </code>
-
-
-
-<a href="#torchdde.Ralston" class="headerlink" title="Permanent link">¤</a></h4>
-
-    <div class="doc doc-contents first">
-
-      <p>Ralston's method (2nd order)</p>
 
 
 
@@ -722,122 +800,52 @@ torchdde.RK4            (<a class="autorefs autorefs-internal" title="torchdde.A
 
   </div>
 
-<h2 id="dde-solvers">DDE Solvers<a class="headerlink" href="#dde-solvers" title="Permanent link">¤</a></h2>
 
 
   <div class="doc doc-object doc-class">
 
 
 
-<h4 id="torchdde.DDESolver" class="doc doc-heading">
+<h4 id="torchdde.Dopri5" class="doc doc-heading">
         <code>
-torchdde.DDESolver        </code>
+torchdde.Dopri5            (<a class="autorefs autorefs-internal" title="torchdde.AbstractOdeSolver" href="#torchdde.AbstractOdeSolver">AbstractOdeSolver</a>)
+        </code>
 
 
 
-<a href="#torchdde.DDESolver" class="headerlink" title="Permanent link">¤</a></h4>
+<a href="#torchdde.Dopri5" class="headerlink" title="Permanent link">¤</a></h4>
 
     <div class="doc doc-contents first">
 
-      <p>Solver class used to integrate a DDE with a given ODE solver.
-See <a class="autorefs autorefs-internal" href="#torchdde.AbstractOdeSolver"><code>torchdde.AbstractOdeSolver</code></a> for more details on which solvers are available.</p>
+      <p>5th order order explicit Runge-Kutta method Dormand Prince</p>
 
 
-
-
-  <div class="doc doc-children">
-
-
-
-
-
-
-
-
-
-  <div class="doc doc-object doc-method">
-
-
-
-<h5 id="torchdde.DDESolver.__init__" class="doc doc-heading">
-<code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">solver</span><span class="p">:</span> <span class="n">AbstractOdeSolver</span><span class="p">,</span> <span class="n">delays</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;delays&#39;</span><span class="p">])</span></code>
-
-
-<a href="#torchdde.DDESolver.__init__" class="headerlink" title="Permanent link">¤</a></h5>
-
-    <div class="doc doc-contents ">
-
-      <p><strong>Arguments:</strong></p>
-<ul>
-<li><code>solver</code>: Solver to integrate the DDE</li>
-<li><code>delays</code>: Delays tensors used in DDE</li>
-</ul>
 
     </div>
 
   </div>
 
+<h3 id="implicit-solvers">Implicit Solvers<a class="headerlink" href="#implicit-solvers" title="Permanent link">¤</a></h3>
 
 
-  <div class="doc doc-object doc-method">
-
-
-
-<h5 id="torchdde.DDESolver.integrate" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">integrate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">:</span> <span class="n">Module</span><span class="p">,</span> <span class="n">ts</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;time&#39;</span><span class="p">],</span> <span class="n">history_func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch time ...&#39;</span><span class="p">],</span> <span class="n">Callable</span><span class="p">]</span></code>
-
-
-<a href="#torchdde.DDESolver.integrate" class="headerlink" title="Permanent link">¤</a></h5>
-
-    <div class="doc doc-contents ">
-
-      <p>Integrate a system of DDEs.</p>
-<p><strong>Arguments:</strong></p>
-<ul>
-<li><code>func</code>: Pytorch model, i.e vector field</li>
-<li><code>ts</code>: Integration span</li>
-<li><code>history_func</code>: DDE's history function</li>
-</ul>
-<p><strong>Returns:</strong></p>
-<p>Integration result over <code>ts</code> and a <code>TorchLinearInterpolator</code> object of the result integration</p>
-
-    </div>
-
-  </div>
+  <div class="doc doc-object doc-class">
 
 
 
-  <div class="doc doc-object doc-method">
+<h4 id="torchdde.ImplicitEuler" class="doc doc-heading">
+        <code>
+torchdde.ImplicitEuler            (<a class="autorefs autorefs-internal" title="torchdde.AbstractOdeSolver" href="#torchdde.AbstractOdeSolver">AbstractOdeSolver</a>)
+        </code>
 
 
 
-<h5 id="torchdde.DDESolver.integrate_with_cubic_interpolator" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">integrate_with_cubic_interpolator</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">:</span> <span class="n">Module</span><span class="p">,</span> <span class="n">ts</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;time&#39;</span><span class="p">],</span> <span class="n">history_func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch time ...&#39;</span><span class="p">],</span> <span class="n">Callable</span><span class="p">]</span></code>
+<a href="#torchdde.ImplicitEuler" class="headerlink" title="Permanent link">¤</a></h4>
+
+    <div class="doc doc-contents first">
+
+      <p>ImplicitEuler Euler's method</p>
 
 
-<a href="#torchdde.DDESolver.integrate_with_cubic_interpolator" class="headerlink" title="Permanent link">¤</a></h5>
-
-    <div class="doc doc-contents ">
-
-      <p>Integrate a system of DDEs. Please note that this method is not not efficient since <code>NaturalCubicSpline</code> needs to recompute its coefficients after each integration step. Please use [<code>torchdde.AbstractOdeSolver.integrate</code>]</p>
-<p><strong>Arguments:</strong></p>
-<ul>
-<li><code>func</code>: Pytorch model, i.e vector field</li>
-<li><code>ts</code>: Integration span</li>
-<li><code>history_func</code>: DDE's history function</li>
-</ul>
-<p><strong>Returns:</strong></p>
-<p>Integration result over <code>ts</code> and a <code>NaturalCubicSpline</code> object of the result integration</p>
-
-    </div>
-
-  </div>
-
-
-
-
-
-  </div>
 
     </div>
 
@@ -861,7 +869,7 @@ See <a class="autorefs autorefs-internal" href="#torchdde.AbstractOdeSolver"><co
     <nav class="md-footer__inner md-grid" aria-label="Footer">
       
         
-        <a href="../neural-dde/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Neural DDE" rel="prev">
+        <a href="../getting-started/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Getting Started" rel="prev">
           <div class="md-footer__button md-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
           </div>
@@ -870,20 +878,20 @@ See <a class="autorefs autorefs-internal" href="#torchdde.AbstractOdeSolver"><co
               <span class="md-footer__direction">
                 Previous
               </span>
-              Neural DDE
+              Getting Started
             </div>
           </div>
         </a>
       
       
         
-        <a href="../training-dde/" class="md-footer__link md-footer__link--next" aria-label="Next: Training a DDE" rel="next">
+        <a href="../integration-de/" class="md-footer__link md-footer__link--next" aria-label="Next: Integration" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">
                 Next
               </span>
-              Training a DDE
+              Integration
             </div>
           </div>
           <div class="md-footer__button md-icon">

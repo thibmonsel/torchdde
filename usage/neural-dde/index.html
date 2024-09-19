@@ -219,7 +219,7 @@
   
     <li class="md-nav__item">
       <a href="../.." class="md-nav__link">
-        torchdde
+        Home
       </a>
     </li>
   
@@ -275,6 +275,62 @@
               
   
   
+  
+    <li class="md-nav__item">
+      <a href="../solvers/" class="md-nav__link">
+        Numerical Solvers
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integration-de/" class="md-nav__link">
+        Integration
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../stepsize-controller/" class="md-nav__link">
+        Stepsize controller
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../training-de/" class="md-nav__link">
+        Training
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
     
   
   
@@ -301,50 +357,22 @@
   
   
     <li class="md-nav__item">
-      <a href="../solvers/" class="md-nav__link">
-        Numerical Solvers
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../training-dde/" class="md-nav__link">
-        Training a DDE
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../training-ode/" class="md-nav__link">
-        Training a ODE
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../faq/" class="md-nav__link">
         FAQ
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contribute/" class="md-nav__link">
+        Contribute
       </a>
     </li>
   
@@ -423,22 +451,21 @@
                 <h1 id="neural-dde">Neural DDE<a class="headerlink" href="#neural-dde" title="Permanent link">¤</a></h1>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p>This library only supports constant lag DDEs. Therefore we are unable to model state dependent DDEs.</p>
+<p>This library only supports constant lag DDEs. Therefore we are unable to model time and state dependent DDEs.</p>
 </div>
-<p>This examples trains a Neural DDE to reproduce a simple dataset of a delay logistic equation. The backward pass is compute with the adjoint method i.e <code>ddesolve_adjoint</code>.</p>
+<p>This examples trains a Neural DDE to reproduce a simple dataset of a delay logistic equation. In this example, the backward pass is computed with the adjoint method.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">time</span>
 
 <span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
 <span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torch.nn</span> <span class="k">as</span> <span class="nn">nn</span>
 <span class="kn">from</span> <span class="nn">torch.utils.data</span> <span class="kn">import</span> <span class="n">DataLoader</span><span class="p">,</span> <span class="n">Dataset</span>
-<span class="kn">from</span> <span class="nn">torchdde</span> <span class="kn">import</span> <span class="n">ddesolve_adjoint</span><span class="p">,</span> <span class="n">DDESolver</span><span class="p">,</span> <span class="n">Euler</span>
+<span class="kn">from</span> <span class="nn">torchdde</span> <span class="kn">import</span> <span class="n">integrate</span><span class="p">,</span> <span class="n">Euler</span>
 <span class="kn">from</span> <span class="nn">torchvision.ops</span> <span class="kn">import</span> <span class="n">MLP</span>
-
 
 <span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span> <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">()</span> <span class="k">else</span> <span class="s2">&quot;cpu&quot;</span><span class="p">)</span>
 </code></pre></div>
-<p>Recalling that a neural DDE is defined as</p>
+<p>Recalling that a Neural DDE is defined as</p>
 <div class="arithmatex">\[\frac{dy}{dt} = f_{\theta}(t, y(t), y(t-\tau_1), \dots, y(t-\tau_{n})), \quad y(t&lt;0) = \psi(t)\]</div>
 <p>then here we're now about to define <span class="arithmatex">\(f_{\theta}\)</span> that appears on that right hand side on the equation above</p>
 <div class="highlight"><pre><span></span><code><span class="k">class</span> <span class="nc">NDDE</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
@@ -466,8 +493,8 @@
     <span class="k">def</span> <span class="nf">f</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">history</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">y</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">history</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
 
-    <span class="n">solver</span> <span class="o">=</span> <span class="n">DDESolver</span><span class="p">(</span><span class="n">Euler</span><span class="p">(),</span> <span class="n">tau</span><span class="p">)</span>
-    <span class="n">ys</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">integrate</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">ts</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="n">y0</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">history_function</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="n">y0</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">ys</span> <span class="o">=</span> <span class="n">integrate</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">Euler</span><span class="p">(),</span> <span class="n">ts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">ts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">ts</span><span class="p">,</span> <span class="n">history_function</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">dt0</span><span class="o">=</span><span class="n">ts</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">ts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">delays</span><span class="o">=</span><span class="n">tau</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">ys</span>
 
 
@@ -492,6 +519,7 @@
     <span class="n">seed</span><span class="o">=</span><span class="mi">5678</span><span class="p">,</span>
     <span class="n">plot</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">print_every</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+    <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
 <span class="p">):</span>
     <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
     <span class="n">ts</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">101</span><span class="p">)</span>
@@ -499,21 +527,19 @@
     <span class="n">y0</span> <span class="o">=</span> <span class="p">(</span><span class="n">y0_min</span> <span class="o">-</span> <span class="n">y0_max</span><span class="p">)</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">((</span><span class="n">dataset_size</span><span class="p">,))</span> <span class="o">+</span> <span class="n">y0_max</span>
     <span class="n">ys</span> <span class="o">=</span> <span class="n">get_data</span><span class="p">(</span><span class="n">y0</span><span class="p">,</span> <span class="n">ts</span><span class="p">)</span>
     <span class="n">ts</span><span class="p">,</span> <span class="n">ys</span> <span class="o">=</span> <span class="n">ts</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">),</span> <span class="n">ys</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
-
     <span class="n">delay_min</span><span class="p">,</span> <span class="n">delay_max</span> <span class="o">=</span> <span class="mf">0.7</span><span class="p">,</span> <span class="mf">1.3</span>
     <span class="n">value</span> <span class="o">=</span> <span class="p">(</span><span class="n">delay_max</span> <span class="o">-</span> <span class="n">delay_min</span><span class="p">)</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">((</span><span class="mi">1</span><span class="p">,))</span> <span class="o">+</span> <span class="n">delay_min</span>
-    <span class="n">list_delays</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="n">value</span><span class="p">])</span>
-    <span class="n">list_delays</span> <span class="o">=</span> <span class="n">list_delays</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+    <span class="n">tau</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="n">value</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+    <span class="n">tau</span> <span class="o">=</span> <span class="n">tau</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
 
     <span class="n">state_dim</span> <span class="o">=</span> <span class="n">ys</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-    <span class="n">model</span> <span class="o">=</span> <span class="n">NDDE</span><span class="p">(</span><span class="n">list_delays</span><span class="p">,</span> <span class="n">state_dim</span><span class="p">,</span> <span class="n">state_dim</span><span class="p">,</span> <span class="n">width_size</span><span class="p">,</span> <span class="n">depth</span><span class="p">)</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">NDDE</span><span class="p">(</span><span class="n">tau</span><span class="p">,</span> <span class="n">state_dim</span><span class="p">,</span> <span class="n">state_dim</span><span class="p">,</span> <span class="n">width_size</span><span class="p">,</span> <span class="n">depth</span><span class="p">)</span>
     <span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
 
     <span class="n">dataset</span> <span class="o">=</span> <span class="n">MyDataset</span><span class="p">(</span><span class="n">ys</span><span class="p">)</span>
     <span class="n">train_loader</span> <span class="o">=</span> <span class="n">DataLoader</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
     <span class="c1"># Training loop like normal.</span>
-
     <span class="n">model</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
     <span class="n">loss_fn</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">MSELoss</span><span class="p">()</span>
     <span class="n">optimizer</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Adam</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">lr</span><span class="o">=</span><span class="n">lr</span><span class="p">)</span>
@@ -523,7 +549,7 @@
             <span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
             <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
             <span class="n">history_fn</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="n">data</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>
-            <span class="n">ys_pred</span> <span class="o">=</span> <span class="n">ddesolve_adjoint</span><span class="p">(</span><span class="n">history_fn</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">ts</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">Euler</span><span class="p">())</span>
+            <span class="n">ys_pred</span> <span class="o">=</span> <span class="n">integrate</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">Euler</span><span class="p">(),</span> <span class="n">ts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">ts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">ts</span><span class="p">,</span> <span class="n">history_fn</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">dt0</span><span class="o">=</span><span class="n">ts</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">ts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">delays</span><span class="o">=</span><span class="n">tau</span><span class="p">)</span>
             <span class="n">loss</span> <span class="o">=</span> <span class="n">loss_fn</span><span class="p">(</span><span class="n">ys_pred</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
             <span class="n">loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
             <span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
@@ -542,7 +568,7 @@
         <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">ts</span><span class="o">.</span><span class="n">cpu</span><span class="p">(),</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">cpu</span><span class="p">(),</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;dodgerblue&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Real&quot;</span><span class="p">)</span>
         <span class="n">history_values</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">][</span><span class="o">...</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span>
         <span class="n">history_fn</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="n">history_values</span>
-        <span class="n">ys_pred</span> <span class="o">=</span> <span class="n">ddesolve_adjoint</span><span class="p">(</span><span class="n">history_fn</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">ts</span><span class="p">,</span> <span class="n">Euler</span><span class="p">())</span>
+        <span class="n">ys_pred</span> <span class="o">=</span> <span class="n">integrate</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">Euler</span><span class="p">(),</span> <span class="n">ts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">ts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">ts</span><span class="p">,</span> <span class="n">history_fn</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">dt0</span><span class="o">=</span><span class="n">ts</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">ts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">delays</span><span class="o">=</span><span class="n">tau</span><span class="p">)</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
             <span class="n">ts</span><span class="o">.</span><span class="n">cpu</span><span class="p">(),</span>
             <span class="n">ys_pred</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">detach</span><span class="p">(),</span>
@@ -556,7 +582,6 @@
         <span class="n">plt</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
 
     <span class="k">return</span> <span class="n">ts</span><span class="p">,</span> <span class="n">ys</span><span class="p">,</span> <span class="n">model</span>
-
 
 <span class="n">ts</span><span class="p">,</span> <span class="n">ys</span><span class="p">,</span> <span class="n">model</span> <span class="o">=</span> <span class="n">main</span><span class="p">()</span>
 </code></pre></div>
@@ -579,7 +604,7 @@
     <nav class="md-footer__inner md-grid" aria-label="Footer">
       
         
-        <a href="../getting-started/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Getting Started" rel="prev">
+        <a href="../training-de/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Training" rel="prev">
           <div class="md-footer__button md-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
           </div>
@@ -588,20 +613,20 @@
               <span class="md-footer__direction">
                 Previous
               </span>
-              Getting Started
+              Training
             </div>
           </div>
         </a>
       
       
         
-        <a href="../solvers/" class="md-footer__link md-footer__link--next" aria-label="Next: Numerical Solvers" rel="next">
+        <a href="../faq/" class="md-footer__link md-footer__link--next" aria-label="Next: FAQ" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">
                 Next
               </span>
-              Numerical Solvers
+              FAQ
             </div>
           </div>
           <div class="md-footer__button md-icon">

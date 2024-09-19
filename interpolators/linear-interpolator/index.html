@@ -219,7 +219,7 @@
   
     <li class="md-nav__item">
       <a href="../.." class="md-nav__link">
-        torchdde
+        Home
       </a>
     </li>
   
@@ -275,20 +275,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../usage/neural-dde/" class="md-nav__link">
-        Neural DDE
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../usage/solvers/" class="md-nav__link">
         Numerical Solvers
       </a>
@@ -303,8 +289,8 @@
   
   
     <li class="md-nav__item">
-      <a href="../../usage/training-dde/" class="md-nav__link">
-        Training a DDE
+      <a href="../../usage/integration-de/" class="md-nav__link">
+        Integration
       </a>
     </li>
   
@@ -317,8 +303,36 @@
   
   
     <li class="md-nav__item">
-      <a href="../../usage/training-ode/" class="md-nav__link">
-        Training a ODE
+      <a href="../../usage/stepsize-controller/" class="md-nav__link">
+        Stepsize controller
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/training-de/" class="md-nav__link">
+        Training
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/neural-dde/" class="md-nav__link">
+        Neural DDE
       </a>
     </li>
   
@@ -333,6 +347,20 @@
     <li class="md-nav__item">
       <a href="../../usage/faq/" class="md-nav__link">
         FAQ
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/contribute/" class="md-nav__link">
+        Contribute
       </a>
     </li>
   
@@ -450,7 +478,7 @@
                 
                   <h1>Linear interpolator</h1>
                 
-                <p>This library only support linear interpolation at this moment !</p>
+                <p>This library only supports linear interpolation at this moment !</p>
 
 
   <div class="doc doc-object doc-class">
@@ -467,7 +495,8 @@ torchdde.TorchLinearInterpolator        </code>
 
     <div class="doc doc-contents first">
 
-      <p>Linear interpolator class that is compatible with batching.</p>
+      <p>Linear interpolator class that is compatible with batching.
+All elements in batch must have the same ts.</p>
 
 
 
@@ -510,8 +539,31 @@ torchdde.TorchLinearInterpolator        </code>
 
 
 
+<h5 id="torchdde.TorchLinearInterpolator.__call__" class="doc doc-heading">
+<code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">],</span> <span class="nb">float</span><span class="p">],</span> <span class="n">left</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch ...&#39;</span><span class="p">]</span></code>
+
+
+<a href="#torchdde.TorchLinearInterpolator.__call__" class="headerlink" title="Permanent link">¤</a></h5>
+
+    <div class="doc doc-contents ">
+
+      <p><strong>Arguments:</strong></p>
+<ul>
+<li><code>t</code>: time to evalute to </li>
+</ul>
+
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-method">
+
+
+
 <h5 id="torchdde.TorchLinearInterpolator.add_point" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">add_point</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_t</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;1&#39;</span><span class="p">],</span> <span class="n">new_y</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch ...&#39;</span><span class="p">])</span></code>
+<code class="highlight language-python"><span class="n">add_point</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_t</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">],</span> <span class="n">new_y</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch ...&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
 
 
 <a href="#torchdde.TorchLinearInterpolator.add_point" class="headerlink" title="Permanent link">¤</a></h5>
@@ -556,7 +608,7 @@ torchdde.TorchLinearInterpolator        </code>
     <nav class="md-footer__inner md-grid" aria-label="Footer">
       
         
-        <a href="../../usage/faq/" class="md-footer__link md-footer__link--prev" aria-label="Previous: FAQ" rel="prev">
+        <a href="../../usage/contribute/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Contribute" rel="prev">
           <div class="md-footer__button md-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
           </div>
@@ -565,7 +617,7 @@ torchdde.TorchLinearInterpolator        </code>
               <span class="md-footer__direction">
                 Previous
               </span>
-              FAQ
+              Contribute
             </div>
           </div>
         </a>

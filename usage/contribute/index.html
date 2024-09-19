@@ -16,7 +16,7 @@
     
     
       
-        <title>Getting Started - torchdde</title>
+        <title>Contribute - torchdde</title>
       
     
     
@@ -76,11 +76,6 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
-        
-        <a href="#getting-started" class="md-skip">
-          Skip to content
-        </a>
-      
     </div>
     <div data-md-component="announce">
       
@@ -108,7 +103,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Getting Started
+              Contribute
             
           </span>
         </div>
@@ -261,73 +256,11 @@
               
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          Getting Started
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
         Getting Started
       </a>
-      
-        
-
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#integrating" class="md-nav__link">
-    Integrating ...
-  </a>
-  
-    <nav class="md-nav" aria-label="Integrating ...">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#ddes" class="md-nav__link">
-    ... DDEs
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#odes" class="md-nav__link">
-    ... ODEs
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -421,11 +354,19 @@
               
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../contribute/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+      
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         Contribute
       </a>
+      
     </li>
   
 
@@ -500,74 +441,12 @@
               
                 
                 
-                <h1 id="getting-started">Getting Started<a class="headerlink" href="#getting-started" title="Permanent link">¤</a></h1>
-<h2 id="integrating">Integrating ...<a class="headerlink" href="#integrating" title="Permanent link">¤</a></h2>
-<h3 id="ddes">... DDEs<a class="headerlink" href="#ddes" title="Permanent link">¤</a></h3>
-<p>We provide an illustrative example which solves the following DDE :</p>
-<p><span class="arithmatex">\(\frac{dy}{dt}= -y(t-2), \quad \psi(t&lt;0) = 2\)</span> over the interval <span class="arithmatex">\([0, 5]\)</span>.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
-<span class="kn">from</span> <span class="nn">torchdde</span> <span class="kn">import</span> <span class="n">RK4</span>
-<span class="kn">import</span> <span class="nn">torch</span>
-
-<span class="k">def</span> <span class="nf">simple_dde</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">history</span><span class="p">):</span>
-    <span class="k">return</span> <span class="o">-</span><span class="n">history</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-
-
-<span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cuda:0&quot;</span> <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">()</span> <span class="k">else</span> <span class="s2">&quot;cpu&quot;</span><span class="p">)</span>
-
-<span class="c1"># Define the time span of the DDE</span>
-<span class="n">ts</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">51</span><span class="p">)</span>
-<span class="n">ts</span> <span class="o">=</span> <span class="n">ts</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
-
-<span class="c1"># Define the delays, here there is only one tau=2.0</span>
-<span class="n">delays</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">2.0</span><span class="p">])</span>
-<span class="n">delays</span> <span class="o">=</span> <span class="n">delays</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
-
-<span class="c1"># Defining a constant history function for the DDE</span>
-<span class="n">history_values</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">3.0</span><span class="p">])</span>
-<span class="n">history_values</span> <span class="o">=</span> <span class="n">history_values</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-<span class="n">history_values</span> <span class="o">=</span> <span class="n">history_values</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
-<span class="n">history_function</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="n">history_values</span>
-
-<span class="c1"># Solve the DDE by using the RK4 method</span>
-<span class="n">solver</span> <span class="o">=</span> <span class="n">RK4</span><span class="p">()</span>
-<span class="n">solution</span> <span class="o">=</span> <span class="n">torchdde</span><span class="o">.</span><span class="n">integrate</span><span class="p">(</span><span class="n">simple_dde</span><span class="p">,</span> <span class="n">solver</span><span class="p">,</span> <span class="n">ts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">ts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">ts</span><span class="p">,</span> <span class="n">history_function</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">dt0</span><span class="o">=</span><span class="n">ts</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">ts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">delays</span><span class="o">=</span><span class="n">delays</span><span class="p">)</span>
-</code></pre></div>
+                  <h1>Contribute</h1>
+                
+                <p>If you wish to contribute there would be plenty to do for example : </p>
 <ul>
-<li>The numerical solver used is <code>RK4</code> is the 4th Runge Kutta method.</li>
-<li>The solution is saved at each time stamp in <code>ts</code>.</li>
-<li>The initial step size is equal to <code>ts[1]-ts[0]</code>.</li>
-</ul>
-<h3 id="odes">... ODEs<a class="headerlink" href="#odes" title="Permanent link">¤</a></h3>
-<p>We provide an illustrative example which solves the following ODE :</p>
-<p><span class="arithmatex">\(\frac{dy}{dt}= -y(t)^{2}, \quad y(0) = 2\)</span> over the interval <span class="arithmatex">\([0, 5]\)</span>.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
-<span class="kn">from</span> <span class="nn">torchdde</span> <span class="kn">import</span> <span class="n">RK4</span>
-<span class="kn">import</span> <span class="nn">torch</span>
-
-<span class="k">def</span> <span class="nf">simple_ode</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
-    <span class="k">return</span> <span class="o">-</span><span class="n">y</span><span class="o">**</span><span class="mi">2</span>
-
-
-<span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cuda:0&quot;</span> <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">()</span> <span class="k">else</span> <span class="s2">&quot;cpu&quot;</span><span class="p">)</span>
-
-<span class="c1"># Define the time span of the ODE</span>
-<span class="n">ts</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">51</span><span class="p">)</span>
-<span class="n">ts</span> <span class="o">=</span> <span class="n">ts</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
-
-<span class="c1"># Initial condition </span>
-<span class="n">y0</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">3.0</span><span class="p">])</span>
-<span class="n">y0</span> <span class="o">=</span> <span class="n">y0</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-<span class="n">y0</span> <span class="o">=</span> <span class="n">y0</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
-
-<span class="c1"># Solve the ODE by using the RK4 method</span>
-<span class="n">solver</span> <span class="o">=</span> <span class="n">RK4</span><span class="p">()</span>
-<span class="n">solution</span> <span class="o">=</span> <span class="n">torchdde</span><span class="o">.</span><span class="n">integrate</span><span class="p">(</span><span class="n">simple_ode</span><span class="p">,</span> <span class="n">solver</span><span class="p">,</span> <span class="n">ts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">ts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">ts</span><span class="p">,</span> <span class="n">y0</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">dt0</span><span class="o">=</span><span class="n">ts</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">ts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">delays</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
-</code></pre></div>
-<ul>
-<li>The numerical solver used is <code>RK4</code> is the 4th Runge Kutta method.</li>
-<li>The solution is saved at each time stamp in <code>ts</code>.</li>
-<li>The initial step size is equal to <code>ts[1]-ts[0]</code>.</li>
+<li>Encapsulate all Runge Kutta methods (e.g. <code>RK2(),RK4(),Dopri5()...</code>) in one abstract class <code>AbstractRK</code>. One example of this is in <a href="https://github.com/patrick-kidger/diffrax/blob/main/diffrax/_solver/runge_kutta.py"><code>Diffrax</code></a> or in <a href="https://github.com/martenlienen/torchode/blob/main/torchode/single_step_methods/runge_kutta.py"><code>torchode</code></a>.</li>
+<li>Attend this exploration phase for the adjoint method from the <a href="https://github.com/thibmonsel/torchdde/issues/24">issue</a>.</li>
 </ul>
                 
               
@@ -588,7 +467,7 @@
     <nav class="md-footer__inner md-grid" aria-label="Footer">
       
         
-        <a href="../.." class="md-footer__link md-footer__link--prev" aria-label="Previous: Home" rel="prev">
+        <a href="../faq/" class="md-footer__link md-footer__link--prev" aria-label="Previous: FAQ" rel="prev">
           <div class="md-footer__button md-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
           </div>
@@ -597,20 +476,20 @@
               <span class="md-footer__direction">
                 Previous
               </span>
-              Home
+              FAQ
             </div>
           </div>
         </a>
       
       
         
-        <a href="../solvers/" class="md-footer__link md-footer__link--next" aria-label="Next: Numerical Solvers" rel="next">
+        <a href="../../interpolators/linear-interpolator/" class="md-footer__link md-footer__link--next" aria-label="Next: Linear interpolator" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">
                 Next
               </span>
-              Numerical Solvers
+              Linear interpolator
             </div>
           </div>
           <div class="md-footer__button md-icon">

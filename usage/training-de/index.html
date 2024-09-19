@@ -16,7 +16,7 @@
     
     
       
-        <title>Training a DDE - torchdde</title>
+        <title>Training - torchdde</title>
       
     
     
@@ -77,7 +77,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#training-a-dde" class="md-skip">
+        <a href="#training" class="md-skip">
           Skip to content
         </a>
       
@@ -108,7 +108,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Training a DDE
+              Training
             
           </span>
         </div>
@@ -219,7 +219,7 @@
   
     <li class="md-nav__item">
       <a href="../.." class="md-nav__link">
-        torchdde
+        Home
       </a>
     </li>
   
@@ -277,8 +277,8 @@
   
   
     <li class="md-nav__item">
-      <a href="../neural-dde/" class="md-nav__link">
-        Neural DDE
+      <a href="../solvers/" class="md-nav__link">
+        Numerical Solvers
       </a>
     </li>
   
@@ -291,8 +291,22 @@
   
   
     <li class="md-nav__item">
-      <a href="../solvers/" class="md-nav__link">
-        Numerical Solvers
+      <a href="../integration-de/" class="md-nav__link">
+        Integration
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../stepsize-controller/" class="md-nav__link">
+        Stepsize controller
       </a>
     </li>
   
@@ -314,61 +328,9 @@
         
       
       
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          Training a DDE
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
       <a href="./" class="md-nav__link md-nav__link--active">
-        Training a DDE
+        Training
       </a>
-      
-        
-
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#optimize-then-discretize" class="md-nav__link">
-    optimize-then-discretize
-  </a>
-  
-    <nav class="md-nav" aria-label="optimize-then-discretize">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#torchdde.ddesolve_adjoint" class="md-nav__link">
-    ddesolve_adjoint()
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#discretize-then-optimize" class="md-nav__link">
-    discretize-then-optimize
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
       
     </li>
   
@@ -381,8 +343,8 @@
   
   
     <li class="md-nav__item">
-      <a href="../training-ode/" class="md-nav__link">
-        Training a ODE
+      <a href="../neural-dde/" class="md-nav__link">
+        Neural DDE
       </a>
     </li>
   
@@ -397,6 +359,20 @@
     <li class="md-nav__item">
       <a href="../faq/" class="md-nav__link">
         FAQ
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contribute/" class="md-nav__link">
+        Contribute
       </a>
     </li>
   
@@ -472,67 +448,35 @@
               
                 
                 
-                <h1 id="training-a-dde">Training a DDE<a class="headerlink" href="#training-a-dde" title="Permanent link">¤</a></h1>
-<p>Two following ways are possible to train Neural DDE :</p>
+                <h1 id="training">Training<a class="headerlink" href="#training" title="Permanent link">¤</a></h1>
+<p>Two following ways are possible to train Neural DDEs / Neural ODEs :</p>
 <ul>
-<li>optimize-then-discretize</li>
-<li>discretize-then-optimize</li>
+<li>optimize-then-discretize (with the adjoint method)</li>
+<li>discretize-then-optimize (regular backpropagation)</li>
 </ul>
 <p>Please see the doctorial thesis <a href="https://arxiv.org/pdf/2202.02435.pdf">On Neural Differential Equations</a> for more information on both procedures.</p>
-<h2 id="optimize-then-discretize">optimize-then-discretize<a class="headerlink" href="#optimize-then-discretize" title="Permanent link">¤</a></h2>
-<p>If you choose to train with the adjoint method then you only to use <code>ddesolve_adjoint</code> :</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">torchdde</span> <span class="kn">import</span> <span class="n">ddesolve_adjoint</span>
-
-<span class="n">history_function</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">t</span> <span class="p">:</span> <span class="o">...</span>
-<span class="n">ts</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
-<span class="n">pred</span> <span class="o">=</span> <span class="n">ddesolve_adjoint</span><span class="p">(</span><span class="n">history_function</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">ts</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">solver</span><span class="p">)</span>
+<p>To choose from either two possibilities is easy, you just need to set the bool <code>discretize_then_optimize</code>.</p>
+<p>A simple training loop would look like: </p>
+<div class="highlight"><pre><span></span><code><span class="k">for</span> <span class="n">step</span><span class="p">,</span> <span class="n">data</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">train_loader</span><span class="p">):</span>
+    <span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+    <span class="n">ys_pred</span> <span class="o">=</span> <span class="n">integrate</span><span class="p">(</span>
+        <span class="n">model</span><span class="p">,</span>
+        <span class="n">solver</span><span class="o">=...</span><span class="p">,</span>
+        <span class="n">t0</span><span class="o">=</span><span class="n">ts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="n">t1</span><span class="o">=</span><span class="n">ts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span>
+        <span class="n">ts</span><span class="o">=</span><span class="n">ts</span><span class="p">,</span>
+        <span class="n">y0</span><span class="o">=...</span><span class="p">,</span>
+        <span class="n">args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">dt0</span><span class="o">=</span><span class="n">ts</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">ts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="n">delays</span><span class="o">=...</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">loss</span> <span class="o">=</span> <span class="n">loss_fn</span><span class="p">(</span><span class="n">ys_pred</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+    <span class="n">loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+    <span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
 </code></pre></div>
-
-
-  <div class="doc doc-object doc-function">
-
-
-
-<h4 id="torchdde.ddesolve_adjoint" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">torchdde</span><span class="o">.</span><span class="n">ddesolve_adjoint</span><span class="p">(</span><span class="n">history_func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">func</span><span class="p">:</span> <span class="n">Module</span><span class="p">,</span> <span class="n">ts</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;time&#39;</span><span class="p">],</span> <span class="n">args</span><span class="p">,</span> <span class="n">solver</span><span class="p">:</span> <span class="n">AbstractOdeSolver</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch time ...&#39;</span><span class="p">]</span></code>
-
-
-<a href="#torchdde.ddesolve_adjoint" class="headerlink" title="Permanent link">¤</a></h4>
-
-    <div class="doc doc-contents first">
-
-      <p>Main function to integrate a constant time delay DDE with the adjoint method</p>
-<p><strong>Arguments:</strong></p>
-<ul>
-<li><code>history_func</code>: DDE's history function</li>
-<li><code>func</code>: Pytorch model, i.e vector field</li>
-<li><code>ts</code>: Integration span</li>
-<li><code>solver</code>: ODE solver use</li>
-</ul>
-<p><strong>Returns:</strong></p>
-<p>Integration result over <code>ts</code>.</p>
-
-    </div>
-
-  </div>
-
-<h2 id="discretize-then-optimize">discretize-then-optimize<a class="headerlink" href="#discretize-then-optimize" title="Permanent link">¤</a></h2>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>You are unable to learn the DDE's delays if using the discretize-then-optimize approach.</p>
-</div>
-<p>If you choose to train with the inherent auto differentiation capabilities of Pytorch then you need to use <code>DDESolver</code> with specified : history function <code>history_function</code>, pytorch model <code>model</code>, integration span <code>ts</code>, ode solver used <code>solver</code>.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">torchdde</span> <span class="kn">import</span> <span class="n">ddesolve_adjoint</span>
-
-<span class="n">ode_solver</span> <span class="o">=</span> <span class="o">...</span>
-<span class="n">tensor_delays</span> <span class="o">=</span> <span class="o">...</span>
-<span class="n">dde_solver</span> <span class="o">=</span> <span class="n">DDEsolver</span><span class="p">(</span><span class="n">ode_solver</span><span class="p">,</span> <span class="n">tensor_delays</span><span class="p">)</span>
-<span class="n">history_function</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">t</span> <span class="p">:</span> <span class="o">...</span>
-<span class="n">ts</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
-<span class="n">pred</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">dde_solver</span><span class="o">.</span><span class="n">integrate</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ts</span><span class="p">,</span> <span class="n">history_function</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span>
-</code></pre></div>
+<p>If you are training an ODE then <code>delays=None</code> and <code>y0</code> is a <code>Tensor</code>.<br />
+If you are training an DDE then <code>delays</code> is a <code>Tensor</code> and <code>y0</code> is a <code>Callable</code>. </p>
                 
               
               
@@ -552,7 +496,7 @@
     <nav class="md-footer__inner md-grid" aria-label="Footer">
       
         
-        <a href="../solvers/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Numerical Solvers" rel="prev">
+        <a href="../stepsize-controller/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Stepsize controller" rel="prev">
           <div class="md-footer__button md-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
           </div>
@@ -561,20 +505,20 @@
               <span class="md-footer__direction">
                 Previous
               </span>
-              Numerical Solvers
+              Stepsize controller
             </div>
           </div>
         </a>
       
       
         
-        <a href="../training-ode/" class="md-footer__link md-footer__link--next" aria-label="Next: Training a ODE" rel="next">
+        <a href="../neural-dde/" class="md-footer__link md-footer__link--next" aria-label="Next: Neural DDE" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">
                 Next
               </span>
-              Training a ODE
+              Neural DDE
             </div>
           </div>
           <div class="md-footer__button md-icon">
