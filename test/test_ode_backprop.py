@@ -5,10 +5,11 @@ from torchdde import AdaptiveStepSizeController, ConstantStepSizeController, int
 from torchdde.solver import Dopri5, Euler, ImplicitEuler, Ralston, RK2, RK4
 
 
+@pytest.mark.parametrize("discretize_then_optimize", [True, False])
 @pytest.mark.parametrize(
     "solver", [Euler(), RK2(), Ralston(), RK4(), ImplicitEuler(), Dopri5()]
 )
-def test_very_simple_system(solver):
+def test_very_simple_system(solver, discretize_then_optimize):
     class SimpleNODE(nn.Module):
         def __init__(self):
             super().__init__()
@@ -64,6 +65,7 @@ def test_very_simple_system(solver):
             None,
             stepsize_controller=controller,
             dt0=ts[1] - ts[0],
+            discretize_then_optimize=discretize_then_optimize,
         )
         loss = lossfunc(ret, ys)
 

@@ -5,8 +5,9 @@ from torchdde import AdaptiveStepSizeController, ConstantStepSizeController, int
 from torchdde.solver import Dopri5, Euler, ImplicitEuler, Ralston, RK2, RK4
 
 
+@pytest.mark.parametrize("discretize_then_optimize", [True, False])
 @pytest.mark.parametrize("solver", [Euler(), RK2(), Ralston(), RK4(), ImplicitEuler()])
-def test_learning_delay_in_convex_case_constant(solver):
+def test_learning_delay_in_convex_case_constant(solver, discretize_then_optimize):
     class SimpleNDDE(nn.Module):
         def __init__(self, dim, list_delays):
             super().__init__()
@@ -34,7 +35,7 @@ def test_learning_delay_in_convex_case_constant(solver):
     ts = torch.linspace(0, 10, 101)
     list_delays = torch.tensor([1.0])
     rtol, atol, pcoeff, icoeff, dcoeff = 1e-3, 1e-6, 0.0, 1.0, 0.0
-    if solver.__class__.__name__ == "Dopri5" or solver.__class__.__name__ == "Heun":
+    if solver.__class__.__name__ == "Dopri5":
         controller = AdaptiveStepSizeController(
             rtol=rtol, atol=atol, pcoeff=pcoeff, icoeff=icoeff, dcoeff=dcoeff
         )
@@ -53,7 +54,13 @@ def test_learning_delay_in_convex_case_constant(solver):
         dt0=ts[1] - ts[0],
     )
 
-    learnable_delays = torch.abs(torch.randn((len(list_delays),))) + (ts[1] - ts[0])
+    learnable_delays = torch.nn.Parameter(
+        2
+        * (ts[1] - ts[0])
+        * torch.ones(
+            1,
+        )
+    )
     model = SimpleNDDE(dim=1, list_delays=learnable_delays)
     lossfunc = nn.MSELoss()
     opt = torch.optim.Adam(model.parameters(), lr=0.1, weight_decay=0)
@@ -71,6 +78,7 @@ def test_learning_delay_in_convex_case_constant(solver):
             None,
             dt0=ts[1] - ts[0],
             delays=model.delays,
+            discretize_then_optimize=discretize_then_optimize,
         )
         loss = lossfunc(ret, ys)
         if isinstance(solver, ImplicitEuler):
@@ -88,8 +96,9 @@ def test_learning_delay_in_convex_case_constant(solver):
     reason="This test doesn't work for AdaptiveStepSizeController,\
     but for ConstantStepSizeController, it does to be investigated..."
 )
+@pytest.mark.parametrize("discretize_then_optimize", [True, False])
 @pytest.mark.parametrize("solver", [Dopri5()])
-def test_learning_delay_in_convex_case_adaptative(solver):
+def test_learning_delay_in_convex_case_adaptative(solver, discretize_then_optimize):
     class SimpleNDDE(nn.Module):
         def __init__(self, dim, list_delays):
             super().__init__()
@@ -133,7 +142,13 @@ def test_learning_delay_in_convex_case_adaptative(solver):
         dt0=ts[1] - ts[0],
     )
 
-    learnable_delays = torch.abs(torch.randn((len(list_delays),))) + (ts[1] - ts[0])
+    learnable_delays = torch.nn.Parameter(
+        2
+        * (ts[1] - ts[0])
+        * torch.ones(
+            1,
+        )
+    )
     model = SimpleNDDE(dim=1, list_delays=learnable_delays)
     lossfunc = nn.MSELoss()
     opt = torch.optim.Adam(model.parameters(), lr=0.05, weight_decay=0)
@@ -152,6 +167,7 @@ def test_learning_delay_in_convex_case_adaptative(solver):
             stepsize_controller=controller,
             dt0=ts[1] - ts[0],
             delays=model.delays,
+            discretize_then_optimize=discretize_then_optimize,
         )
         loss = lossfunc(ret, ys)
         loss.backward()
