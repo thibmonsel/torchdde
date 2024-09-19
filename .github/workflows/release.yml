@@ -22,10 +22,8 @@ jobs:
     - name: Install dependencies
       run: |
         pip install -e .
-        cp -r ${{ github.workspace }}/test ./test
-        cp ${{ github.workspace }}/pyproject.toml ./pyproject.toml
         pip -r ./test/requirements.txt
-        pytest .test/
+        pytest test
     - name: Run tests
       run: |
         pytest test 
