@@ -5,32 +5,37 @@ on:
     branches:
       - master  # Set this to your default branch
 
+
 jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
+  build:
+    strategy:
+      matrix:
+        python-version: [ 3.11 ]
+        os: [ ubuntu-latest ]
+    runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install .
-        python -m pip install -r docs/requirements.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .
+          python -m pip install -r docs/requirements.txt
 
-    - name: Build docs
-      run: |
-        mkdocs build
-        mkdocs build  # twice, see https://github.com/patrick-kidger/pytkdocs_tweaks
+      - name: Build docs
+        run: |
+          mkdocs build
+          mkdocs build  # twice, see https://github.com/patrick-kidger/pytkdocs_tweaks
 
-
-    - name: Deploy to GitHub Pages
-      if: github.event_name == 'push'
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./site
+      - name: Deploy to GitHub Pages
+        if: github.event_name == 'push'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
