@@ -19,14 +19,12 @@ jobs:
         pip install
         build
         --user
-    - name: Install dependencies
+    - name: Install dependencies and Run tests
       run: |
-        pip install -e .
-        pip -r ./test/requirements.txt
+        python -m pip install --upgrade pip
+        python -m pip install .
+        python -m pip install -r docs/requirements.txt
         pytest test
-    - name: Run tests
-      run: |
-        pytest test 
     - name: Build a binary wheel and a source tarball
       run: python3 -m build
     - name: Store the distribution packages
