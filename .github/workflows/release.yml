@@ -22,8 +22,6 @@ jobs:
     - name: Install dependencies
       run: |
         pip install -e .
-        cp -r ${{ github.workspace }}/tests ./tests
-        cp ${{ github.workspace }}/pyproject.toml ./pyproject.toml
         python -m pip install -r ./tests/requirements.txt
         pytest
     - name: Run tests
@@ -110,7 +108,7 @@ jobs:
 
     environment:
       name: testpypi
-      url: https://test.pypi.org/p/torchdde
+      url: https://test.pypi.org/p/torchdde_testpypi
 
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
@@ -125,3 +123,11 @@ jobs:
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         repository-url: https://test.pypi.org/legacy/
+
+
+
+# pip install -e .
+# cp -r ${{ github.workspace }}/tests ./tests
+# cp ${{ github.workspace }}/pyproject.toml ./pyproject.toml
+# python -m pip install -r ./tests/requirements.txt
+# pytest
