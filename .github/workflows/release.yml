@@ -17,7 +17,7 @@ jobs:
                 cp -r ${{ github.workspace }}/test ./test
                 cp ${{ github.workspace }}/pyproject.toml ./pyproject.toml
                 python -m pip install -r ./test/requirements.txt
-                python -m test
+                pytest ./test
             pypi-token: ${{ secrets.pypi_token }}
             github-user: thibmonsel
-            github-token: ${{ github.token }}  # automatically created token
+            github-token: ${{ github.token }} 
