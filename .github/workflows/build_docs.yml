@@ -3,10 +3,7 @@ name: Build and Deploy MkDocs
 on:
   push:
     branches:
-      - main  # Set this to your default branch
-  pull_request:
-    branches:
-      - main
+      - master  # Set this to your default branch
 
 jobs:
   build-and-deploy:
