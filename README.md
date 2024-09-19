@@ -18,6 +18,8 @@ pip install torchdde/
 
 ## Documentation
 
+Github pages hosts the documentation at : [https://thibmonsel.github.io/torchdde/](https://thibmonsel.github.io/torchdde/)
+
 To generate the documentation locally, please look at `CONTRIBUTING.MD`.
 
 ## Quick example
