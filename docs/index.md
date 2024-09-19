@@ -4,6 +4,10 @@
 `torchdde` is a library that provides numerical solvers in [Pytorch](https://github.com/pytorch/pytorch) for Delay Differential Equations (DDEs) with constant delays.
 
 
+!!! warning
+
+    This a brand new library, please reach out for feedback, issues !
+
 ## Installation
 
 ```bash
@@ -22,12 +26,6 @@ pip install torchdde/
 To generate the documentation locally, please look at `CONTRIBUTING.MD`.
 
 ## Quick example
-!!! warning
-
-    This a brand new library, please reach out for feedback, issues !
-
-
-## Quick examples
 
 ```python
 import torch
