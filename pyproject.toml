@@ -3,7 +3,7 @@ name = "torchdde"
 version = "0.0.1"
 description = "DDE numerical solvers in Python."
 readme = "README.md"
-requires-python ="~=3.9"
+requires-python =">=3.9"
 license = {file = "LICENSE"}
 authors = [
   {name = "thibault monsel", email = "thibaultmonsel@gmail.com"},
