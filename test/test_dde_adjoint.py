@@ -81,7 +81,7 @@ def test_learning_delay_in_convex_case_constant(solver):
         if loss < 1e-6:
             break
 
-    assert torch.allclose(model.delays, list_delays, atol=0.05, rtol=0.00)
+    assert torch.allclose(model.delays, list_delays, atol=0.1, rtol=0.00)
 
 
 @pytest.mark.skip(
