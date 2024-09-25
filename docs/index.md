@@ -11,7 +11,7 @@
 ## Installation
 
 ```bash
-pip install git@github.com:thibmonsel/torchdde.git
+pip install torchdde
 ```
 
 or locally
@@ -20,10 +20,6 @@ or locally
 git clone https://github.com/thibmonsel/torchdde.git
 pip install torchdde/
 ```
-
-## Documentation
-
-To generate the documentation locally, please look at `CONTRIBUTING.MD`.
 
 ## Quick example
 
