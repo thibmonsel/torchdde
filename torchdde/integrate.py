@@ -293,6 +293,8 @@ def _integrate_dde(
         # TODO: do a fixed point iteration algorithm
         too_large = (tnext - tprev) > torch.min(delays)
         tnext = torch.where(too_large, tprev + torch.min(delays), tnext)
+        # Clipping tnext if it goes beyond t1
+        tnext = torch.where((tprev + dt) > t1, t1, tprev + dt)
         dt = torch.where(too_large, torch.min(delays), dt)
         step_save_idx = 0
         if keep_step:
@@ -412,6 +414,7 @@ def _integrate_ode(
             state.dt,
         )
         tprev = torch.clamp(tprev, max=t1)
+        tnext = torch.where((tprev + dt) > t1, t1, tprev + dt)
         step_save_idx = 0
         if keep_step:
             interp = solver.build_interpolation(state.tprev, state.tnext, dense_info)
@@ -448,8 +451,7 @@ def _integrate_ode(
             num_rejected_steps,
             save_idx,
         )
-
-        cond = tprev < t1 if (t1 > t0) else tprev > t1
+        cond = state.tprev < t1 if (t1 > t0) else state.tprev > t1
     if state.num_steps >= max_steps:
         raise RuntimeError(
             f"Maximum number of steps reached \
