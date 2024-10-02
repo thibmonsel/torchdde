@@ -294,7 +294,9 @@ def _integrate_dde(
         too_large = (tnext - tprev) > torch.min(delays)
         tnext = torch.where(too_large, tprev + torch.min(delays), tnext)
         # Clipping tnext if it goes beyond t1
+        # and update dt such that tprev + dt = tnext
         tnext = torch.where((tprev + dt) > t1, t1, tprev + dt)
+        dt = torch.where((tprev + dt) > t1, t1 - tprev, dt)
         dt = torch.where(too_large, torch.min(delays), dt)
         step_save_idx = 0
         if keep_step:
@@ -414,7 +416,10 @@ def _integrate_ode(
             state.dt,
         )
         tprev = torch.clamp(tprev, max=t1)
+        # Clipping tnext if it goes beyond t1
+        # and update dt such that tprev + dt = tnext
         tnext = torch.where((tprev + dt) > t1, t1, tprev + dt)
+        dt = torch.where((tprev + dt) > t1, t1 - tprev, dt)
         step_save_idx = 0
         if keep_step:
             interp = solver.build_interpolation(state.tprev, state.tnext, dense_info)
