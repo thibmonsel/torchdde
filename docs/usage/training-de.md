@@ -32,5 +32,5 @@ for step, data in enumerate(train_loader):
 
 ```
 
-If you are training an ODE then `delays=None` and `y0` is a `Tensor`.  
+If you are training an ODE then `delays=None` and `y0=data[:, 0]` is a `Tensor`.  
 If you are training an DDE then `delays` is a `Tensor` and `y0` is a `Callable`. 

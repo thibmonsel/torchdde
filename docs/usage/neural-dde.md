@@ -44,6 +44,9 @@ class NDDE(nn.Module):
         )
 
     def forward(self, t, z, args, *, history):
+        # `history` corresponds to the list of
+        # delayed states defined in your DDE
+        # i.e. here history=[y(t-tau1), ..., y(t-taun)]
         return self.mlp(torch.cat([z, *history], dim=-1))
 ```
 

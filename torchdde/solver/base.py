@@ -76,7 +76,7 @@ class AbstractOdeSolver(ABC):
 
     @abstractmethod
     def build_interpolation(self, t0, t1, dense_info) -> Any:
-        """Interpolator building method based on the solver's order.
+        """Interpolator building method based on the solver used.
 
         **Arguments:**
 
