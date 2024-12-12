@@ -395,6 +395,13 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#what-if-my-trajectories-have-different-evaluation-points" class="md-nav__link">
+    What if my trajectories have different evaluation points ?
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -502,7 +509,28 @@
 <span class="n">ys</span> <span class="o">=</span> <span class="n">torchdde</span><span class="o">.</span><span class="n">integrate</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">solver</span><span class="p">,</span> <span class="n">ts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">ts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">ts</span><span class="p">,</span> <span class="n">history_function</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">dt0</span><span class="o">=</span><span class="n">ts</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">ts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">delays</span><span class="o">=</span><span class="n">delays</span><span class="p">)</span>
 </code></pre></div>
 <h2 id="how-about-if-i-want-a-neural-network-to-have-also-several-delays">How about if I want a neural network to have also several delays ?<a class="headerlink" href="#how-about-if-i-want-a-neural-network-to-have-also-several-delays" title="Permanent link">¤</a></h2>
-<p>Well if its the same forward pass in the <a href="../neural-dde/">Neural DDE</a>, then nothing needs to be changed ! The term <code>torch.cat([z, *history], dim=-1)</code> unpacks all the delayed terms.</p>
+<p>Well if it's the same forward pass in the <a href="../neural-dde/">Neural DDE</a>, then nothing needs to be changed ! The term <code>torch.cat([z, *history], dim=-1)</code> unpacks all the delayed terms.</p>
+<h2 id="what-if-my-trajectories-have-different-evaluation-points">What if my trajectories have different evaluation points ?<a class="headerlink" href="#what-if-my-trajectories-have-different-evaluation-points" title="Permanent link">¤</a></h2>
+<p><code>torchdde</code> was developed with in mind that the evaluation points <code>ts</code> are the same for all trajectories.<br />
+Nonetheless, if this isn't the case, that's not an issue. One could think of doing the following : </p>
+<div class="highlight"><pre><span></span><code><span class="c1"># creating different evaluation times ts </span>
+<span class="n">different_ts_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,))</span><span class="o">.</span><span class="n">item</span><span class="p">())</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">4</span><span class="p">)]</span>
+<span class="n">all_values</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">different_ts_list</span><span class="p">)</span>
+<span class="c1"># taking all unique values from `different_ts_list`</span>
+<span class="n">ts</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">all_values</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span>
+
+<span class="c1"># integrate your ODE/DDE with ts </span>
+<span class="c1"># after successful integration, we will have to take the values of ys at the times ts_list</span>
+<span class="n">ys</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">((</span><span class="mi">4</span><span class="p">,</span> <span class="n">ts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">2</span><span class="p">))</span>
+
+<span class="n">ys_list_pred</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">ys_</span><span class="p">,</span> <span class="n">ts_</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">ys</span><span class="p">,</span> <span class="n">different_ts_list</span><span class="p">):</span> 
+    <span class="c1"># creating a mask to get the values of ys at the times ts_list</span>
+    <span class="n">mask</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">ts</span><span class="p">,</span> <span class="n">ts_</span><span class="p">))</span>
+    <span class="k">assert</span> <span class="n">torch</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">different_ts_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">ts</span><span class="p">[</span><span class="n">mask</span><span class="p">]),</span> <span class="s2">&quot;Error&quot;</span>
+    <span class="n">ys_subset</span> <span class="o">=</span> <span class="n">ys_</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span>
+    <span class="n">ys_list_pred</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ys_subset</span><span class="p">)</span>
+</code></pre></div>
                 
               
               

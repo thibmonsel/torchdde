@@ -486,6 +486,9 @@
         <span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">history</span><span class="p">):</span>
+        <span class="c1"># `history` corresponds to the list of</span>
+        <span class="c1"># delayed states defined in your DDE</span>
+        <span class="c1"># i.e. here history=[y(t-tau1), ..., y(t-taun)]</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlp</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">z</span><span class="p">,</span> <span class="o">*</span><span class="n">history</span><span class="p">],</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">))</span>
 </code></pre></div>
 <p>We generate the toy dataset of the <a href="https://www.math.miami.edu/~ruan/MyPapers/Ruan-nato.pdf">delayed logistic equation</a> (Equation 2.1).</p>

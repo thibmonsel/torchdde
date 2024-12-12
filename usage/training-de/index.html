@@ -475,7 +475,7 @@
     <span class="n">loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
     <span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
 </code></pre></div>
-<p>If you are training an ODE then <code>delays=None</code> and <code>y0</code> is a <code>Tensor</code>.<br />
+<p>If you are training an ODE then <code>delays=None</code> and <code>y0=data[:, 0]</code> is a <code>Tensor</code>.<br />
 If you are training an DDE then <code>delays</code> is a <code>Tensor</code> and <code>y0</code> is a <code>Callable</code>. </p>
                 
               
