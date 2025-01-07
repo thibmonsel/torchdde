@@ -11,7 +11,7 @@ authors = [
 keywords = ["torch", "dynamical-systems", "differential-equations", "deep-learning", "neural-differential-equations"]
 
 urls = {repository = "https://github.com/thibmonsel/torchdde" }
-dependencies = ["torch>=2.1", "jaxtyping>=0.2.24", "typing_extensions>=4.5.0"]
+dependencies = ["torch", "jaxtyping>=0.2.24", "typing_extensions>=4.5.0"]
 
 [build-system]
 requires = ["hatchling"]
