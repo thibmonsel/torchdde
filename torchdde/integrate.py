@@ -249,7 +249,9 @@ def _integrate_dde(
         ]
         return func(t, y, args, history=history)
 
-    tnext, dt = stepsize_controller.init(func, t0, t1, y0, dt0, args, solver.order())
+    tnext, dt = stepsize_controller.init(
+        ode_func, t0, t1, y0, dt0, args, solver.order()
+    )
     dt = torch.clamp(dt, max=torch.min(delays))
 
     state = State(
