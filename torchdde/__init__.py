@@ -11,6 +11,7 @@ from .local_interpolation import (
     FourthOrderPolynomialInterpolation as FourthOrderPolynomialInterpolation,
     ThirdOrderPolynomialInterpolation as ThirdOrderPolynomialInterpolation,
 )
+from .misc import TupleTensorTransformer as TupleTensorTransformer
 from .solver import (
     AbstractOdeSolver as AbstractOdeSolver,
     Dopri5 as Dopri5,
