@@ -32,6 +32,7 @@ class odeint_ACA(torch.autograd.Function):
         ctx.ts = ts
         ctx.y0 = y0
         ctx.solver = solver
+        ctx.dt0 = dt0
         ctx.stepsize_controller = stepsize_controller
         ctx.max_steps = max_steps
 
@@ -58,7 +59,7 @@ class odeint_ACA(torch.autograd.Function):
         # grad_output holds the gradient of the
         # loss w.r.t. each evaluation step
         grad_output = grad_y[0]
-        dt = ctx.ts[1] - ctx.ts[0]
+        dt0 = ctx.dt0
         ys = ctx.ys
         ts = ctx.ts
         args = ctx.args
@@ -87,7 +88,6 @@ class odeint_ACA(torch.autograd.Function):
 
         for i in range(len(ts) - 1, 0, -1):
             t0, t1 = ts[i], ts[i - 1]
-            dt = t1 - t0
             y_t = torch.autograd.Variable(ys[:, i], requires_grad=True)
             with torch.enable_grad():
                 aug_state[0] = y_t
@@ -101,7 +101,7 @@ class odeint_ACA(torch.autograd.Function):
                     args,
                     solver,
                     stepsize_controller,
-                    dt,
+                    -dt0,
                     ctx.max_steps,
                 )
                 aug_state = transformer.unflatten(aug_state[0])

@@ -428,6 +428,9 @@ def _integrate_ode(
             # and that we are in the case where ts[0] == t1 do the
             # following :
             # NOTE : this is used for adjoint computation
+            # This works if we have ts[i+1] - ts[i] that is
+            # small enough. This will most likely not work
+            # if dt is "large"
             if len(ts) == 1 and t1 == state.tnext:
                 ys[:, state.save_idx] = y
                 step_save_idx += 1
