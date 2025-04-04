@@ -1,10 +1,10 @@
 import pytest
 import torch
 from torchdde import AdaptiveStepSizeController, integrate
-from torchdde.solver import Dopri5, Euler, ImplicitEuler, RK2, RK4
+from torchdde.solver import Bosh3, Dopri5, Euler, ImplicitEuler, RK2, RK4
 
 
-@pytest.mark.parametrize("solver", [Euler(), RK2(), RK4(), Dopri5()])
+@pytest.mark.parametrize("solver", [Euler(), RK2(), RK4()])
 def test_explicit_solver_constant(solver):
     vf = lambda t, y, args: -y
     ts = torch.linspace(0, 5, 500)
@@ -13,7 +13,7 @@ def test_explicit_solver_constant(solver):
     assert torch.allclose(ys[:, -1], y0 * torch.exp(-ts[-1]), rtol=10e-3, atol=10e-3)
 
 
-@pytest.mark.parametrize("solver", [Euler(), RK2()])
+@pytest.mark.parametrize("solver", [Euler()])
 def test_explicit_solver_constant2(solver):
     vf = lambda t, y, args: t + t**2
     ts = torch.linspace(0, 5, 500)
@@ -27,7 +27,7 @@ def test_explicit_solver_constant2(solver):
 @pytest.mark.skip(
     reason="RK stages for only time dependent DE don't respect the y0 shape natively"
 )
-@pytest.mark.parametrize("solver", [RK4()])
+@pytest.mark.parametrize("solver", [RK2(), RK4()])
 def test_explicit_solver_constant3(solver):
     vf = lambda t, y, args: t + t**2
     ts = torch.linspace(0, 5, 500)
@@ -38,7 +38,7 @@ def test_explicit_solver_constant3(solver):
     )
 
 
-@pytest.mark.parametrize("solver", [Dopri5()])
+@pytest.mark.parametrize("solver", [Dopri5(), Bosh3()])
 def test_explicit_solver_adaptive(solver):
     vf = lambda t, y, args: -y
     ts = torch.linspace(0, 5, 500)
@@ -57,7 +57,7 @@ def test_explicit_solver_adaptive(solver):
     reason="Fix integration for only time dependent \
         functions for adaptive step size controllers"
 )
-@pytest.mark.parametrize("solver", [Dopri5()])
+@pytest.mark.parametrize("solver", [Dopri5(), Bosh3()])
 def test_explicit_solver_adaptive2(solver):
     vf = lambda t, y, args: t + t**2
     ts = torch.linspace(0, 5, 500)

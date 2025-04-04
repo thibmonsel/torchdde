@@ -1,4 +1,4 @@
-from .base import AbstractInterpolation as AbstractInterpolation
+from .base import AbstractLocalInterpolation as AbstractLocalInterpolation
 from .first_order_interpolation import (
     FirstOrderPolynomialInterpolation as FirstOrderPolynomialInterpolation,
 )

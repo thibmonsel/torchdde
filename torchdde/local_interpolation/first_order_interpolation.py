@@ -3,8 +3,10 @@ from typing import Dict, Optional, Union
 import torch
 from jaxtyping import Float
 
+from torchdde.local_interpolation.base import AbstractLocalInterpolation
 
-class FirstOrderPolynomialInterpolation:
+
+class FirstOrderPolynomialInterpolation(AbstractLocalInterpolation):
     def __init__(
         self,
         t0: Float[torch.Tensor, ""],
@@ -19,8 +21,10 @@ class FirstOrderPolynomialInterpolation:
     def __call__(
         self,
         t: Union[Float[torch.Tensor, " 1"], Float[torch.Tensor, ""]],
+        t1: Optional[Union[Float[torch.Tensor, " 1"], Float[torch.Tensor, ""]]] = None,
         left: Optional[bool] = True,
     ) -> Float[torch.Tensor, "batch ..."]:
+        del t1, left
         dt = self.t1 - self.t0
         dt = torch.where(dt.abs() > 0.0, dt, 1.0)
         coeff = (self.y1 - self.y0) / dt

@@ -1,11 +1,13 @@
-from typing import Any, Callable, Union
+from typing import Any, Callable, Dict, Tuple, Type, Union
 
 import torch
 from jaxtyping import Float
 
+from torchdde.local_interpolation.first_order_interpolation import (
+    AbstractLocalInterpolation,
+    FirstOrderPolynomialInterpolation,
+)
 from torchdde.solver.base import AbstractOdeSolver
-
-from ..local_interpolation import FirstOrderPolynomialInterpolation
 
 
 class ImplicitEuler(AbstractOdeSolver):
@@ -15,15 +17,18 @@ class ImplicitEuler(AbstractOdeSolver):
     # of the implicit Euler method, adapted from:
     # https://github.com/DiffEqML/torchdyn/blob/95cc74b0e35330b03d2cd4d875df362a93e1b5ea/torchdyn/numerics/solvers/ode.py#L181
 
-    interpolation_cls = FirstOrderPolynomialInterpolation
+    interpolation_cls: Type[
+        AbstractLocalInterpolation
+    ] = FirstOrderPolynomialInterpolation
 
-    def __init__(self, max_iters=100):
+    def __init__(self, max_iters: int = 100):
         super().__init__()
         self.opt = torch.optim.LBFGS
         self.max_iters = max_iters
 
-    def init(self):
-        pass
+    def init(self, func, t0, y0, dt0, func_args, *args, **kwargs):
+        del func, t0, y0, dt0, func_args, args, kwargs
+        return None
 
     def order(self):
         return 1
@@ -35,13 +40,13 @@ class ImplicitEuler(AbstractOdeSolver):
         y: Float[torch.Tensor, "batch ..."],
         dt: Float[torch.Tensor, ""],
         y_sol: Float[torch.Tensor, "batch ..."],
-        args: Any,
+        func_args: Any,
         has_aux=False,
     ) -> Float[torch.Tensor, ""]:
         if has_aux:
-            f_sol, _ = func(t, y_sol, args)
+            f_sol, _ = func(t, y_sol, func_args)
         else:
-            f_sol = func(t, y_sol, args)
+            f_sol = func(t, y_sol, func_args)
         return torch.sum((y_sol - y - dt * f_sol) ** 2)
 
     def step(
@@ -50,14 +55,18 @@ class ImplicitEuler(AbstractOdeSolver):
         t: Float[torch.Tensor, ""],
         y: Float[torch.Tensor, "batch ..."],
         dt: Float[torch.Tensor, ""],
-        args: Any,
-        has_aux=False,
+        solver_state: Union[Tuple[Any, ...], None],
+        func_args: Any,
+        has_aux: bool = False,
     ) -> tuple[
         Float[torch.Tensor, "batch ..."],
+        None,
+        Dict[str, Float[torch.Tensor, "batch ..."]],
+        None,
         Any,
-        dict[str, Float[torch.Tensor, "batch order"]],
-        Union[Float[torch.Tensor, " batch"], Any],
     ]:
+        assert solver_state is None, "Implicit Euler solver should be stateless"
+
         y_sol = y.clone()
         y_sol = torch.nn.Parameter(data=y_sol)
         opt = self.opt(
@@ -74,7 +83,7 @@ class ImplicitEuler(AbstractOdeSolver):
         def closure() -> Float[torch.Tensor, ""]:
             opt.zero_grad()
             residual = ImplicitEuler._residual(
-                func, t, y, dt, y_sol, args, has_aux=has_aux
+                func, t, y, dt, y_sol, func_args, has_aux=has_aux
             )
             (y_sol.grad,) = torch.autograd.grad(
                 residual, y_sol, only_inputs=True, allow_unused=False
@@ -83,12 +92,15 @@ class ImplicitEuler(AbstractOdeSolver):
 
         opt.step(closure)  # type: ignore
         if has_aux:
-            _, aux = func(t, y, args)
-            return y_sol, None, dict(y0=y, y1=y_sol), aux
+            _, aux = func(t, y, func_args)
+            return y_sol, None, dict(y0=y, y1=y_sol), None, aux
         else:
-            return y_sol, None, dict(y0=y, y1=y_sol), None
+            return y_sol, None, dict(y0=y, y1=y_sol), None, None
 
     def build_interpolation(
-        self, t0, t1, dense_info
+        self,
+        t0: Float[torch.Tensor, ""],
+        t1: Float[torch.Tensor, ""],
+        dense_info: Dict[str, Float[torch.Tensor, "batch ..."]],
     ) -> FirstOrderPolynomialInterpolation:
-        return self.interpolation_cls(t0, t1, dense_info)
+        return self.interpolation_cls(t0, t1, dense_info)  # type: ignore
