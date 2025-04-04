@@ -6,13 +6,14 @@ from .global_interpolation import (
 )
 from .integrate import integrate as integrate
 from .local_interpolation import (
-    AbstractInterpolation as AbstractInterpolation,
+    AbstractLocalInterpolation as AbstractLocalInterpolation,
     FirstOrderPolynomialInterpolation as FirstOrderPolynomialInterpolation,
     FourthOrderPolynomialInterpolation as FourthOrderPolynomialInterpolation,
     ThirdOrderPolynomialInterpolation as ThirdOrderPolynomialInterpolation,
 )
 from .solver import (
     AbstractOdeSolver as AbstractOdeSolver,
+    Bosh3 as Bosh3,
     Dopri5 as Dopri5,
     Euler as Euler,
     ImplicitEuler as ImplicitEuler,

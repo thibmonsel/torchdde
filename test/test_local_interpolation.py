@@ -14,8 +14,8 @@ def test_third_order_interpolation():
 
     y0, f0 = y(t0), yprime(t0)
     y1, f1 = y(t1), yprime(t1)
-    k0 = f0 * (t1 - t0)
-    k1 = f1 * (t1 - t0)
+    k0 = f0
+    k1 = f1
     y0, f0, y1, f1, k0, k1 = (
         y0.reshape(-1, 1),
         f0.reshape(-1, 1),
@@ -27,6 +27,6 @@ def test_third_order_interpolation():
     dense_info = dict(y0=y0, y1=y1, k=torch.stack([k0, k1]))
     interp = ThirdOrderPolynomialInterpolation(t0=t0, t1=t1, dense_info=dense_info)
     assert torch.allclose(
-        interp(torch.tensor(2.6)).flatten(),
+        y(torch.tensor(2.6)).flatten(),
         interp(torch.tensor(2.6)).flatten(),
     )

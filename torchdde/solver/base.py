@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Union
+from typing import Any, Callable, Dict, Tuple, Type, Union
 
 import torch
 from jaxtyping import Float
 
-from torchdde.local_interpolation.base import AbstractInterpolation
+from torchdde.local_interpolation.base import AbstractLocalInterpolation
 
 
 class AbstractOdeSolver(ABC):
@@ -12,12 +12,37 @@ class AbstractOdeSolver(ABC):
     To create new solvers users must implement the `init`, `step` and `order` method.
     """
 
-    interpolation_cls: AbstractInterpolation
+    interpolation_cls: Type[AbstractLocalInterpolation]
 
     @abstractmethod
-    def init(self):
+    def init(
+        self,
+        func: Union[torch.nn.Module, Callable],
+        t0: Float[torch.Tensor, ""],
+        y0: Float[torch.Tensor, "batch ..."],
+        dt0: Float[torch.Tensor, ""],
+        func_args: Any,  # Renamed from 'args' - holds arguments for 'func'
+        *args: Any,  # Captures any *extra* positional args passed to init
+        **kwargs: Any,  # Optionally capture extra keyword args too
+    ) -> Union[Tuple[Any, ...], None]:
         """
-        Initializes the solver. This method is called before the integration starts.
+        Initializes the solver state. This method is called before the
+        integration starts.
+
+        **Arguments:**
+
+        - `func`: Pytorch model or callable function, i.e vector field
+        - `t0`: Start of the integration time `t0`
+        - `y0`: Initial state `y0`
+        - `dt0`: Initial step size `dt0`
+        - `func_args`: Arguments to be passed along to `func` when it's called
+                       (e.g., func(t, y, func_args)).
+        - `*args`: Additional positional arguments passed to init (use rarely).
+        - `**kwargs`: Additional keyword arguments passed to init.
+
+        **Returns**
+
+        The initial solver state, which should be used the first time `step` is called.
         """
         pass
 
@@ -35,12 +60,14 @@ class AbstractOdeSolver(ABC):
         t: Float[torch.Tensor, ""],
         y: Float[torch.Tensor, "batch ..."],
         dt: Float[torch.Tensor, ""],
-        args: Any,
-        has_aux=False,
-    ) -> tuple[
+        solver_state: Union[Tuple[Any, ...], None],
+        func_args: Any,
+        has_aux: bool = False,
+    ) -> Tuple[
         Float[torch.Tensor, "batch ..."],
-        Float[torch.Tensor, "batch ..."],
+        Union[Float[torch.Tensor, "batch ..."], None],
         dict[str, Float[torch.Tensor, "batch order"]],
+        Union[Tuple[Any, ...], None],
         Union[Float[torch.Tensor, " batch"], Any],
     ]:
         """ODE's solver stepping method
@@ -57,7 +84,7 @@ class AbstractOdeSolver(ABC):
 
             A function with an auxiliary output can look like
             ```python
-            def f(t,y,args):
+            def f(t,y,func_args):
                 return -y, ("Hello World",1)
             ```
             The `has_aux` `kwargs` argument is used to compute the adjoint method
@@ -75,7 +102,12 @@ class AbstractOdeSolver(ABC):
         pass
 
     @abstractmethod
-    def build_interpolation(self, t0, t1, dense_info) -> Any:
+    def build_interpolation(
+        self,
+        t0: Float[torch.Tensor, ""],
+        t1: Float[torch.Tensor, ""],
+        dense_info: Dict[str, Float[torch.Tensor, "..."]],
+    ) -> AbstractLocalInterpolation:
         """Interpolator building method based on the solver used.
 
         **Arguments:**

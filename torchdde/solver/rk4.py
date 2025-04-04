@@ -1,57 +1,35 @@
-from typing import Any, Callable, Union
-
-import torch
-from jaxtyping import Float
-
-from torchdde.solver.base import AbstractOdeSolver
-
-from ..local_interpolation import ThirdOrderPolynomialInterpolation
+from torchdde.local_interpolation import ThirdOrderPolynomialInterpolation
+from torchdde.solver.runge_kutta import ButcherTableau, ExplicitRungeKutta
 
 
-class RK4(AbstractOdeSolver):
-    """4th order explicit Runge-Kutta method"""
+# Define the RK4 class inheriting from ExplicitRungeKutta
+class RK4(ExplicitRungeKutta):
+    """
+    Classic fourth-order explicit Runge-Kutta method.
 
-    interpolation_cls = ThirdOrderPolynomialInterpolation
+    This implementation uses the standard Butcher Tableau for RK4.
+    It does not inherently provide error estimation for adaptive step sizing.
+    """
 
     def __init__(self):
-        super().__init__()
+        c_list = [0.0, 1 / 2, 1 / 2, 1.0]
 
-    def init(self):
-        pass
+        a_list = [[], [1 / 2], [0.0, 1 / 2], [0.0, 0.0, 1.0]]
 
-    def order(self):
-        return 2
+        b_list = [1 / 6, 1 / 3, 1 / 3, 1 / 6]
+        # Standard RK4 doesn't have an embedded method for error estimation
+        # by default, so b_err is [0, 0, 0, 0].
+        b_err_list = [0.0, 0.0, 0.0, 0.0]
 
-    def step(
-        self,
-        func: Union[torch.nn.Module, Callable],
-        t: Float[torch.Tensor, ""],
-        y: Float[torch.Tensor, "batch ..."],
-        dt: Float[torch.Tensor, ""],
-        args: Any,
-        has_aux=False,
-    ) -> tuple[
-        Float[torch.Tensor, "batch ..."],
-        Any,
-        dict[str, Float[torch.Tensor, "batch order"]],
-        Union[Float[torch.Tensor, " batch"], Any],
-    ]:
-        if has_aux:
-            k1, aux = func(t, y, args)
-            k2, _ = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k1, args)
-            k3, _ = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k2, args)
-            k4, _ = func(t + dt, y + dt * k3, args)
-            y1 = y + 1 / 6 * dt * (k1 + 2 * k2 + 2 * k3 + k4)
-            return y1, None, dict(y0=y, k=torch.stack([k1, k2, k3, k4]), y1=y1), aux
-        else:
-            k1 = func(t, y, args)
-            k2 = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k1, args)
-            k3 = func(t + 1 / 2 * dt, y + 1 / 2 * dt * k2, args)
-            k4 = func(t + dt, y + dt * k3, args)
-            y1 = y + 1 / 6 * dt * (k1 + 2 * k2 + 2 * k3 + k4)
-            return y1, None, dict(y0=y, k=torch.stack([k1, k2, k3, k4]), y1=y1), None
+        # Create the ButcherTableau object
+        rk4_tableau = ButcherTableau.from_lists(
+            c=c_list, a=a_list, b=b_list, b_err=b_err_list
+        )
 
-    def build_interpolation(
-        self, t0, t1, dense_info
-    ) -> ThirdOrderPolynomialInterpolation:
-        return self.interpolation_cls(t0, t1, dense_info)
+        super().__init__(
+            tableau=rk4_tableau,
+            interpolation_cls=ThirdOrderPolynomialInterpolation,
+        )
+
+    def order(self) -> int:
+        return 4

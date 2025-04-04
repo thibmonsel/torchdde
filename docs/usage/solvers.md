@@ -23,6 +23,9 @@ Only some explicit solvers are available to use but adding new ones is rather si
 ::: torchdde.RK4
     selection:
         members: false
+::: torchdde.Bosh3
+    selection:
+        members: false
 ::: torchdde.Dopri5
     selection:
         members: false

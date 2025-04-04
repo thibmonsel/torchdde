@@ -3,6 +3,8 @@ from typing import Dict, Optional, Union
 import torch
 from jaxtyping import Float
 
+from torchdde.local_interpolation.base import AbstractLocalInterpolation
+
 
 def linear_rescale(t0, t, t1):
     """
@@ -15,7 +17,7 @@ def linear_rescale(t0, t, t1):
     return numerator / denominator
 
 
-class FourthOrderPolynomialInterpolation:
+class FourthOrderPolynomialInterpolation(AbstractLocalInterpolation):
     """Polynomial interpolation on [t0, t1].
 
     `coefficients` holds the coefficients of a fourth-order polynomial on [0, 1] in

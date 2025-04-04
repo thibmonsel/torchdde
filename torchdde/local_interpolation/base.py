@@ -1,15 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 import torch
 from jaxtyping import Float
 
 
-class AbstractInterpolation(ABC):
+class AbstractLocalInterpolation(ABC):
     """Abstract class for creating new interpolation classes."""
 
-    @abstractmethod
-    def init(
+    def __init__(
         self,
         t0: Float[torch.Tensor, ""],
         t1: Float[torch.Tensor, ""],
@@ -24,7 +23,10 @@ class AbstractInterpolation(ABC):
 
     @abstractmethod
     def __call__(
-        self, t: Float[torch.Tensor, ""], left: Optional[bool] = True
+        self,
+        t: Union[Float[torch.Tensor, " 1"], Float[torch.Tensor, ""]],
+        t1: Optional[Union[Float[torch.Tensor, " 1"], Float[torch.Tensor, ""]]] = None,
+        left: Optional[bool] = True,
     ) -> Float[torch.Tensor, "batch ..."]:
         """
         Call method for the interpolation class that is used to
