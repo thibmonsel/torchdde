@@ -6,7 +6,7 @@
 
 !!! warning
 
-    This a brand new library, please reach out for feedback, issues !
+    This a brand new library, please reach out for feedback, issues ! 
 
 ## Installation
 
