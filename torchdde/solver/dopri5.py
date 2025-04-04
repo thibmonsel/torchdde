@@ -1,11 +1,9 @@
-from typing import Any, Callable, Union
-
 import torch
-from jaxtyping import Float
 
-from torchdde.solver.base import AbstractOdeSolver
-
-from ..local_interpolation import FourthOrderPolynomialInterpolation
+from torchdde.local_interpolation.fourth_order_interpolation import (
+    FourthOrderPolynomialInterpolation,
+)
+from torchdde.solver.runge_kutta import ButcherTableau, ExplicitRungeKutta
 
 
 class _Dopri5Interpolation(FourthOrderPolynomialInterpolation):
@@ -24,97 +22,48 @@ class _Dopri5Interpolation(FourthOrderPolynomialInterpolation):
     def __init__(self, t0, t1, dense_info):
         super().__init__(t0, t1, dense_info, self.c_mid)
 
-
-class Dopri5(AbstractOdeSolver):
-    """5th order order explicit Runge-Kutta method Dormand Prince"""
-
-    interpolation_cls = _Dopri5Interpolation
-
-    a_lower = (
-        torch.tensor([1 / 5]),
-        torch.tensor([3 / 40, 9 / 40]),
-        torch.tensor([44 / 45, -56 / 15, 32 / 9]),
-        torch.tensor([19372 / 6561, -25360 / 2187, 64448 / 6561, -212 / 729]),
-        torch.tensor([9017 / 3168, -355 / 33, 46732 / 5247, 49 / 176, -5103 / 18656]),
-        torch.tensor([35 / 384, 0, 500 / 1113, 125 / 192, -2187 / 6784, 11 / 84]),
-    )
-    b_sol = (
-        torch.tensor([35 / 384, 0, 500 / 1113, 125 / 192, -2187 / 6784, 11 / 84, 0]),
-    )
-    b_error = (
-        torch.tensor(
-            [
-                35 / 384 - 1951 / 21600,
-                0,
-                500 / 1113 - 22642 / 50085,
-                125 / 192 - 451 / 720,
-                -2187 / 6784 - -12231 / 42400,
-                11 / 84 - 649 / 6300,
-                -1.0 / 60.0,
-            ],
-        ),
-    )
-    c = (torch.tensor([1 / 5, 3 / 10, 4 / 5, 8 / 9, 1.0, 1.0]),)
-
-    def __init__(self):
-        super().__init__()
-
     def init(self):
         pass
 
+
+class Dopri5(ExplicitRungeKutta):
+    """
+    Dormand-Prince 5(4) explicit Runge-Kutta method.
+
+    Uses a 7-stage, 5th-order method with an embedded 4th-order method for
+    error estimation and adaptive step sizing. Features the FSAL property.
+    """
+
+    c_list = [0.0, 1 / 5, 3 / 10, 4 / 5, 8 / 9, 1.0, 1.0]
+    a_list = [
+        [],
+        [1 / 5],
+        [3 / 40, 9 / 40],
+        [44 / 45, -56 / 15, 32 / 9],
+        [19372 / 6561, -25360 / 2187, 64448 / 6561, -212 / 729],
+        [9017 / 3168, -355 / 33, 46732 / 5247, 49 / 176, -5103 / 18656],
+        [35 / 384, 0.0, 500 / 1113, 125 / 192, -2187 / 6784, 11 / 84],
+    ]
+    b_list = [35 / 384, 0.0, 500 / 1113, 125 / 192, -2187 / 6784, 11 / 84, 0.0]
+    b_err_list = [
+        (35 / 384 - 5179 / 57600),
+        (0.0 - 0.0),
+        (500 / 1113 - 7571 / 16695),
+        (125 / 192 - 393 / 640),
+        (-2187 / 6784 - -92097 / 339200),
+        (11 / 84 - 187 / 2100),
+        (0.0 - 1 / 40),
+    ]
+
+    def __init__(self):
+        dopri5_tableau = ButcherTableau.from_lists(
+            c=self.c_list, a=self.a_list, b=self.b_list, b_err=self.b_err_list
+        )
+
+        super().__init__(
+            tableau=dopri5_tableau,
+            interpolation_cls=_Dopri5Interpolation,
+        )
+
     def order(self):
         return 5
-
-    def to(self, device):
-        self.a_lower = tuple([ai.to(device) for ai in self.a_lower])
-        self.b_sol = tuple([bi.to(device) for bi in self.b_sol])
-        self.b_error = tuple([be.to(device) for be in self.b_error])
-        self.c = tuple([ci.to(device) for ci in self.c])
-        self.interpolation_cls.c_mid = self.interpolation_cls.c_mid.to(device)
-
-    def step(
-        self,
-        func: Union[torch.nn.Module, Callable],
-        t: Float[torch.Tensor, ""],
-        y: Float[torch.Tensor, "batch ..."],
-        dt: Union[Float[torch.Tensor, ""], float],
-        args: Any,
-        has_aux=False,
-    ) -> tuple[
-        Float[torch.Tensor, "batch ..."],
-        Float[torch.Tensor, "batch ..."],
-        dict[str, Float[torch.Tensor, "..."]],
-        Union[Float[torch.Tensor, "batch ..."], Any],
-    ]:
-        if has_aux:
-            k = []
-            k1, aux = func(t, y, args)
-            k.append(k1)
-            for ci, ai in zip(self.c[0], self.a_lower):
-                ki, _ = func(
-                    t + dt * ci,
-                    y + dt * torch.einsum("k, kbf -> bf", ai, torch.stack(k)),
-                    args,
-                )
-                k.append(ki)
-            y1 = y + dt * torch.einsum("k, kbf -> bf", self.b_sol[0], torch.stack(k))
-            y_error = dt * torch.einsum("k, kbf -> bf", self.b_error[0], torch.stack(k))
-            dense_info = dict(y0=y, y1=y1, k=torch.stack(k))
-            return y1, y_error, dense_info, aux
-        else:
-            k = []
-            k.append(func(t, y, args))
-            for ci, ai in zip(self.c[0], self.a_lower):
-                ki = func(
-                    t + dt * ci,
-                    y + dt * torch.einsum("k, kbf -> bf", ai, torch.stack(k)),
-                    args,
-                )
-                k.append(ki)
-            y1 = y + dt * torch.einsum("k, kbf -> bf", self.b_sol[0], torch.stack(k))
-            y_error = dt * torch.einsum("k, kbf -> bf", self.b_error[0], torch.stack(k))
-            dense_info = dict(y0=y, y1=y1, k=torch.stack(k))
-            return y1, y_error, dense_info, None
-
-    def build_interpolation(self, t0, t1, dense_info):
-        return self.interpolation_cls(t0, t1, dense_info)

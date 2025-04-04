@@ -1,53 +1,31 @@
-from typing import Any, Callable, Union
-
-import torch
-from jaxtyping import Float
-
-from torchdde.solver.base import AbstractOdeSolver
-
-from ..local_interpolation import FirstOrderPolynomialInterpolation
+from torchdde.local_interpolation import FirstOrderPolynomialInterpolation
+from torchdde.solver.runge_kutta import ButcherTableau, ExplicitRungeKutta
 
 
-class RK2(AbstractOdeSolver):
-    """2nd order explicit Runge-Kutta method"""
+class RK2(ExplicitRungeKutta):
+    """
+    Second-order explicit Runge-Kutta method (RK2's method).
 
-    interpolation_cls = FirstOrderPolynomialInterpolation
+    This implementation uses the 2-stage Butcher Tableau for Heun's method
+    (also known as the improved Euler method or trapezoidal rule).
+    It does not inherently provide error estimation for adaptive step sizing.
+    """
 
     def __init__(self):
-        super().__init__()
+        c_list = [0.0, 1.0]
+        a_list = [[], [1.0]]
+        b_list = [1 / 2, 1 / 2]
+        b_err_list = [0.0, 0.0]
 
-    def init(self):
-        pass
+        # Create the ButcherTableau object
+        rk2_tableau = ButcherTableau.from_lists(
+            c=c_list, a=a_list, b=b_list, b_err=b_err_list
+        )
 
-    def order(self):
+        super().__init__(
+            tableau=rk2_tableau,
+            interpolation_cls=FirstOrderPolynomialInterpolation,
+        )
+
+    def order(self) -> int:
         return 2
-
-    def step(
-        self,
-        func: Union[torch.nn.Module, Callable],
-        t: Float[torch.Tensor, ""],
-        y: Float[torch.Tensor, "batch ..."],
-        dt: Float[torch.Tensor, ""],
-        args: Any,
-        has_aux=False,
-    ) -> tuple[
-        Float[torch.Tensor, "batch ..."],
-        Any,
-        dict[str, Float[torch.Tensor, "batch order"]],
-        Union[Float[torch.Tensor, " batch"], Any],
-    ]:
-        if has_aux:
-            k1, aux = func(t, y, args)
-            k2, _ = func(t + dt, y + dt * k1, args)
-            y1 = y + dt / 2 * (k1 + k2)
-            return y1, None, dict(y0=y, y1=y1), aux
-        else:
-            k1 = func(t, y, args)
-            k2 = func(t + dt, y + dt * k1, args)
-            y1 = y + dt / 2 * (k1 + k2)
-            return y1, None, dict(y0=y, y1=y1), None
-
-    def build_interpolation(
-        self, t0, t1, dense_info
-    ) -> FirstOrderPolynomialInterpolation:
-        return self.interpolation_cls(t0, t1, dense_info)

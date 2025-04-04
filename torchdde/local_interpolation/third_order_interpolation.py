@@ -3,10 +3,11 @@ from typing import Dict, Optional, Union
 import torch
 from jaxtyping import Float
 
+from torchdde.local_interpolation.base import AbstractLocalInterpolation
 from torchdde.local_interpolation.fourth_order_interpolation import linear_rescale
 
 
-class ThirdOrderPolynomialInterpolation:
+class ThirdOrderPolynomialInterpolation(AbstractLocalInterpolation):
     """Hermite Polynomial third order interpolation on [t0, t1].
 
     `coefficients` holds the coefficients of a fourth-order polynomial on [0, 1] in
@@ -25,7 +26,7 @@ class ThirdOrderPolynomialInterpolation:
         self.coeffs = self._calculate(dense_info)
 
     def _calculate(self, dense_info: Dict[str, Float[torch.Tensor, "..."]]):
-        _k0, _k1 = dense_info["k"][0], dense_info["k"][-1]
+        _k0, _k1 = self.dt * dense_info["k"][0], self.dt * dense_info["k"][-1]
         _a = _k0 + _k1 + 2 * dense_info["y0"] - 2 * dense_info["y1"]
         _b = -2 * _k0 - _k1 - 3 * dense_info["y0"] + 3 * dense_info["y1"]
         return torch.stack([_a, _b, _k0, dense_info["y0"]], dim=1)
@@ -47,6 +48,7 @@ class ThirdOrderPolynomialInterpolation:
                 torch.arange(4, device=t.device), dims=(0,)
             ),  # pyright : ignore
         )
+
         return torch.einsum("c, bcf -> bf", t_polynomial, self.coeffs)
 
     def __repr__(self):
