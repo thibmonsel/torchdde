@@ -62,7 +62,6 @@ class AbstractOdeSolver(ABC):
         dt: Float[torch.Tensor, ""],
         solver_state: Union[Tuple[Any, ...], None],
         func_args: Any,
-        has_aux: bool = False,
     ) -> Tuple[
         Float[torch.Tensor, "batch ..."],
         Union[Float[torch.Tensor, "batch ..."], None],
@@ -78,16 +77,10 @@ class AbstractOdeSolver(ABC):
         - `t`: Current time step `t`
         - `y`: Current state `y`
         - `dt`: Step size `dt`
-        - `has_aux`: Whether the model/callable has an auxiliary output.
-
-        ??? tip "has_aux ?"
-
-            A function with an auxiliary output can look like
-            ```python
-            def f(t,y,func_args):
-                return -y, ("Hello World",1)
-            ```
-            The `has_aux` `kwargs` argument is used to compute the adjoint method
+        - `solver_state`: State of the solver. It is the output of the previous
+        `step` method.
+        - `func_args`: Arguments to be passed along to `func` when it's called
+                       (e.g., func(t, y, func_args)).
 
         **Returns:**
 

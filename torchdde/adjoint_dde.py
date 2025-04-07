@@ -243,7 +243,6 @@ class nddeint_ACA(torch.autograd.Function):
                     stepsize_controller,
                     dt,
                     ctx.max_steps,
-                    has_aux=False,
                 )
                 aug_state = transformer.unflatten(new_aug_state)
 

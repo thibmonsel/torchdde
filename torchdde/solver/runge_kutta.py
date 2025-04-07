@@ -182,7 +182,6 @@ class ExplicitRungeKutta(AbstractOdeSolver):
         dt: Float[torch.Tensor, ""],
         solver_state: Union[Tuple[Any, ...], None],
         func_args: Any,
-        has_aux: bool = False,
     ) -> Tuple[
         Float[torch.Tensor, "batch ..."],
         Float[torch.Tensor, "batch ..."],

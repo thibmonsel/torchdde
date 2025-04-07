@@ -41,12 +41,8 @@ class ImplicitEuler(AbstractOdeSolver):
         dt: Float[torch.Tensor, ""],
         y_sol: Float[torch.Tensor, "batch ..."],
         func_args: Any,
-        has_aux=False,
     ) -> Float[torch.Tensor, ""]:
-        if has_aux:
-            f_sol, _ = func(t, y_sol, func_args)
-        else:
-            f_sol = func(t, y_sol, func_args)
+        f_sol = func(t, y_sol, func_args)
         return torch.sum((y_sol - y - dt * f_sol) ** 2)
 
     def step(
@@ -57,7 +53,6 @@ class ImplicitEuler(AbstractOdeSolver):
         dt: Float[torch.Tensor, ""],
         solver_state: Union[Tuple[Any, ...], None],
         func_args: Any,
-        has_aux: bool = False,
     ) -> tuple[
         Float[torch.Tensor, "batch ..."],
         None,
@@ -82,20 +77,14 @@ class ImplicitEuler(AbstractOdeSolver):
 
         def closure() -> Float[torch.Tensor, ""]:
             opt.zero_grad()
-            residual = ImplicitEuler._residual(
-                func, t, y, dt, y_sol, func_args, has_aux=has_aux
-            )
+            residual = ImplicitEuler._residual(func, t, y, dt, y_sol, func_args)
             (y_sol.grad,) = torch.autograd.grad(
                 residual, y_sol, only_inputs=True, allow_unused=False
             )
             return residual
 
         opt.step(closure)  # type: ignore
-        if has_aux:
-            _, aux = func(t, y, func_args)
-            return y_sol, None, dict(y0=y, y1=y_sol), None, aux
-        else:
-            return y_sol, None, dict(y0=y, y1=y_sol), None, None
+        return y_sol, None, dict(y0=y, y1=y_sol), None, None
 
     def build_interpolation(
         self,
