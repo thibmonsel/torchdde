@@ -22,7 +22,7 @@ for step, data in enumerate(train_loader):
         t1=ts[-1],
         ts=ts,
         y0=...,
-        args=None,
+        func_args=...,
         dt0=ts[1] - ts[0],
         delays=...,
     )

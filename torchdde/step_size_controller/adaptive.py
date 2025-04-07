@@ -1,3 +1,5 @@
+import warnings
+
 import torch
 
 from .base import AbstractStepSizeController
@@ -249,6 +251,10 @@ class AdaptiveStepSizeController(AbstractStepSizeController):
             new_dt = torch.max(new_dt, torch.tensor(self.dtmin))
         if self.dtmax is not None:
             new_dt = torch.min(new_dt, torch.tensor(self.dtmax))
+        if torch.abs(new_dt) < 1e-8:
+            warnings.warn(
+                "AdaptiveStepSizeController yields a abs(dt) value is smaller than 1e-8"
+            )
 
         t0 = torch.where(keep_step, t1, t0)
         t1 = torch.where(keep_step, t1 + new_dt, t0 + new_dt)

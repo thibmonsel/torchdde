@@ -35,7 +35,6 @@ class Euler(AbstractOdeSolver):
         dt: Float[torch.Tensor, ""],
         solver_state: Union[Tuple[Any, ...], None],
         func_args: Any,
-        has_aux: bool = False,
     ) -> Tuple[
         Float[torch.Tensor, "batch ..."],
         None,
@@ -45,13 +44,8 @@ class Euler(AbstractOdeSolver):
     ]:
         assert solver_state is None, "Euler solver should be stateless"
 
-        if has_aux:
-            k1, aux = func(t, y, func_args)
-            y1 = y + dt * k1
-            return y1, None, dict(y0=y, y1=y1), None, aux
-        else:
-            y1 = y + dt * func(t, y, func_args)
-            return y1, None, dict(y0=y, y1=y1), None, None
+        y1 = y + dt * func(t, y, func_args)
+        return y1, None, dict(y0=y, y1=y1), None, None
 
     def build_interpolation(
         self,

@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from torchdde import RK4
 import torch
 
-def simple_dde(t, y, args, *, history):
+def simple_dde(t, y, func_args, *, history):
     # `history` corresponds to the list of
     # delayed states defined in your DDE
     # i.e. here history=[y(t-2)]
@@ -54,7 +54,7 @@ import matplotlib.pyplot as plt
 from torchdde import RK4
 import torch
 
-def simple_ode(t, y, args):
+def simple_ode(t, y, func_args):
     return -y**2
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

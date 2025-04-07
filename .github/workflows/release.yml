@@ -1,6 +1,9 @@
 name: Publish Python 🐍 distribution 📦 to PyPI and TestPyPI
+on:
+  push:
+    branches:
+      - master  # Set this to your default branch
 
-on: push
 
 jobs:
   build:

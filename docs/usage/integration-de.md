@@ -13,10 +13,10 @@ What essentially differentiates DDEs with ODEs are :
 
     In practice, your function will be defined like this :  
     ```python
-    def f_ode(t,y,args):
+    def f_ode(t,y,func_args):
         return ...
     
-    def f_dde(t,y,args, history):
+    def f_dde(t,y,func_args, history):
         return ...
     ```
 

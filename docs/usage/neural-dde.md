@@ -43,7 +43,7 @@ class NDDE(nn.Module):
             hidden_channels=depth * [width_size] + [out_size],
         )
 
-    def forward(self, t, z, args, *, history):
+    def forward(self, t, z, func_args, *, history):
         # `history` corresponds to the list of
         # delayed states defined in your DDE
         # i.e. here history=[y(t-tau1), ..., y(t-taun)]
@@ -54,11 +54,11 @@ We generate the toy dataset of the [delayed logistic equation](https://www.math.
 
 ```python
 def get_data(y0, ts, tau=torch.tensor([1.0])):
-    def f(t, y, args, history):
+    def f(t, y, func_args, history):
         return y * (1 - history[0])
 
     history_function = lambda t: torch.unsqueeze(y0, dim=1)
-    ys = integrate(f, Euler(), ts[0], ts[-1], ts, history_function, args=None, dt0=ts[1]-ts[0], delays=tau)
+    ys = integrate(f, Euler(), ts[0], ts[-1], ts, history_function, func_args=None, dt0=ts[1]-ts[0], delays=tau)
     return ys
 
 
@@ -136,7 +136,7 @@ def main(
         plt.plot(ts.cpu(), data[0].cpu(), c="dodgerblue", label="Real")
         history_values = data[0, 0][..., None]
         history_fn = lambda t: history_values
-        ys_pred = integrate(model, Euler(), ts[0], ts[-1], ts, history_fn, args=None, dt0=ts[1]-ts[0], delays=tau)
+        ys_pred = integrate(model, Euler(), ts[0], ts[-1], ts, history_fn, func_args=None, dt0=ts[1]-ts[0], delays=tau)
         plt.plot(
             ts.cpu(),
             ys_pred[0].cpu().detach(),

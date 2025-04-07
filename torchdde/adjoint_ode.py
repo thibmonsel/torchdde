@@ -5,6 +5,7 @@ import torch.nn as nn
 from jaxtyping import Float
 
 from torchdde.integrate import _integrate_ode
+from torchdde.misc import TupleTensorTransformer
 from torchdde.solver.base import AbstractOdeSolver
 from torchdde.step_size_controller.base import AbstractStepSizeController
 from torchdde.step_size_controller.constant import ConstantStepSizeController
@@ -31,6 +32,7 @@ class odeint_ACA(torch.autograd.Function):
         ctx.ts = ts
         ctx.y0 = y0
         ctx.solver = solver
+        ctx.dt0 = dt0
         ctx.stepsize_controller = stepsize_controller
         ctx.max_steps = max_steps
 
@@ -57,49 +59,58 @@ class odeint_ACA(torch.autograd.Function):
         # grad_output holds the gradient of the
         # loss w.r.t. each evaluation step
         grad_output = grad_y[0]
-        dt = ctx.ts[1] - ctx.ts[0]
         ys = ctx.ys
         ts = ctx.ts
+        dt0 = ctx.dt0
         args = ctx.args
 
         solver = ctx.solver
         stepsize_controller = ctx.stepsize_controller
         params = ctx.saved_tensors
-        adjoint_state = grad_output[:, -1]
+        # aug_state will hold the [y_t, adjoint_state, params_incr]
+        aug_state = [torch.zeros_like(ys[:, -1]), torch.zeros_like(ys[:, -1])]
+        aug_state.extend([torch.zeros_like(param) for param in params])
+        transformer = TupleTensorTransformer.from_tuple(aug_state)
 
-        out2 = None
+        def augmented_dyn(t, aug_state, args):
+            y_t, adjoint_state, *params_inc = transformer.unflatten(aug_state)
+            out = ctx.func(t, y_t, args)
+            adjoint_state, *params_inc = torch.autograd.grad(
+                out,
+                (y_t,) + params,
+                -adjoint_state,
+                retain_graph=True,
+                allow_unused=True,
+            )
+            return transformer.flatten((y_t, adjoint_state, *params_inc))
+
         for i in range(len(ts) - 1, 0, -1):
             t0, t1 = ts[i], ts[i - 1]
-            dt = t1 - t0
+            dt0 = t1 - t0
             y_t = torch.autograd.Variable(ys[:, i], requires_grad=True)
+
+            aug_state[0] = y_t
+            aug_state[1] += grad_output[:, i]
+
             with torch.enable_grad():
-                out = ctx.func(ts[i], y_t, args)
-                adj_dyn = lambda t, adj_y, args: torch.autograd.grad(
-                    out, y_t, -adj_y, retain_graph=True
-                )[0]
-                adjoint_state, _ = _integrate_ode(
-                    adj_dyn,
+                aug_state[0] = y_t
+                aug_state = transformer.flatten(aug_state)
+                new_aug_state, _ = _integrate_ode(
+                    augmented_dyn,
                     t0,
                     t1,
                     t1[None],
-                    adjoint_state,
+                    aug_state,
                     args,
                     solver,
                     stepsize_controller,
-                    dt,
+                    dt0,
                     ctx.max_steps,
                 )
-                adjoint_state = adjoint_state.squeeze(dim=1)
-                adjoint_state = adjoint_state - grad_output[:, i]
-                param_inc = torch.autograd.grad(
-                    out, params, -adjoint_state, retain_graph=True
-                )
+                aug_state = transformer.unflatten(new_aug_state)
 
-            if out2 is None:
-                out2 = tuple([dt.abs() * p for p in param_inc])
-            else:
-                for _1, _2 in zip([*out2], [*param_inc]):
-                    _1 += dt.abs() * _2
+        adjoint_state = aug_state[1]
+        params_incr = aug_state[2:]
         return (  # type: ignore
             None,
             None,
@@ -111,7 +122,7 @@ class odeint_ACA(torch.autograd.Function):
             None,
             None,
             None,
-            *out2,  # type: ignore
+            *params_incr,  # type: ignore
         )
 
 

@@ -161,7 +161,6 @@ def _integrate(
     dt0: Optional[Float[torch.Tensor, ""]] = None,
     delays: Optional[Float[torch.Tensor, " delays"]] = None,
     max_steps: int = 100,
-    has_aux: bool = False,
 ) -> tuple[
     Float[torch.Tensor, "batch time ..."],
     Union[Callable[[Float[torch.Tensor, ""]], Float[torch.Tensor, "batch ..."]], Any],
@@ -172,7 +171,6 @@ def _integrate(
     - `func`: Pytorch model, i.e vector field
     - `ts`: Integration span
     - `y0`: Initial condition for ODE / History function for DDE
-    - `has_aux`: Whether the model has an auxiliary output.
 
     **Returns:**
 
@@ -195,7 +193,6 @@ def _integrate(
             stepsize_controller,
             dt0,
             max_steps=max_steps,
-            has_aux=has_aux,
         )
     else:
         assert isinstance(y0, torch.Tensor)
@@ -210,7 +207,6 @@ def _integrate(
             stepsize_controller,
             dt0,
             max_steps=max_steps,
-            has_aux=has_aux,
         )
 
 
@@ -227,7 +223,6 @@ def _integrate_dde(
     stepsize_controller: AbstractStepSizeController,
     dt0: Optional[Float[torch.Tensor, ""]] = None,
     max_steps: Optional[int] = 100,
-    has_aux: bool = False,
 ) -> tuple[
     Float[torch.Tensor, "batch time ..."],
     tuple[
@@ -297,7 +292,6 @@ def _integrate_dde(
             state.dt,
             state.solver_state,
             func_args,
-            has_aux=has_aux,
         )
         (
             keep_step,
@@ -398,7 +392,6 @@ def _integrate_ode(
     stepsize_controller: AbstractStepSizeController,
     dt0: Optional[Float[torch.Tensor, ""]] = None,
     max_steps: Optional[int] = 100,
-    has_aux: bool = False,
 ) -> tuple[Float[torch.Tensor, "batch time ..."], Any]:
     assert max_steps is not None
 
@@ -439,7 +432,6 @@ def _integrate_ode(
             state.dt,
             state.solver_state,
             func_args,
-            has_aux=has_aux,
         )
         (
             keep_step,
@@ -468,9 +460,7 @@ def _integrate_ode(
             while torch.any(state.tnext >= ts[state.save_idx + step_save_idx :]):
                 idx = state.save_idx + step_save_idx
                 out = interp(ts[idx])
-                ys[:, idx] = (
-                    out.unsqueeze(1) if len(out.shape) != len(ys[:, idx].shape) else out
-                )
+                ys[:, idx] = out.unsqueeze(1) if out.ndim != ys[:, idx].ndim else out
                 step_save_idx += 1
 
         ########################################
@@ -503,6 +493,7 @@ def _integrate_ode(
             save_idx,
         )
         cond = state.tprev < t1 if (t1 > t0) else state.tprev > t1
+
     if state.num_steps >= max_steps:
         raise RuntimeError(
             f"Maximum number of steps reached \

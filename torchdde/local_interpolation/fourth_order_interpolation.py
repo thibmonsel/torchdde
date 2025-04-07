@@ -35,6 +35,7 @@ class FourthOrderPolynomialInterpolation(AbstractLocalInterpolation):
         self.t1 = t1
         self.dt = t1 - t0
         self.c_mid = c_mid
+        self.c_mid = self.c_mid.to(dense_info["y0"].device)
         self.coeffs = self._calculate(dense_info)
 
     def _calculate(
