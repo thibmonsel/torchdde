@@ -17,3 +17,4 @@ mknotebooks==0.7.1       # Turn Jupyter Lab notebooks into webpages.
 
 jaxtyping
 numpy
+jax[cpu]
