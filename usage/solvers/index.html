@@ -356,6 +356,13 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#torchdde.Bosh3" class="md-nav__link">
+    Bosh3
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#torchdde.Dopri5" class="md-nav__link">
     Dopri5
   </a>
@@ -594,7 +601,7 @@ To create new solvers users must implement the <code>init</code>, <code>step</co
 
 
 <h5 id="torchdde.AbstractOdeSolver.init" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">init</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span></code>
+<code class="highlight language-python"><span class="n">init</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">module</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">Callable</span><span class="p">],</span> <span class="n">t0</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">],</span> <span class="n">y0</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch ...&#39;</span><span class="p">],</span> <span class="n">dt0</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">],</span> <span class="n">func_args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span></code>
 
   <span class="doc doc-properties">
       <small class="doc doc-property doc-property-abstractmethod"><code>abstractmethod</code></small>
@@ -604,7 +611,21 @@ To create new solvers users must implement the <code>init</code>, <code>step</co
 
     <div class="doc doc-contents ">
 
-      <p>Initializes the solver. This method is called before the integration starts.</p>
+      <p>Initializes the solver state. This method is called before the
+integration starts.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>func</code>: Pytorch model or callable function, i.e vector field</li>
+<li><code>t0</code>: Start of the integration time <code>t0</code></li>
+<li><code>y0</code>: Initial state <code>y0</code></li>
+<li><code>dt0</code>: Initial step size <code>dt0</code></li>
+<li><code>func_args</code>: Arguments to be passed along to <code>func</code> when it's called
+               (e.g., func(t, y, func_args)).</li>
+<li><code>*args</code>: Additional positional arguments passed to init (use rarely).</li>
+<li><code>**kwargs</code>: Additional keyword arguments passed to init.</li>
+</ul>
+<p><strong>Returns</strong></p>
+<p>The initial solver state, which should be used the first time <code>step</code> is called.</p>
 
     </div>
 
@@ -640,7 +661,7 @@ To create new solvers users must implement the <code>init</code>, <code>step</co
 
 
 <h5 id="torchdde.AbstractOdeSolver.step" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">module</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">Callable</span><span class="p">],</span> <span class="n">t</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">],</span> <span class="n">y</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch ...&#39;</span><span class="p">],</span> <span class="n">dt</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">],</span> <span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">has_aux</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch ...&#39;</span><span class="p">],</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch ...&#39;</span><span class="p">],</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch order&#39;</span><span class="p">]],</span> <span class="n">Union</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch&#39;</span><span class="p">],</span> <span class="n">Any</span><span class="p">]]</span></code>
+<code class="highlight language-python"><span class="n">step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">module</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">Callable</span><span class="p">],</span> <span class="n">t</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">],</span> <span class="n">y</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch ...&#39;</span><span class="p">],</span> <span class="n">dt</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">],</span> <span class="n">solver_state</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span> <span class="n">func_args</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch ...&#39;</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch ...&#39;</span><span class="p">]],</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch order&#39;</span><span class="p">]],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span> <span class="n">Union</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch&#39;</span><span class="p">],</span> <span class="n">Any</span><span class="p">]]</span></code>
 
   <span class="doc doc-properties">
       <small class="doc doc-property doc-property-abstractmethod"><code>abstractmethod</code></small>
@@ -657,16 +678,11 @@ To create new solvers users must implement the <code>init</code>, <code>step</co
 <li><code>t</code>: Current time step <code>t</code></li>
 <li><code>y</code>: Current state <code>y</code></li>
 <li><code>dt</code>: Step size <code>dt</code></li>
-<li><code>has_aux</code>: Whether the model/callable has an auxiliary output.</li>
+<li><code>solver_state</code>: State of the solver. It is the output of the previous
+<code>step</code> method.</li>
+<li><code>func_args</code>: Arguments to be passed along to <code>func</code> when it's called
+               (e.g., func(t, y, func_args)).</li>
 </ul>
-<details class="tip">
-<summary>has_aux ?</summary>
-<p>A function with an auxiliary output can look like
-<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">f</span><span class="p">(</span><span class="n">t</span><span class="p">,</span><span class="n">y</span><span class="p">,</span><span class="n">args</span><span class="p">):</span>
-    <span class="k">return</span> <span class="o">-</span><span class="n">y</span><span class="p">,</span> <span class="p">(</span><span class="s2">&quot;Hello World&quot;</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
-</code></pre></div>
-The <code>has_aux</code> <code>kwargs</code> argument is used to compute the adjoint method</p>
-</details>
 <p><strong>Returns:</strong></p>
 <ul>
 <li>The value of the solution at <code>t+dt</code>.</li>
@@ -689,7 +705,7 @@ build the interpolation between <code>t</code> and <code>t+dt</code>.</li>
 
 
 <h5 id="torchdde.AbstractOdeSolver.build_interpolation" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">build_interpolation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t0</span><span class="p">,</span> <span class="n">t1</span><span class="p">,</span> <span class="n">dense_info</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span></code>
+<code class="highlight language-python"><span class="n">build_interpolation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t0</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">],</span> <span class="n">t1</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">],</span> <span class="n">dense_info</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;...&#39;</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="n">AbstractLocalInterpolation</span></code>
 
   <span class="doc doc-properties">
       <small class="doc doc-property doc-property-abstractmethod"><code>abstractmethod</code></small>
@@ -767,7 +783,10 @@ torchdde.RK2            (<a class="autorefs autorefs-internal" title="torchdde.A
 
     <div class="doc doc-contents first">
 
-      <p>2nd order explicit Runge-Kutta method</p>
+      <p>Second-order explicit Runge-Kutta method (RK2's method).</p>
+<p>This implementation uses the 2-stage Butcher Tableau for Heun's method
+(also known as the improved Euler method or trapezoidal rule).
+It does not inherently provide error estimation for adaptive step sizing.</p>
 
 
 
@@ -792,7 +811,37 @@ torchdde.RK4            (<a class="autorefs autorefs-internal" title="torchdde.A
 
     <div class="doc doc-contents first">
 
-      <p>4th order explicit Runge-Kutta method</p>
+      <p>Classic fourth-order explicit Runge-Kutta method.</p>
+<p>This implementation uses the standard Butcher Tableau for RK4.
+It does not inherently provide error estimation for adaptive step sizing.</p>
+
+
+
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-class">
+
+
+
+<h4 id="torchdde.Bosh3" class="doc doc-heading">
+        <code>
+torchdde.Bosh3            (<a class="autorefs autorefs-internal" title="torchdde.AbstractOdeSolver" href="#torchdde.AbstractOdeSolver">AbstractOdeSolver</a>)
+        </code>
+
+
+
+<a href="#torchdde.Bosh3" class="headerlink" title="Permanent link">¤</a></h4>
+
+    <div class="doc doc-contents first">
+
+      <p>Bogacki--Shampine's 3/2 method.</p>
+<p>3rd order explicit Runge--Kutta method. Has an embedded 2nd order method for
+adaptive step sizing. Uses 4 stages with FSAL. Uses 3rd order Hermite
+interpolation for dense/ts output.</p>
 
 
 
@@ -817,7 +866,9 @@ torchdde.Dopri5            (<a class="autorefs autorefs-internal" title="torchdd
 
     <div class="doc doc-contents first">
 
-      <p>5th order order explicit Runge-Kutta method Dormand Prince</p>
+      <p>Dormand-Prince 5(4) explicit Runge-Kutta method.</p>
+<p>Uses a 7-stage, 5th-order method with an embedded 4th-order method for
+error estimation and adaptive step sizing. Features the FSAL property.</p>
 
 
 
