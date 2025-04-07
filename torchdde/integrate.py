@@ -464,29 +464,12 @@ def _integrate_ode(
         dt = torch.where((tprev + dt) > t1, t1 - tprev, dt)
         step_save_idx = 0
         if keep_step:
-            # If we have only one time step to save in the output
-            # and that we are in the case where ts[0] == t1 do the
-            # following :
-            # NOTE : this is used for adjoint computation
-            # This works if we have ts[i+1] - ts[i] that is
-            # small enough. This will most likely not work
-            # if dt is "large"
-            if len(ts) == 1 and t1 == state.tnext:
-                ys[:, state.save_idx] = y
+            interp = solver.build_interpolation(state.tprev, state.tnext, dense_info)
+            while torch.any(state.tnext >= ts[state.save_idx + step_save_idx :]):
+                idx = state.save_idx + step_save_idx
+                out = interp(ts[idx])
+                ys[:, idx] = out.unsqueeze(1) if out.ndim != ys[:, idx].ndim else out
                 step_save_idx += 1
-            else:
-                interp = solver.build_interpolation(
-                    state.tprev, state.tnext, dense_info
-                )
-                while torch.any(state.tnext >= ts[state.save_idx + step_save_idx :]):
-                    idx = state.save_idx + step_save_idx
-                    out = interp(ts[idx])
-                    ys[:, idx] = (
-                        out.unsqueeze(1)
-                        if len(out.shape) != len(ys[:, idx].shape)
-                        else out
-                    )
-                    step_save_idx += 1
 
         ########################################
         ##### Updating State for next step #####
@@ -518,6 +501,7 @@ def _integrate_ode(
             save_idx,
         )
         cond = state.tprev < t1 if (t1 > t0) else state.tprev > t1
+
     if state.num_steps >= max_steps:
         raise RuntimeError(
             f"Maximum number of steps reached \

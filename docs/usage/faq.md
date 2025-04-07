@@ -10,11 +10,11 @@ delays = torch.tensor([1.0, 2.0])
 history_function = lambda t : ...
 ts = ...
 
-def simple_dde(t, y, args, *, history):
+def simple_dde(t, y, func_args, *, history):
     # this correspond to y'(t) = -y(t-1) - y(t-2)
     return - history[0] - history[1]
 
-ys = torchdde.integrate(f, solver, ts[0], ts[-1], ts, history_function, args=None, dt0=ts[1]-ts[0], delays=delays)
+ys = torchdde.integrate(f, solver, ts[0], ts[-1], ts, history_function, func_args=None, dt0=ts[1]-ts[0], delays=delays)
 ```
 
 ## How about if I want a neural network to have also several delays ?

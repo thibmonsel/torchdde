@@ -162,6 +162,8 @@ class ExplicitRungeKutta(AbstractOdeSolver):
         **kwargs,
     ) -> Tuple[Optional[Float[torch.Tensor, "batch ..."]]]:
         del dt0, args, kwargs
+        self.tableau = self.tableau.to(y0.device, y0.dtype, t0.dtype)
+
         if self.tableau.fsal:
             if f0 is None:
                 prev_vf1 = func(t0, y0, func_args)
@@ -193,7 +195,6 @@ class ExplicitRungeKutta(AbstractOdeSolver):
             f0, *_ = solver_state
         else:
             f0 = func(t, y, func_args)
-        print(f0.shape)
         y_i = y
         t_nodes = torch.addcmul(t, self.tableau.c, dt)
         k = f0.new_empty((self.tableau.n_stages, f0.shape[0], f0.shape[1]))

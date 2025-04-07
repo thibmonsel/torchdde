@@ -59,18 +59,16 @@ class odeint_ACA(torch.autograd.Function):
         # grad_output holds the gradient of the
         # loss w.r.t. each evaluation step
         grad_output = grad_y[0]
-        dt0 = ctx.dt0
         ys = ctx.ys
         ts = ctx.ts
+        dt0 = ctx.dt0
         args = ctx.args
 
         solver = ctx.solver
         stepsize_controller = ctx.stepsize_controller
         params = ctx.saved_tensors
-        adjoint_state = grad_output[:, -1]
-
         # aug_state will hold the [y_t, adjoint_state, params_incr]
-        aug_state = [ys[:, -1], adjoint_state]
+        aug_state = [torch.zeros_like(ys[:, -1]), torch.zeros_like(ys[:, -1])]
         aug_state.extend([torch.zeros_like(param) for param in params])
         transformer = TupleTensorTransformer.from_tuple(aug_state)
 
@@ -88,11 +86,16 @@ class odeint_ACA(torch.autograd.Function):
 
         for i in range(len(ts) - 1, 0, -1):
             t0, t1 = ts[i], ts[i - 1]
+            dt0 = t1 - t0
             y_t = torch.autograd.Variable(ys[:, i], requires_grad=True)
+
+            aug_state[0] = y_t
+            aug_state[1] += grad_output[:, i]
+
             with torch.enable_grad():
                 aug_state[0] = y_t
                 aug_state = transformer.flatten(aug_state)
-                aug_state, _ = _integrate_ode(
+                new_aug_state, _ = _integrate_ode(
                     augmented_dyn,
                     t0,
                     t1,
@@ -101,15 +104,13 @@ class odeint_ACA(torch.autograd.Function):
                     args,
                     solver,
                     stepsize_controller,
-                    -dt0,
+                    dt0,
                     ctx.max_steps,
                 )
-                aug_state = transformer.unflatten(aug_state[0])
-                aug_state[1] += grad_output[:, i - 1]
+                aug_state = transformer.unflatten(new_aug_state)
 
         adjoint_state = aug_state[1]
         params_incr = aug_state[2:]
-
         return (  # type: ignore
             None,
             None,
