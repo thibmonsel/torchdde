@@ -177,7 +177,6 @@ class nddeint_ACA(torch.autograd.Function):
                 # computing second term of the adjoint dynamics
                 # \lambda_t \partial{f_\theta(t)}{g}
                 if t < ctx.t1 - tau_i:
-                    print("t", t, "tau_i", tau_i)
                     adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
                     y_t_plus_tau = state_interpolator(t + tau_i)
                     history = [
