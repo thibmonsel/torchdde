@@ -1,7 +1,7 @@
 
 This library only supports linear interpolation at this moment !
 
-::: torchdde.TorchLinearInterpolator
+::: torchdde.global_interpolation.TorchLinearInterpolator
     selection:
         members:
             - __init__
