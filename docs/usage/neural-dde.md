@@ -4,7 +4,7 @@
 
     This library only supports constant lag DDEs. Therefore we are unable to model time and state dependent DDEs.
 
-This examples trains a Neural DDE to reproduce a simple dataset of a delay logistic equation. In this example, the backward pass is computed with the adjoint method.
+This examples trains a Neural DDE with learnable delays to reproduce a simple dataset of a delay logistic equation. In this example, "discretize then optimize" is used to train the model. 
 
 ```python
 import time
@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
-from torchdde import integrate, Euler
+from torchdde import integrate, AdaptiveStepSizeController, Dopri5
 from torchvision.ops import MLP
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -37,7 +37,7 @@ class NDDE(nn.Module):
     ):
         super().__init__()
         self.in_dim = in_size * (1 + len(delays))
-        self.delays = torch.nn.Parameter(delays)
+        self.delays = delays
         self.mlp = MLP(
             self.in_dim,
             hidden_channels=depth * [width_size] + [out_size],
@@ -57,8 +57,19 @@ def get_data(y0, ts, tau=torch.tensor([1.0])):
     def f(t, y, func_args, history):
         return y * (1 - history[0])
 
-    history_function = lambda t: torch.unsqueeze(y0, dim=1)
-    ys = integrate(f, Euler(), ts[0], ts[-1], ts, history_function, func_args=None, dt0=ts[1]-ts[0], delays=tau)
+    history_function = lambda t: y0
+    ys = integrate(
+        f,
+        Dopri5(),
+        ts[0],
+        ts[-1],
+        ts,
+        history_function,
+        func_args=None,
+        stepsize_controller=AdaptiveStepSizeController(1e-6, 1e-9),
+        dt0=ts[1] - ts[0],
+        delays=tau,
+    )
     return ys
 
 
@@ -71,17 +82,17 @@ class MyDataset(Dataset):
 
     def __len__(self):
         return self.ys.shape[0]
-
 ```
 
 Main entry point. Try running `main()`.
 
 ```python
+
 def main(
     dataset_size=128,
     batch_size=128,
-    lr=0.0005,
-    max_epoch=1000,
+    lr=0.01,
+    max_epoch=100,
     width_size=32,
     depth=2,
     seed=5678,
@@ -92,33 +103,50 @@ def main(
     torch.manual_seed(seed)
     ts = torch.linspace(0, 10, 101)
     y0_min, y0_max = 2.0, 3.0
-    y0 = (y0_min - y0_max) * torch.rand((dataset_size,)) + y0_max
+    y0 = (y0_min - y0_max) * torch.rand((dataset_size,1)) + y0_max
     ys = get_data(y0, ts)
     ts, ys = ts.to(device), ys.to(device)
     delay_min, delay_max = 0.7, 1.3
     value = (delay_max - delay_min) * torch.rand((1,)) + delay_min
-    tau = torch.tensor([value], device=device)
-    tau = tau.to(device)
+    # This allows for tau to be learnable and train along with the model.
+    tau = torch.nn.Parameter(value)
 
     state_dim = ys.shape[-1]
     model = NDDE(tau, state_dim, state_dim, width_size, depth)
+    # uncomment this line to make tau not learnable i.e. fixed
+    # model.delays.requires_grad = False
     model = model.to(device)
 
     dataset = MyDataset(ys)
     train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     # Training loop like normal.
-    model.train()
+    losses, delays_evol = [], []
     loss_fn = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     for epoch in range(max_epoch):
+        model.train()
         for step, data in enumerate(train_loader):
             t = time.time()
             optimizer.zero_grad()
             data = data.to(device)
             history_fn = lambda t: data[:, 0]
-            ys_pred = integrate(model, Euler(), ts[0], ts[-1], ts, history_fn, args=None, dt0=ts[1]-ts[0], delays=tau)
+            ys_pred = integrate(
+                model,
+                Dopri5(),
+                ts[0],
+                ts[-1],
+                ts,
+                history_fn,
+                func_args=None,
+                dt0=ts[1] - ts[0],
+                stepsize_controller=AdaptiveStepSizeController(1e-6, 1e-9),
+                discretize_then_optimize=True,
+                delays=tau,
+            )
             loss = loss_fn(ys_pred, data)
+            losses.append(loss.item())
+            delays_evol.append(model.delays.clone())
             loss.backward()
             optimizer.step()
             if (epoch % print_every) == 0 or epoch == max_epoch - 1:
@@ -133,10 +161,8 @@ def main(
                     )
                 )
     if plot:
-        plt.plot(ts.cpu(), data[0].cpu(), c="dodgerblue", label="Real")
-        history_values = data[0, 0][..., None]
-        history_fn = lambda t: history_values
-        ys_pred = integrate(model, Euler(), ts[0], ts[-1], ts, history_fn, func_args=None, dt0=ts[1]-ts[0], delays=tau)
+        plt.clf()
+        plt.subplot(3, 1, 1)
         plt.plot(
             ts.cpu(),
             ys_pred[0].cpu().detach(),
@@ -144,9 +170,23 @@ def main(
             c="crimson",
             label="Model",
         )
+        plt.plot(
+            ts.cpu(),
+            data[0].cpu().detach(),
+            label="Ground Truth",
+        )
         plt.legend()
+        plt.subplot(3, 1, 2)
+        plt.plot(losses)
+        plt.yscale("log")
+        plt.ylabel("Loss")
+        plt.xlabel("Epoch")
+        plt.subplot(3, 1, 3)
+        plt.plot(torch.stack(delays_evol).cpu().detach().numpy())
+        plt.xlabel("Epoch")
+        plt.ylabel("Tau")
+        plt.tight_layout()
         plt.savefig("neural_dde.png")
-        plt.show()
         plt.close()
 
     return ts, ys, model
