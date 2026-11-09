@@ -14,6 +14,8 @@ class ThirdOrderPolynomialInterpolation(AbstractLocalInterpolation):
     increasing order, i.e. `cofficients[i]` belongs to `x**i`.
     """
 
+    cache_coefficients = True
+
     def __init__(
         self,
         t0: Float[torch.Tensor, ""],
@@ -23,7 +25,11 @@ class ThirdOrderPolynomialInterpolation(AbstractLocalInterpolation):
         self.t0 = t0
         self.t1 = t1
         self.dt = t1 - t0
-        self.coeffs = self._calculate(dense_info)
+        self.coeffs = (
+            dense_info["_cached_coefficients"]
+            if "_cached_coefficients" in dense_info
+            else self._calculate(dense_info)
+        )
 
     def _calculate(self, dense_info: Dict[str, Float[torch.Tensor, "..."]]):
         _k0, _k1 = self.dt * dense_info["k"][0], self.dt * dense_info["k"][-1]

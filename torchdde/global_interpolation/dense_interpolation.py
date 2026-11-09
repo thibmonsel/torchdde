@@ -16,6 +16,27 @@ class DenseInterpolation:
         self.ts = ts
         self.infos = infos
         self.interpolation_cls = interpolation_cls
+        # Require explicit opt-in: subclasses may need additional raw dense_info
+        # in their constructor even if a parent supports cached coefficients.
+        self._cache_coefficients = interpolation_cls.__dict__.get(
+            "cache_coefficients", False
+        )
+        if self._cache_coefficients:
+            # Keep coefficients attached to their original autograd graph.
+            # Selecting a cached interval then only differentiates through the
+            # polynomial evaluation, without rebuilding the coefficients.
+            coefficients = []
+            for i in range(ts.shape[0] - 1):
+                local_info = {key: value[i] for key, value in infos.items()}
+                local = interpolation_cls(ts[i], ts[i + 1], local_info)
+                coefficients.append(local.coeffs)
+            self.infos = {"_cached_coefficients": torch.stack(coefficients)}
+
+    def _prepare_info(self, t0, t1, dense_info):
+        if not self._cache_coefficients:
+            return dense_info
+        local = self.interpolation_cls(t0, t1, dense_info)
+        return {"_cached_coefficients": local.coeffs}
 
     def __check_init__(self):
         if self.ts is not None and self.infos is not None:
@@ -54,12 +75,14 @@ class DenseInterpolation:
 
     def add_point(self, t, dense_info):
         if self.direction:
+            dense_info = self._prepare_info(self.ts[-1], t.reshape(()), dense_info)
             self.ts = torch.cat([self.ts, t])
             for key in dense_info.keys():
                 self.infos[key] = torch.concat(
                     [self.infos[key], dense_info[key].unsqueeze(0)], dim=0
                 )
         else:
+            dense_info = self._prepare_info(t.reshape(()), self.ts[0], dense_info)
             self.ts = torch.cat([t, self.ts])
             for key in dense_info.keys():
                 self.infos[key] = torch.concat(

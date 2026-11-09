@@ -2,7 +2,83 @@ import pytest
 import torch
 from torchdde import TorchLinearInterpolator
 from torchdde.global_interpolation.dense_interpolation import DenseInterpolation
-from torchdde.local_interpolation import FirstOrderPolynomialInterpolation
+from torchdde.local_interpolation import (
+    FirstOrderPolynomialInterpolation,
+    ThirdOrderPolynomialInterpolation,
+)
+from torchdde.solver import Bosh3, Dopri5, RK4
+
+
+@pytest.mark.parametrize("solver", [RK4(), Bosh3(), Dopri5()])
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+def test_cached_coefficients_preserve_values_and_gradients_after_append(solver, dtype):
+    calculations = []
+    interpolation_cls = solver.interpolation_cls
+
+    class CountingInterpolation(interpolation_cls):
+        cache_coefficients = True
+
+        def _calculate(self, dense_info):
+            calculations.append(1)
+            return super()._calculate(dense_info)
+
+    class UncachedInterpolation(interpolation_cls):
+        cache_coefficients = False
+
+    times = torch.tensor([0.0, 0.1, 0.2], dtype=dtype, requires_grad=True)
+    query = torch.tensor([0.05, 0.1, 0.15], dtype=dtype, requires_grad=True)
+    generator = torch.Generator().manual_seed(123)
+    infos = {
+        "y0": torch.rand(2, 2, 1, dtype=dtype, generator=generator, requires_grad=True),
+        "y1": torch.rand(2, 2, 1, dtype=dtype, generator=generator, requires_grad=True),
+        "k": torch.rand(
+            2, solver.tableau.n_stages, 2, 1,
+            dtype=dtype, generator=generator, requires_grad=True,
+        ),
+    }
+    cached = DenseInterpolation(
+        True, CountingInterpolation, times[:2],
+        {key: value[:1] for key, value in infos.items()},
+    )
+    first_value = cached(query[0])
+    cached.add_point(times[2:], {key: value[1] for key, value in infos.items()})
+    torch.testing.assert_close(cached(query[0]), first_value)
+    reference = DenseInterpolation(True, UncachedInterpolation, times, infos)
+
+    actual = torch.stack([cached(t) for t in query.unbind()])
+    expected = torch.stack([reference(t) for t in query.unbind()])
+    torch.testing.assert_close(actual, expected)
+    for left in (True, False):
+        torch.testing.assert_close(
+            cached(query[1], left=left), reference(query[1], left=left)
+        )
+
+    inputs = (*infos.values(), times, query)
+    actual_gradients = torch.autograd.grad(actual.square().sum(), inputs, retain_graph=True)
+    expected_gradients = torch.autograd.grad(expected.square().sum(), inputs)
+    for actual_gradient, expected_gradient in zip(actual_gradients, expected_gradients):
+        torch.testing.assert_close(actual_gradient, expected_gradient)
+    # Repeated queries, including queries to a previous interval after append,
+    # must not rebuild coefficients. Each interval was prepared exactly once.
+    assert len(calculations) == 2
+
+
+def test_custom_polynomial_subclass_keeps_raw_dense_info_by_default():
+    class CustomInterpolation(ThirdOrderPolynomialInterpolation):
+        def __init__(self, t0, t1, dense_info):
+            # A custom constructor can require data beyond the coefficients.
+            self.endpoint = dense_info["y1"]
+            super().__init__(t0, t1, dense_info)
+
+    infos = {
+        "y0": torch.ones(1, 1, 1),
+        "y1": torch.ones(1, 1, 1) * 2,
+        "k": torch.ones(1, 4, 1, 1),
+    }
+    dense = DenseInterpolation(
+        True, CustomInterpolation, torch.tensor([0.0, 1.0]), infos,
+    )
+    torch.testing.assert_close(dense(torch.tensor(0.5)), torch.tensor([[1.5]]))
 
 
 @pytest.mark.parametrize("left, expected", [(True, 3.0), (False, 4.0)])

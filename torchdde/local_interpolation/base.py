@@ -8,6 +8,12 @@ from jaxtyping import Float
 class AbstractLocalInterpolation(ABC):
     """Abstract class for creating new interpolation classes."""
 
+    # Each class must explicitly opt in when its constructor accepts
+    # _cached_coefficients in dense_info
+    # and exposes its coefficient tensor as .coeffs. Custom interpolators keep
+    # the original raw dense_info path by default.
+    cache_coefficients = False
+
     def __init__(
         self,
         t0: Float[torch.Tensor, ""],

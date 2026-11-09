@@ -25,6 +25,8 @@ class FourthOrderPolynomialInterpolation(AbstractLocalInterpolation):
     increasing order, i.e. `cofficients[i]` belongs to `x**i`.
     """
 
+    cache_coefficients = True
+
     def __init__(
         self,
         t0: Float[torch.Tensor, ""],
@@ -35,10 +37,17 @@ class FourthOrderPolynomialInterpolation(AbstractLocalInterpolation):
         self.t0 = t0
         self.t1 = t1
         self.dt = t1 - t0
-        self.c_mid = c_mid.to(
-            device=dense_info["y0"].device, dtype=dense_info["y0"].dtype
+        data = (
+            dense_info["_cached_coefficients"]
+            if "_cached_coefficients" in dense_info
+            else dense_info["y0"]
         )
-        self.coeffs = self._calculate(dense_info)
+        self.c_mid = c_mid.to(device=data.device, dtype=data.dtype)
+        self.coeffs = (
+            dense_info["_cached_coefficients"]
+            if "_cached_coefficients" in dense_info
+            else self._calculate(dense_info)
+        )
 
     def _calculate(
         self, dense_info: Dict[str, Float[torch.Tensor, "..."]]
