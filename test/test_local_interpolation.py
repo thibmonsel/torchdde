@@ -1,6 +1,31 @@
 import torch
+import pytest
 from torchdde import ThirdOrderPolynomialInterpolation
+from torchdde.solver import Dopri5, RK4
 from torchdde.local_interpolation.fourth_order_interpolation import linear_rescale
+
+
+@pytest.mark.parametrize("solver, degree", [(RK4(), 3), (Dopri5(), 4)])
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+def test_horner_values_and_gradients_match_power_basis(solver, degree, dtype):
+    generator = torch.Generator().manual_seed(3)
+    coeffs = torch.rand(2, degree + 1, 3, dtype=dtype, generator=generator, requires_grad=True)
+    start = torch.tensor(-0.2, dtype=dtype, requires_grad=True)
+    end = torch.tensor(0.7, dtype=dtype, requires_grad=True)
+    query = torch.tensor(0.37, dtype=dtype, requires_grad=True)
+    interpolator = solver.interpolation_cls(
+        start, end, {"_cached_coefficients": coeffs},
+    )
+    actual = interpolator(query)
+    normalized = (query - start) / (end - start)
+    powers = normalized ** torch.arange(degree, -1, -1, dtype=dtype)
+    expected = torch.einsum("c,bcf->bf", powers, coeffs)
+    torch.testing.assert_close(actual, expected)
+    inputs = (coeffs, start, end, query)
+    actual_grads = torch.autograd.grad(actual.square().sum(), inputs, retain_graph=True)
+    expected_grads = torch.autograd.grad(expected.square().sum(), inputs)
+    for actual_grad, expected_grad in zip(actual_grads, expected_grads):
+        torch.testing.assert_close(actual_grad, expected_grad)
 
 
 def test_linear_rescale_degenerate_interval_has_finite_gradients():
