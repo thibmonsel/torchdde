@@ -251,6 +251,9 @@ def _integrate_dde(
         if dt0 * (t1 - t0) < 0:
             raise ValueError("Must have (t1 - t0) * dt0 >= 0")
 
+    # FSAL solvers and adaptive initial-step selection call ode_func during init.
+    ys_interpolation = None
+
     def ode_func(
         t: Float[torch.Tensor, ""],
         y: Float[torch.Tensor, "batch ..."],
@@ -308,7 +311,6 @@ def _integrate_dde(
     ys = torch.empty(
         (y0.shape[0], ts.shape[0], *(y0.shape[1:])), device=y0.device, dtype=y0.dtype
     )
-    ys_interpolation = None
     cond = state.tprev < t1 if (t1 > t0) else state.tprev > t1
     while cond and state.num_steps < max_steps:
         y, y_error, dense_info, solver_state, aux = solver.step(
