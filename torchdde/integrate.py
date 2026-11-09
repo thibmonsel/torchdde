@@ -252,15 +252,32 @@ def _integrate_dde(
         # we have to make sur that t - tau > dt
         # otherwise we are making a prediction with
         # an unknown ys_interpolation ...
-        def cond(t, tau):
-            in_history_domain = (t - tau).item() <= t0
-            very_close_to_t0 = torch.allclose(t - tau, t0)
-            return in_history_domain or very_close_to_t0
+        history = []
+        for tau in delays:
+            delayed_t = t - tau
+            close_to_boundary = torch.isclose(delayed_t, t0)
+            in_history = (delayed_t <= t0) | close_to_boundary
 
-        history = [
-            history_func(t - tau) if cond(t, tau) else ys_interpolation(t - tau)  # type: ignore
-            for tau in delays
-        ]
+            # The initial-step selection and first solver step can evaluate the
+            # vector field before a dense interpolator exists. The first solver
+            # step is capped by the smallest delay, so its delayed values come
+            # from the history function.
+            if ys_interpolation is None:
+                history.append(history_func(torch.minimum(delayed_t, t0)))
+                continue
+
+            # Evaluate both candidates and select with a tensor mask. Clamp the
+            # unused candidate to its valid domain so arbitrary history
+            # functions and interpolators are not queried outside their bounds.
+            history_t = torch.where(
+                close_to_boundary, delayed_t, torch.minimum(delayed_t, t0)
+            )
+            interpolation_t = torch.maximum(delayed_t, t0)
+            history_value = history_func(history_t)
+            interpolation_value = ys_interpolation(interpolation_t)
+            history.append(
+                torch.where(in_history, history_value, interpolation_value)
+            )
         return func(t, y, func_args, history=history)
 
     tnext, dt = stepsize_controller.init(
