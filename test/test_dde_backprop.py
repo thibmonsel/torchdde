@@ -10,7 +10,38 @@ from torchdde.solver import Bosh3, Dopri5, Euler, ImplicitEuler, RK2, RK4
 # Removed ImplicitEuler() since discretize_then_optimize=True doesnt work
 
 
-# Removed discretize_then_optimize False since the adjoint needs to be modified for now.
+def test_adjoint_zero_loss_has_zero_parameter_gradients():
+    class SimpleDDE(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.delays = nn.Parameter(torch.tensor([0.5]))
+            self.a = nn.Parameter(torch.tensor(0.7))
+
+        def forward(self, t, y, args, *, history):
+            return self.a * y + 0.1 * history[0]
+
+    ts = torch.linspace(0, 1, 11)
+    model = SimpleDDE()
+    ys = integrate(
+        model,
+        Euler(),
+        ts[0],
+        ts[-1],
+        ts,
+        lambda t: torch.ones(1, 1),
+        None,
+        dt0=ts[1] - ts[0],
+        delays=model.delays,
+        discretize_then_optimize=False,
+    )
+
+    loss = 0.0 * ys[:, -1].sum()
+    loss.backward()
+
+    assert torch.equal(model.a.grad, torch.zeros_like(model.a))
+    assert torch.equal(model.delays.grad, torch.zeros_like(model.delays))
+
+
 @pytest.mark.parametrize("discretize_then_optimize", [True])
 @pytest.mark.parametrize("solver", [Euler(), RK2(), RK4()])
 def test_learning_delay_in_convex_case_constant(solver, discretize_then_optimize):

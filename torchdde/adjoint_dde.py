@@ -201,12 +201,8 @@ class nddeint_ACA(torch.autograd.Function):
                     rhs_adjoint_1 += rhs_adjoint_2
 
             params_inc = tuple(
-                [
-                    -param
-                    if param is not None
-                    else torch.zeros_like(transformer.original_shapes[i])
-                    for i, param in enumerate(params)
-                ]
+                grad if grad is not None else torch.zeros_like(param)
+                for grad, param in zip(params_inc, params)
             )
 
             return transformer.flatten(
