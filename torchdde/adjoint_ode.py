@@ -82,6 +82,10 @@ class odeint_ACA(torch.autograd.Function):
                 retain_graph=True,
                 allow_unused=True,
             )
+            params_inc = tuple(
+                grad if grad is not None else torch.zeros_like(param)
+                for grad, param in zip(params_inc, params)
+            )
             return transformer.flatten((y_t, adjoint_state, *params_inc))
 
         for i in range(len(ts) - 1, 0, -1):

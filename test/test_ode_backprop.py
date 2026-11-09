@@ -8,6 +8,37 @@ from torchdde.solver import Bosh3, Dopri5, Euler, RK2, RK4
 # Due to issue #24 the adjoint method is an approximation since Euler() is used
 # for computing the gradient
 # Removed ImplicitEuler() since discretize_then_optimize=True doesnt work
+def test_adjoint_unused_parameter_has_zero_gradient():
+    class SimpleNODE(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.unused = nn.Parameter(torch.tensor(2.0))
+            self.rate = nn.Parameter(torch.tensor(-1.0))
+
+        def forward(self, t, y, args):
+            return self.rate * y
+
+    ts = torch.linspace(0, 1, 11)
+    model = SimpleNODE()
+    ys = integrate(
+        model,
+        Euler(),
+        ts[0],
+        ts[-1],
+        ts,
+        torch.ones(1, 1),
+        None,
+        dt0=ts[1] - ts[0],
+        discretize_then_optimize=False,
+    )
+
+    ys[:, -1].sum().backward()
+
+    assert torch.equal(model.unused.grad, torch.zeros_like(model.unused))
+    assert model.rate.grad is not None
+    assert not torch.equal(model.rate.grad, torch.zeros_like(model.rate))
+
+
 @pytest.mark.parametrize("discretize_then_optimize", [True, False])
 @pytest.mark.parametrize("solver", [Euler(), RK2(), RK4(), Dopri5(), Bosh3()])
 def test_very_simple_system(solver, discretize_then_optimize):
