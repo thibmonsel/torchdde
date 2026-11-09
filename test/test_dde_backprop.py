@@ -42,6 +42,38 @@ def test_adjoint_zero_loss_has_zero_parameter_gradients():
     assert torch.equal(model.delays.grad, torch.zeros_like(model.delays))
 
 
+def test_adjoint_delay_gradient_goes_to_delay_parameter():
+    class SimpleDDE(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.unused = nn.Parameter(torch.tensor(2.0))
+            self.delays = nn.Parameter(torch.tensor([0.5]))
+
+        def forward(self, t, y, args, *, history):
+            return history[0]
+
+    ts = torch.linspace(0, 1, 11)
+    model = SimpleDDE()
+    ys = integrate(
+        model,
+        Euler(),
+        ts[0],
+        ts[-1],
+        ts,
+        lambda t: torch.ones(1, 1) * t,
+        None,
+        dt0=ts[1] - ts[0],
+        delays=model.delays,
+        discretize_then_optimize=False,
+    )
+
+    ys[:, -1].sum().backward()
+
+    assert torch.equal(model.unused.grad, torch.zeros_like(model.unused))
+    assert model.delays.grad is not None
+    assert not torch.equal(model.delays.grad, torch.zeros_like(model.delays))
+
+
 @pytest.mark.parametrize("discretize_then_optimize", [True])
 @pytest.mark.parametrize("solver", [Euler(), RK2(), RK4()])
 def test_learning_delay_in_convex_case_constant(solver, discretize_then_optimize):

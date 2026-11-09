@@ -40,6 +40,9 @@ class nddeint_ACA(torch.autograd.Function):
         ctx.t0 = t0
         ctx.t1 = t1
         ctx.max_steps = max_steps
+        ctx.delay_param_index = next(
+            (i for i, param in enumerate(params) if param is func.delays), None
+        )
 
         with torch.no_grad():
             ctx.save_for_backward(*params)
@@ -204,13 +207,15 @@ class nddeint_ACA(torch.autograd.Function):
                 grad if grad is not None else torch.zeros_like(param)
                 for grad, param in zip(params_inc, params)
             )
+            if ctx.delay_param_index is not None:
+                params_inc = list(params_inc)
+                params_inc[ctx.delay_param_index] = (
+                    params_inc[ctx.delay_param_index] - delay_derivative_inc.squeeze(1)
+                )
+                params_inc = tuple(params_inc)
 
             return transformer.flatten(
-                (
-                    rhs_adjoint_1,
-                    -delay_derivative_inc.squeeze(1) + params_inc[0],
-                    *params_inc[1:],
-                )
+                (rhs_adjoint_1, *params_inc)
             )
 
         # computing the adjoint dynamics
