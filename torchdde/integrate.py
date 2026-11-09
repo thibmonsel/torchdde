@@ -97,6 +97,9 @@ def integrate(
     from torchdde.adjoint_dde import ddesolve_adjoint
     from torchdde.adjoint_ode import odesolve_adjoint
 
+    if delays is not None and t1 < t0:
+        raise ValueError("Reverse DDE integration requires future values, not a past history.")
+
     if discretize_then_optimize or not isinstance(func, torch.nn.Module):
         return _integrate(
             func,
@@ -425,6 +428,9 @@ def _integrate_ode(
     tnext, dt = stepsize_controller.init(
         func, t0, t1, y0, dt0, func_args, solver.order()
     )
+    forward = t1 > t0
+    tnext = torch.minimum(tnext, t1) if forward else torch.maximum(tnext, t1)
+    dt = tnext - t0
     solver_state = solver.init(func, t0, y0, dt, func_args)
     state = State(
         y0,
@@ -466,15 +472,19 @@ def _integrate_ode(
             solver.order(),
             state.dt,
         )
-        tprev = torch.clamp(tprev, max=t1)
+        tprev = torch.minimum(tprev, t1) if forward else torch.maximum(tprev, t1)
         # Clipping tnext if it goes beyond t1
         # and update dt such that tprev + dt = tnext
-        tnext = torch.where((tprev + dt) > t1, t1, tprev + dt)
-        dt = torch.where((tprev + dt) > t1, t1 - tprev, dt)
+        tnext = torch.minimum(tprev + dt, t1) if forward else torch.maximum(tprev + dt, t1)
+        dt = tnext - tprev
         step_save_idx = 0
         if keep_step:
             interp = solver.build_interpolation(state.tprev, state.tnext, dense_info)
-            while torch.any(state.tnext >= ts[state.save_idx + step_save_idx :]):
+            while torch.any(
+                state.tnext >= ts[state.save_idx + step_save_idx :]
+                if forward
+                else state.tnext <= ts[state.save_idx + step_save_idx :]
+            ):
                 idx = state.save_idx + step_save_idx
                 out = interp(ts[idx])
                 ys[:, idx] = out.unsqueeze(1) if out.ndim != ys[:, idx].ndim else out

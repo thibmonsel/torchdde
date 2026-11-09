@@ -180,11 +180,11 @@ class AdaptiveStepSizeController(AbstractStepSizeController):
         self.prev_prev_scaled_error = torch.inf * torch.tensor((1.0))
 
     def init(self, func, t0, t1, y0, dt0, args, error_order):
-        del t1
         if dt0 is None:
             dt0 = _select_initial_step(
                 func, t0, y0, args, error_order, self.rtol, self.atol, rms_norm
             )
+            dt0 = dt0 if t1 >= t0 else -dt0
             return t0 + dt0, dt0
         else:
             return t0 + dt0, dt0
