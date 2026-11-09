@@ -219,6 +219,69 @@ def _integrate(
         )
 
 
+def _integrate_fixed(func, solver, t0, t1, ts, y0, func_args, dt0, max_steps,
+                     append_dense=None):
+    """Constant-step solve with host bookkeeping and differentiable state work.
+
+    Callers only select this path when integration times are not trainable.
+    DDE callers also require dt0 strictly below every delay, leaving delay-cap
+    boundaries on the general path. State, history and model gradients remain
+    on-device and attached to autograd.
+    """
+    clock, end, clock_dt = torch.stack((t0, t1, dt0)).detach().cpu().unbind()
+    save_times = ts.detach().cpu().tolist()
+    forward = bool(end > clock)
+    if clock == end:
+        return y0.unsqueeze(1).expand(y0.shape[0], len(save_times), *y0.shape[1:]), None
+    if not torch.isfinite(clock_dt) or clock_dt == 0:
+        raise ValueError("Fixed step size must be finite and nonzero")
+    if (end - clock) * clock_dt < 0:
+        raise ValueError("Must have (t1 - t0) * dt0 >= 0")
+
+    tprev, dt, y = t0, dt0, y0
+    ys = y0.new_empty((y0.shape[0], len(save_times), *y0.shape[1:]))
+    save_idx, count, aux = 0, 0, None
+    solver_state = None
+    while bool(clock < end if forward else clock > end):
+        if count >= max_steps:
+            raise RuntimeError("Maximum number of steps reached")
+        next_clock = clock + clock_dt
+        clipped = bool(next_clock > end if forward else next_clock < end)
+        if clipped:
+            next_clock = end
+        tnext = t1 if clipped else tprev + dt
+        # The general ODE path reconstructs dt from its endpoints every step;
+        # DDEs keep the constant dt until the final clipped step.
+        if append_dense is None or clipped:
+            dt = tnext - tprev
+            clock_dt = next_clock - clock
+        if count == 0:
+            solver_state = solver.init(func, tprev, y, dt, func_args)
+        y, _, dense_info, solver_state, aux = solver.step(
+            func, tprev, y, dt, solver_state, func_args,
+        )
+        next_value = float(next_clock)
+        needs_output = save_idx < len(save_times) and (
+            save_times[save_idx] <= next_value if forward
+            else save_times[save_idx] >= next_value
+        )
+        if append_dense is not None or needs_output:
+            interpolation = solver.build_interpolation(tprev, tnext, dense_info)
+            if append_dense is not None:
+                append_dense(tprev, tnext, dense_info, interpolation)
+            while save_idx < len(save_times) and (
+                save_times[save_idx] <= next_value if forward
+                else save_times[save_idx] >= next_value
+            ):
+                ys[:, save_idx] = interpolation(ts[save_idx])
+                save_idx += 1
+        tprev, clock = tnext, next_clock
+        count += 1
+    if save_idx != len(save_times):
+        raise ValueError("Requested times must lie inside the integration interval")
+    return ys, aux
+
+
 def _integrate_dde(
     func: Union[torch.nn.Module, Callable],
     t0: Float[torch.Tensor, ""],
@@ -291,6 +354,17 @@ def _integrate_dde(
         else:
             shared = interpolation if ys_interpolation._share_step_interpolation else None
             ys_interpolation.add_point(tnext.reshape(1), dense_info, interpolation=shared)
+
+    if (
+        type(stepsize_controller) is ConstantStepSizeController
+        and dt0 is not None
+        and not any(value.requires_grad for value in (t0, t1, ts, dt0))
+        and bool(torch.all(delays > dt0))
+    ):
+        ys, aux = _integrate_fixed(
+            ode_func, solver, t0, t1, ts, y0, func_args, dt0, max_steps, append_dense,
+        )
+        return ys, (ys_interpolation, aux)
 
     tnext, dt = stepsize_controller.init(
         ode_func, t0, t1, y0, dt0, func_args, solver.order()
@@ -418,6 +492,15 @@ def _integrate_ode(
     if dt0 is not None:
         if dt0 * (t1 - t0) < 0:
             raise ValueError("Must have (t1 - t0) * dt0 >= 0")
+
+    if (
+        type(stepsize_controller) is ConstantStepSizeController
+        and dt0 is not None
+        and not any(value.requires_grad for value in (t0, t1, ts, dt0))
+    ):
+        return _integrate_fixed(
+            func, solver, t0, t1, ts, y0, func_args, dt0, max_steps,
+        )
 
     tnext, dt = stepsize_controller.init(
         func, t0, t1, y0, dt0, func_args, solver.order()
