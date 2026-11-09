@@ -53,6 +53,25 @@ def test_explicit_solver_adaptive(solver):
     assert torch.allclose(ys[:, -1], y0 * torch.exp(-ts[-1]), rtol=10e-3, atol=10e-3)
 
 
+def test_dopri5_preserves_float64_interpolation_dtype():
+    solver = Dopri5()
+    ts = torch.linspace(0, 1, 11, dtype=torch.float64)
+    y0 = torch.ones((1, 1), dtype=torch.float64)
+    ys = integrate(
+        lambda t, y, args: -y,
+        solver,
+        ts[0],
+        ts[-1],
+        ts,
+        y0,
+        None,
+        dt0=ts[1] - ts[0],
+    )
+
+    assert ys.dtype == torch.float64
+    assert torch.allclose(ys[:, -1], y0 * torch.exp(-ts[-1]), rtol=1e-5, atol=1e-6)
+
+
 @pytest.mark.skip(
     reason="Fix integration for only time dependent \
         functions for adaptive step size controllers"

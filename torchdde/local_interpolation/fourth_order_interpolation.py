@@ -34,8 +34,9 @@ class FourthOrderPolynomialInterpolation(AbstractLocalInterpolation):
         self.t0 = t0
         self.t1 = t1
         self.dt = t1 - t0
-        self.c_mid = c_mid
-        self.c_mid = self.c_mid.to(dense_info["y0"].device)
+        self.c_mid = c_mid.to(
+            device=dense_info["y0"].device, dtype=dense_info["y0"].dtype
+        )
         self.coeffs = self._calculate(dense_info)
 
     def _calculate(
@@ -56,9 +57,7 @@ class FourthOrderPolynomialInterpolation(AbstractLocalInterpolation):
             - 32 * _ymid
         )
         _c = _f1 - 4 * _f0 - 11 * dense_info["y0"] - 5 * dense_info["y1"] + 16 * _ymid
-        return torch.stack([_a, _b, _c, _f0, dense_info["y0"]], dim=1).type(
-            torch.float32
-        )
+        return torch.stack([_a, _b, _c, _f0, dense_info["y0"]], dim=1)
 
     def __call__(
         self,
