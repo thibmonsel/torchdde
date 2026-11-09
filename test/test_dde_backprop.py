@@ -10,6 +10,45 @@ from torchdde.solver import Bosh3, Dopri5, Euler, ImplicitEuler, RK2, RK4
 # Removed ImplicitEuler() since discretize_then_optimize=True doesnt work
 
 
+@pytest.mark.parametrize("solver", [Euler(), RK2(), RK4(), Bosh3(), Dopri5()])
+@pytest.mark.parametrize("use_second", [False, True])
+def test_adjoint_multiple_delay_gradients_and_unused_history(solver, use_second):
+    class Field(nn.Module):
+        def __init__(self, delays):
+            super().__init__()
+            self.delays = nn.Parameter(delays.clone())
+            self.rate = nn.Parameter(torch.tensor(0.15, dtype=delays.dtype))
+
+        def forward(self, t, y, args, *, history):
+            result = self.rate * y + 0.2 * history[0]
+            return result + 0.1 * history[1] if use_second else result
+
+    ts = torch.linspace(0.0, 0.8, 41, dtype=torch.float64)
+    delays = torch.tensor([0.213, 0.371], dtype=ts.dtype)
+
+    def loss(lags, adjoint):
+        model = Field(lags)
+        ys = integrate(
+            model, solver, ts[0], ts[-1], ts,
+            lambda t: t.exp().reshape(1, 1), None,
+            delays=model.delays, dt0=ts[1] - ts[0],
+            discretize_then_optimize=not adjoint,
+        )
+        return ys[:, -1].square().sum(), model
+
+    value, model = loss(delays, True)
+    value.backward()
+    eps = 1e-5
+    expected = []
+    for offset in torch.eye(2, dtype=ts.dtype) * eps:
+        plus, _ = loss(delays + offset, False)
+        minus, _ = loss(delays - offset, False)
+        expected.append((plus - minus) / (2 * eps))
+    torch.testing.assert_close(
+        model.delays.grad, torch.stack(expected), rtol=0.05, atol=0.005,
+    )
+
+
 def test_adjoint_zero_loss_has_zero_parameter_gradients():
     class SimpleDDE(nn.Module):
         def __init__(self):

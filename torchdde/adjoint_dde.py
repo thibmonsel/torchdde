@@ -147,13 +147,15 @@ class nddeint_ACA(torch.autograd.Function):
             # This correspond to the both terms :
             # \lambda_t \partial{f_\theta(t)}{g} in adjoint dynamics
             # \lambda_t \partial{f_\theta(t)}{\theta} and in loss equation
-            rhs_adjoint_1, *params_inc = torch.autograd.grad(
+            gradients = torch.autograd.grad(
                 func_t,
-                (y_t,) + params,
+                (y_t, *h_t_minus_tau, *params),
                 -adjoint_y,
-                retain_graph=True,
                 allow_unused=True,
             )
+            rhs_adjoint_1 = gradients[0]
+            history_gradients = gradients[1 : 1 + len(h_t_minus_tau)]
+            params_inc = gradients[1 + len(h_t_minus_tau) :]
             if rhs_adjoint_1 is None:
                 rhs_adjoint_1 = torch.zeros_like(y_t)
 
@@ -164,13 +166,7 @@ class nddeint_ACA(torch.autograd.Function):
                 # loss w.r.t the parameters
                 # \lambda(t) \partial{f_\theta(t)}{g}
                 # where g(t) = y(t-tau_i)
-                params_inc2 = torch.autograd.grad(
-                    func_t,
-                    h_t_minus_tau[idx],
-                    -adjoint_y,
-                    retain_graph=True,
-                    allow_unused=True,
-                )[0]
+                params_inc2 = history_gradients[idx]
 
                 if params_inc2 is None:
                     pass
@@ -203,9 +199,10 @@ class nddeint_ACA(torch.autograd.Function):
                     # \lambda(t+tau_i) \partial{f_\theta(t+tau_i)}{y_i}
                     # where y_i(t) = g(t-\tau_i)
                     rhs_adjoint_2 = torch.autograd.grad(
-                        func_t_plus_tau_i, y_t, -adjoint_t_plus_tau
+                        func_t_plus_tau_i, y_t, -adjoint_t_plus_tau, allow_unused=True
                     )[0]
-                    rhs_adjoint_1 += rhs_adjoint_2
+                    if rhs_adjoint_2 is not None:
+                        rhs_adjoint_1 += rhs_adjoint_2
 
             params_inc = tuple(
                 grad if grad is not None else torch.zeros_like(param)
