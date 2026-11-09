@@ -3,6 +3,31 @@ import pytest
 from torchdde import ThirdOrderPolynomialInterpolation
 from torchdde.solver import Dopri5, RK4
 from torchdde.local_interpolation.fourth_order_interpolation import linear_rescale
+from torchdde.local_interpolation import FirstOrderPolynomialInterpolation
+
+
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+@pytest.mark.parametrize("end_value", [0.0, 1.0])
+def test_cached_linear_slope_values_and_gradients(dtype, end_value):
+    start = torch.tensor(0.0, dtype=dtype, requires_grad=True)
+    end = torch.tensor(end_value, dtype=dtype, requires_grad=True)
+    query = torch.tensor(0.2, dtype=dtype, requires_grad=True)
+    y0 = torch.tensor([[1.0, 2.0]], dtype=dtype, requires_grad=True)
+    y1 = torch.tensor([[3.0, 5.0]], dtype=dtype, requires_grad=True)
+    local = FirstOrderPolynomialInterpolation(start, end, {"y0": y0, "y1": y1})
+    cached = FirstOrderPolynomialInterpolation(
+        start, end, {"_cached_coefficients": local.coeffs},
+    )
+    actual = cached(query)
+    duration = torch.where((end - start).abs() > 0, end - start, 1.0)
+    expected = y0 + (y1 - y0) / duration * (query - start)
+    torch.testing.assert_close(actual, expected)
+    torch.testing.assert_close(cached.y1, y1)
+    inputs = (start, end, query, y0, y1)
+    actual_grads = torch.autograd.grad(actual.sum(), inputs, retain_graph=True)
+    expected_grads = torch.autograd.grad(expected.sum(), inputs)
+    for actual_grad, expected_grad in zip(actual_grads, expected_grads):
+        torch.testing.assert_close(actual_grad, expected_grad)
 
 
 @pytest.mark.parametrize("solver, degree", [(RK4(), 3), (Dopri5(), 4)])
