@@ -274,6 +274,24 @@ def _integrate_dde(
             )
         return func(t, y, func_args, history=history)
 
+    def append_dense(tprev, tnext, dense_info, interpolation):
+        nonlocal ys_interpolation
+        if ys_interpolation is None:
+            # The original initial dense times are detached. Do not reuse
+            # coefficients with trainable time endpoints in that case.
+            shared = interpolation if not (tprev.requires_grad or tnext.requires_grad) else None
+            ys_interpolation = DenseInterpolation(
+                True,
+                solver.interpolation_cls,
+                torch.stack((t0, tnext)).detach(),
+                {key: value.unsqueeze(0) for key, value in dense_info.items()},
+                interpolation=shared,
+            )
+            ys_interpolation._share_step_interpolation = shared is not None
+        else:
+            shared = interpolation if ys_interpolation._share_step_interpolation else None
+            ys_interpolation.add_point(tnext.reshape(1), dense_info, interpolation=shared)
+
     tnext, dt = stepsize_controller.init(
         ode_func, t0, t1, y0, dt0, func_args, solver.order()
     )
@@ -333,21 +351,7 @@ def _integrate_dde(
         step_save_idx = 0
         if keep_step:
             interp = solver.build_interpolation(state.tprev, state.tnext, dense_info)
-            #### Updating interpolators ####
-            if ys_interpolation is None:
-                ys_interpolation = DenseInterpolation(
-                    ts[1] - ts[0] > 0,
-                    solver.interpolation_cls,
-                    torch.tensor([t0, state.tnext], device=y.device),
-                    dict(
-                        zip(
-                            dense_info.keys(),
-                            [dense_info[key].unsqueeze(0) for key in dense_info.keys()],
-                        )
-                    ),
-                )
-            else:
-                ys_interpolation.add_point(state.tnext.reshape(1), dense_info)
+            append_dense(state.tprev, state.tnext, dense_info, interp)
 
             while torch.any(state.tnext >= ts[state.save_idx + step_save_idx :]):
                 #### Bookkeeping, saving values ####

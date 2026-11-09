@@ -11,6 +11,7 @@ class DenseInterpolation:
         interpolation_cls,
         ts: Float[torch.Tensor, " 2"],
         infos: Dict[str, Float[torch.Tensor, "1 batch ..."]],
+        interpolation=None,
     ):
         self.direction = direction
         self.ts = ts
@@ -27,15 +28,18 @@ class DenseInterpolation:
             # polynomial evaluation, without rebuilding the coefficients.
             coefficients = []
             for i in range(ts.shape[0] - 1):
-                local_info = {key: value[i] for key, value in infos.items()}
-                local = interpolation_cls(ts[i], ts[i + 1], local_info)
+                if interpolation is not None and ts.shape[0] == 2:
+                    local = interpolation
+                else:
+                    local_info = {key: value[i] for key, value in infos.items()}
+                    local = interpolation_cls(ts[i], ts[i + 1], local_info)
                 coefficients.append(local.coeffs)
             self.infos = {"_cached_coefficients": torch.stack(coefficients)}
 
-    def _prepare_info(self, t0, t1, dense_info):
+    def _prepare_info(self, t0, t1, dense_info, interpolation=None):
         if not self._cache_coefficients:
             return dense_info
-        local = self.interpolation_cls(t0, t1, dense_info)
+        local = interpolation if interpolation is not None else self.interpolation_cls(t0, t1, dense_info)
         return {"_cached_coefficients": local.coeffs}
 
     def __check_init__(self):
@@ -73,16 +77,16 @@ class DenseInterpolation:
         out = self._get_local_interpolation(t, left).__call__(t, left=left)
         return out
 
-    def add_point(self, t, dense_info):
+    def add_point(self, t, dense_info, interpolation=None):
         if self.direction:
-            dense_info = self._prepare_info(self.ts[-1], t.reshape(()), dense_info)
+            dense_info = self._prepare_info(self.ts[-1], t.reshape(()), dense_info, interpolation)
             self.ts = torch.cat([self.ts, t])
             for key in dense_info.keys():
                 self.infos[key] = torch.concat(
                     [self.infos[key], dense_info[key].unsqueeze(0)], dim=0
                 )
         else:
-            dense_info = self._prepare_info(t.reshape(()), self.ts[0], dense_info)
+            dense_info = self._prepare_info(t.reshape(()), self.ts[0], dense_info, interpolation)
             self.ts = torch.cat([t, self.ts])
             for key in dense_info.keys():
                 self.infos[key] = torch.concat(

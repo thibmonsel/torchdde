@@ -11,7 +11,8 @@ from torchdde.solver import Bosh3, Dopri5, RK4
 
 @pytest.mark.parametrize("solver", [RK4(), Bosh3(), Dopri5()])
 @pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
-def test_cached_coefficients_preserve_values_and_gradients_after_append(solver, dtype):
+@pytest.mark.parametrize("share", [False, True])
+def test_cached_coefficients_preserve_values_and_gradients_after_append(solver, dtype, share):
     calculations = []
     interpolation_cls = solver.interpolation_cls
 
@@ -36,12 +37,17 @@ def test_cached_coefficients_preserve_values_and_gradients_after_append(solver, 
             dtype=dtype, generator=generator, requires_grad=True,
         ),
     }
+    initial_info = {key: value[0] for key, value in infos.items()}
+    initial_local = CountingInterpolation(times[0], times[1], initial_info) if share else None
     cached = DenseInterpolation(
         True, CountingInterpolation, times[:2],
         {key: value[:1] for key, value in infos.items()},
+        interpolation=initial_local,
     )
     first_value = cached(query[0])
-    cached.add_point(times[2:], {key: value[1] for key, value in infos.items()})
+    added_info = {key: value[1] for key, value in infos.items()}
+    added_local = CountingInterpolation(times[1], times[2], added_info) if share else None
+    cached.add_point(times[2:], added_info, interpolation=added_local)
     torch.testing.assert_close(cached(query[0]), first_value)
     reference = DenseInterpolation(True, UncachedInterpolation, times, infos)
 
