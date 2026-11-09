@@ -396,7 +396,7 @@ def _integrate_dde(
             save_idx,
         )
         cond = tprev < t1 if (t1 > t0) else tprev > t1
-    if state.num_steps >= max_steps:
+    if cond:
         raise RuntimeError("Maximum number of steps reached")
     return ys, (ys_interpolation, aux)  # type: ignore
 
@@ -521,7 +521,7 @@ def _integrate_ode(
         )
         cond = state.tprev < t1 if (t1 > t0) else state.tprev > t1
 
-    if state.num_steps >= max_steps:
+    if cond:
         raise RuntimeError(
             f"Maximum number of steps reached \
             with solver (max_steps={state.num_steps} \
