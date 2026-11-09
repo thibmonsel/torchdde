@@ -1,6 +1,42 @@
 import pytest
 import torch
 from torchdde import TorchLinearInterpolator
+from torchdde.global_interpolation.dense_interpolation import DenseInterpolation
+from torchdde.local_interpolation import FirstOrderPolynomialInterpolation
+
+
+@pytest.mark.parametrize("left, expected", [(True, 3.0), (False, 4.0)])
+def test_dense_interpolation_boundary_selection(left, expected):
+    interpolator = DenseInterpolation(
+        True,
+        FirstOrderPolynomialInterpolation,
+        torch.tensor([0.0, 1.0, 2.0]),
+        {
+            "y0": torch.tensor([[[1.0]], [[4.0]]]),
+            "y1": torch.tensor([[[3.0]], [[8.0]]]),
+        },
+    )
+    torch.testing.assert_close(
+        interpolator(torch.tensor(1.0), left=left), torch.tensor([[expected]])
+    )
+
+
+def test_dense_interpolation_state_and_time_gradients():
+    y0 = torch.tensor([[[1.0]], [[4.0]]], requires_grad=True)
+    y1 = torch.tensor([[[3.0]], [[8.0]]], requires_grad=True)
+    t = torch.tensor(1.5, requires_grad=True)
+    interpolator = DenseInterpolation(
+        True,
+        FirstOrderPolynomialInterpolation,
+        torch.tensor([0.0, 1.0, 2.0]),
+        {"y0": y0, "y1": y1},
+    )
+    value = interpolator(t)
+    value.sum().backward()
+    torch.testing.assert_close(value, torch.tensor([[6.0]]))
+    torch.testing.assert_close(t.grad, torch.tensor(4.0))
+    for state in (y0, y1):
+        torch.testing.assert_close(state.grad, torch.tensor([[[0.0]], [[0.5]]]))
 
 
 def test_non_montonic_ts():

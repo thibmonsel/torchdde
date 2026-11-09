@@ -30,16 +30,18 @@ class DenseInterpolation:
         index = torch.searchsorted(self.ts, t, side="left" if left else "right")
         index = torch.clip(index - 1, 0, maxlen)
         # Will never access the final element of `ts`; this is correct behaviour.
-        fractional_part = t - self.ts[index]
+        fractional_part = t - self.ts.index_select(0, index.reshape(1)).squeeze(0)
         return index, fractional_part
 
     def _get_local_interpolation(self, t, left: bool):
         index, _ = self._interpret_t(t, left)
-        prev_t = self.ts[index]
-        next_t = self.ts[index + 1]
+        # Scalar tensor indexing implicitly calls item(), synchronizing CUDA.
+        # Keep the interval and data selection on the tensor's device instead.
+        interval = self.ts.index_select(0, torch.stack((index, index + 1)))
+        prev_t, next_t = interval.unbind()
         dense_info = []
         for elmt in self.infos.values():
-            dense_info.append(elmt[index])
+            dense_info.append(elmt.index_select(0, index.reshape(1)).squeeze(0))
         specific_infos = dict(zip(self.infos.keys(), dense_info))
         return self.interpolation_cls(t0=prev_t, t1=next_t, dense_info=specific_infos)
 

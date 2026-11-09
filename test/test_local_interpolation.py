@@ -1,5 +1,22 @@
 import torch
 from torchdde import ThirdOrderPolynomialInterpolation
+from torchdde.local_interpolation.fourth_order_interpolation import linear_rescale
+
+
+def test_linear_rescale_degenerate_interval_has_finite_gradients():
+    t = torch.tensor(2.0, requires_grad=True)
+    result = linear_rescale(torch.tensor(2.0), t, torch.tensor(2.0))
+    result.backward()
+    torch.testing.assert_close(result, torch.tensor(0.0))
+    torch.testing.assert_close(t.grad, torch.tensor(0.0))
+
+
+def test_linear_rescale_value_and_gradient():
+    t = torch.tensor(2.25, requires_grad=True)
+    result = linear_rescale(torch.tensor(2.0), t, torch.tensor(2.5))
+    result.backward()
+    torch.testing.assert_close(result, torch.tensor(0.5))
+    torch.testing.assert_close(t.grad, torch.tensor(2.0))
 
 
 def test_third_order_interpolation():

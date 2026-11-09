@@ -12,8 +12,9 @@ def linear_rescale(t0, t, t1):
     """
 
     cond = t0 == t1
-    numerator = torch.zeros_like(t) if cond else t - t0
-    denominator = torch.ones_like(t) if cond else t1 - t0
+    numerator = torch.where(cond, torch.zeros_like(t), t - t0)
+    # Keep the unselected branch finite, including during backward.
+    denominator = torch.where(cond, torch.ones_like(t), t1 - t0)
     return numerator / denominator
 
 

@@ -259,36 +259,18 @@ def _integrate_dde(
         y: Float[torch.Tensor, "batch ..."],
         func_args: Any,
     ):
-        # applies the function func to the current
-        # time t and state y and the history
-        # we have to make sur that t - tau > dt
-        # otherwise we are making a prediction with
-        # an unknown ys_interpolation ...
         history = []
         for tau in delays:
             delayed_t = t - tau
-            close_to_boundary = torch.isclose(delayed_t, t0)
-            in_history = (delayed_t <= t0) | close_to_boundary
-
-            # The initial-step selection and first solver step can evaluate the
-            # vector field before a dense interpolator exists. The first solver
-            # step is capped by the smallest delay, so its delayed values come
-            # from the history function.
             if ys_interpolation is None:
-                history.append(history_func(torch.minimum(delayed_t, t0)))
+                history.append(history_func(delayed_t))
                 continue
-
-            # Evaluate both candidates and select with a tensor mask. Clamp the
-            # unused candidate to its valid domain so arbitrary history
-            # functions and interpolators are not queried outside their bounds.
-            history_t = torch.where(
-                close_to_boundary, delayed_t, torch.minimum(delayed_t, t0)
-            )
-            interpolation_t = torch.maximum(delayed_t, t0)
-            history_value = history_func(history_t)
-            interpolation_value = ys_interpolation(interpolation_t)
+            in_history_domain = delayed_t.item() <= t0
+            close_to_boundary = torch.allclose(delayed_t, t0)
             history.append(
-                torch.where(in_history, history_value, interpolation_value)
+                history_func(delayed_t)
+                if in_history_domain or close_to_boundary
+                else ys_interpolation(delayed_t)
             )
         return func(t, y, func_args, history=history)
 
