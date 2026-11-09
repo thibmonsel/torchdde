@@ -97,6 +97,12 @@ def integrate(
     from torchdde.adjoint_dde import ddesolve_adjoint
     from torchdde.adjoint_ode import odesolve_adjoint
 
+    if t0 == t1:
+        if not torch.all(ts == t0):
+            raise ValueError("For a zero-duration solve, all requested times must equal t0.")
+        initial = y0(t0) if callable(y0) else y0
+        return initial.unsqueeze(1).expand(initial.shape[0], ts.numel(), *initial.shape[1:])
+
     if delays is not None and t1 < t0:
         raise ValueError("Reverse DDE integration requires future values, not a past history.")
 

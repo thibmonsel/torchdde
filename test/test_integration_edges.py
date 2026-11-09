@@ -51,3 +51,31 @@ def test_completion_at_step_limit(dde):
     with pytest.raises(RuntimeError, match="Maximum number of steps"):
         integrate(func, Euler(), ts[0], ts[-1], ts, y0, None,
                   dt0=ts[1] - ts[0], max_steps=1, **kwargs)
+
+
+@pytest.mark.parametrize("dde", [False, True])
+@pytest.mark.parametrize("module", [False, True])
+def test_zero_duration_returns_initial_value_and_gradient(dde, module):
+    class Field(torch.nn.Module):
+        def forward(self, t, y, args, **kwargs):
+            raise AssertionError("A zero-duration solve must not evaluate the field")
+
+    initial = torch.full((2, 3), 3.0, dtype=torch.float64, requires_grad=True)
+    y0 = (lambda t: initial) if dde else initial
+    func = Field() if module else Field().forward
+    ts = torch.zeros(2, dtype=torch.float64)
+    kwargs = {"delays": torch.tensor([0.5])} if dde else {}
+    ys = integrate(func, Euler(), ts[0], ts[-1], ts, y0, None, **kwargs)
+    assert ys.shape == (2, 2, 3)
+    assert ys.dtype == initial.dtype
+    assert torch.equal(ys[:, 0], initial)
+    assert torch.equal(ys[:, 1], initial)
+    ys.sum().backward()
+    assert torch.equal(initial.grad, torch.full_like(initial, 2.0))
+
+
+def test_zero_duration_rejects_times_outside_interval():
+    with pytest.raises(ValueError, match="requested times"):
+        integrate(lambda t, y, args: y, Euler(), torch.tensor(0.0),
+                  torch.tensor(0.0), torch.tensor([0.0, 1.0]),
+                  torch.ones(1, 1), None)
