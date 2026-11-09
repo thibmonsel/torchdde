@@ -74,6 +74,56 @@ def test_adjoint_delay_gradient_goes_to_delay_parameter():
     assert not torch.equal(model.delays.grad, torch.zeros_like(model.delays))
 
 
+@pytest.mark.parametrize(
+    "solver", [Euler(), RK2(), RK4(), Dopri5(), Bosh3(), ImplicitEuler()]
+)
+def test_adjoint_delay_gradient_matches_finite_difference_for_each_solver(solver):
+    class SimpleDDE(nn.Module):
+        def __init__(self, a, tau):
+            super().__init__()
+            self.delays = nn.Parameter(torch.tensor([tau], dtype=torch.float64))
+            self.a = nn.Parameter(torch.tensor(a, dtype=torch.float64))
+
+        def forward(self, t, y, args, *, history):
+            return self.a * y + 0.3 * history[0]
+
+    ts = torch.linspace(0, 1, 41, dtype=torch.float64)
+    dt = ts[1] - ts[0]
+
+    def terminal_loss(tau):
+        model = SimpleDDE(a=0.7, tau=tau)
+
+        def history(t):
+            return torch.ones(1, 1, dtype=t.dtype, device=t.device) * torch.exp(t)
+
+        ys = integrate(
+            model,
+            solver,
+            ts[0],
+            ts[-1],
+            ts,
+            history,
+            None,
+            stepsize_controller=ConstantStepSizeController(),
+            dt0=dt,
+            delays=model.delays,
+            discretize_then_optimize=False,
+        )
+        return ys[:, -1].square().sum(), model
+
+    loss, model = terminal_loss(0.371)
+    loss.backward()
+
+    epsilon = 1e-5
+    loss_plus, _ = terminal_loss(0.371 + epsilon)
+    loss_minus, _ = terminal_loss(0.371 - epsilon)
+    finite_difference = (loss_plus - loss_minus) / (2 * epsilon)
+
+    assert torch.allclose(
+        model.delays.grad, finite_difference.reshape(1), rtol=0.03, atol=0.01
+    )
+
+
 @pytest.mark.parametrize("discretize_then_optimize", [True])
 @pytest.mark.parametrize("solver", [Euler(), RK2(), RK4()])
 def test_learning_delay_in_convex_case_constant(solver, discretize_then_optimize):

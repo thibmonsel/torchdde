@@ -81,26 +81,6 @@ class nddeint_ACA(torch.autograd.Function):
         params = ctx.saved_tensors
         state_interpolator = ctx.ys_interpolator
 
-        # computing y'(t-tau) for the contribution of
-        # delay parameters in the loss w.r.t to the parameters
-        grad_ys = torch.gradient(ctx.ys, dim=1, spacing=(ctx.ts,))[0]
-        ts_history = torch.linspace(
-            ctx.ts[0] - max(ctx.func.delays).item(),
-            ctx.ts[0],
-            int(max(ctx.func.delays) / dt) + 2,
-            device=ctx.ts.device,
-        )
-        ys_history_eval = torch.concat(
-            [torch.unsqueeze(ctx.history_func(t), dim=1) for t in ts_history],
-            dim=1,
-        )
-        if len(ys_history_eval.shape) == 2:
-            ys_history_eval = ys_history_eval[..., None]
-        grad_ys_history_func = torch.gradient(
-            ys_history_eval, spacing=(ts_history,), dim=1
-        )[0]
-        grad_ys = torch.cat((grad_ys_history_func, grad_ys), dim=1)
-
         # adjoint history shape [N, N_t=1, D]
         # create an adjoint interpolator that will be
         # used for the integration of the adjoint DDE
@@ -122,6 +102,28 @@ class nddeint_ACA(torch.autograd.Function):
         aug_state = [torch.zeros_like(adjoint_state)]
         aug_state.extend([torch.zeros_like(param) for param in params])
         transformer = TupleTensorTransformer.from_tuple(aug_state)
+
+        def trajectory_derivative(t):
+            if t >= ctx.t0:
+                y_t = state_interpolator(t)
+                history = [
+                    (
+                        state_interpolator(t - tau)
+                        if t - tau > ctx.t0
+                        else ctx.history_func(t - tau)
+                    )
+                    for tau in ctx.func.delays
+                ]
+                with torch.no_grad():
+                    return ctx.func(t, y_t, func_args, history=history)
+            history_time = t.detach().requires_grad_(True)
+            _, history_derivative = torch.autograd.functional.jvp(
+                ctx.history_func,
+                history_time,
+                torch.ones_like(history_time),
+                strict=False,
+            )
+            return history_derivative
 
         def augment_dyn(t, aug_state, func_args):
             adjoint_y, *params_inc = transformer.unflatten(aug_state)
@@ -152,6 +154,8 @@ class nddeint_ACA(torch.autograd.Function):
                 retain_graph=True,
                 allow_unused=True,
             )
+            if rhs_adjoint_1 is None:
+                rhs_adjoint_1 = torch.zeros_like(y_t)
 
             # we need to add the second term of rhs in rhs_adjoint computation
             delay_derivative_inc = torch.zeros_like(ctx.func.delays)[..., None]
@@ -172,7 +176,7 @@ class nddeint_ACA(torch.autograd.Function):
                     pass
                 else:
                     delay_derivative_inc[idx] += torch.sum(
-                        params_inc2 * grad_ys[:, -1 - i],
+                        params_inc2 * trajectory_derivative(t - tau_i),
                         dim=(tuple(range(len(params_inc2.shape)))),
                     )
 
