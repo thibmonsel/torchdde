@@ -1,4 +1,3 @@
-import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import torch
@@ -43,11 +42,7 @@ class ButcherTableau:
         b_other: Optional[List[List[float]]] = None,
         dtype: Optional[torch.dtype] = torch.float32,
     ):
-        if b_err is not None and not any(x != 0 for x in b_err):
-            warnings.warn(
-                "b_err_list is only zeros, so this isn't an embedded method like Dopri5"
-            )
-
+        # Non-embedded, fixed-step methods legitimately use zero error weights.
         assert b_err is not None or b_low_order is not None, (
             "You have to provide either the weights for the error approximation"
             " or the weights of an embedded lower-order method"

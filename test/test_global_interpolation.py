@@ -162,16 +162,39 @@ def test_add_point_y_mishape():
         inter.add_point(torch.tensor(11.0), torch.tensor([[2.0, 1.0]]))
 
 
-def test_add_point_warning():
+@pytest.mark.parametrize("index", [0, 4, 9])
+def test_add_point_replaces_existing_timestamp(index):
     ts = torch.linspace(1.0, 10.0, 10)
     ys = torch.arange(1, 11, dtype=torch.float32)[None, ..., None]
     inter = TorchLinearInterpolator(ts, ys)
-    new_t = ts[0]
-    with pytest.warns(
-        UserWarning,
-        match=f"already have new_t={new_t} point in interpolation, overwriting it",
-    ):
-        inter.add_point(new_t, torch.tensor([[2.0]]))
+    new_t = ts[index]
+    inter.add_point(new_t, torch.tensor([[42.0]]))
+    torch.testing.assert_close(inter.ts, ts)
+    assert torch.all(torch.diff(inter.ts) > 0)
+    expected = ys.clone()
+    expected[:, index] = 42.0
+    torch.testing.assert_close(inter.ys, expected)
+    torch.testing.assert_close(inter(new_t), torch.tensor([[42.0]]))
+
+
+def test_add_point_inserts_middle_in_sorted_order():
+    inter = TorchLinearInterpolator(
+        torch.tensor([1.0, 2.0, 3.0]), torch.tensor([[[1.0], [2.0], [3.0]]]),
+    )
+    inter.add_point(torch.tensor(2.5), torch.tensor([[100.0]]))
+    torch.testing.assert_close(inter.ts, torch.tensor([1.0, 2.0, 2.5, 3.0]))
+    torch.testing.assert_close(inter(torch.tensor(2.25)), torch.tensor([[51.0]]))
+    torch.testing.assert_close(inter(torch.tensor(2.75)), torch.tensor([[51.5]]))
+
+
+def test_add_point_replacement_preserves_gradients():
+    original = torch.tensor([[[1.0], [2.0], [3.0]]], requires_grad=True)
+    replacement = torch.tensor([[5.0]], requires_grad=True)
+    inter = TorchLinearInterpolator(torch.tensor([0.0, 1.0, 2.0]), original)
+    inter.add_point(torch.tensor(1.0), replacement)
+    inter.ys.sum().backward()
+    torch.testing.assert_close(original.grad, torch.tensor([[[1.0], [0.0], [1.0]]]))
+    torch.testing.assert_close(replacement.grad, torch.ones_like(replacement))
 
 
 def test_add_point_end():
