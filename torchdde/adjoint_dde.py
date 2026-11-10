@@ -20,6 +20,13 @@ def _evaluate_future_histories(future_times, delays, boundary, lookup):
     return [values[start : start + width] for start in range(0, len(values), width)]
 
 
+def _evaluate_trajectory_inputs(times, delays, boundary, interpolation, lookup):
+    """Group states and history rows used by learned-delay derivatives."""
+    states = interpolation.evaluate_many(times).unbind(0)
+    histories = _evaluate_future_histories(times, delays, boundary, lookup)
+    return list(zip(states, histories))
+
+
 class nddeint_ACA(torch.autograd.Function):
     @staticmethod
     def forward(  # type: ignore
@@ -92,6 +99,7 @@ class nddeint_ACA(torch.autograd.Function):
         state_interpolator = ctx.ys_interpolator
         history_indices = {}
         future_indices = {}
+        trajectory_indices = {}
         batch_history = ctx.func.delays.numel() > 1
 
         def state_history(times, boundary):
@@ -173,6 +181,23 @@ class nddeint_ACA(torch.autograd.Function):
             if rhs_adjoint_1 is None:
                 rhs_adjoint_1 = torch.zeros_like(y_t)
 
+            trajectory_inputs = iter(())
+            if compute_delay_gradient and batch_history:
+                trajectory_times = t - ctx.func.delays
+                trajectory_active = (trajectory_times >= ctx.t0).tolist()
+                positions = tuple(
+                    i for i, active in enumerate(trajectory_active)
+                    if active and history_gradients[i] is not None
+                )
+                if positions:
+                    if positions not in trajectory_indices:
+                        trajectory_indices[positions] = torch.tensor(positions, device=t.device)
+                    selected_times = trajectory_times.index_select(0, trajectory_indices[positions])
+                    trajectory_inputs = iter(_evaluate_trajectory_inputs(
+                        selected_times, ctx.func.delays, ctx.t0, state_interpolator,
+                        state_history,
+                    ))
+
             # we need to add the second term of rhs in rhs_adjoint computation
             if compute_delay_gradient:
                 delay_derivative_inc = torch.zeros_like(ctx.func.delays)[..., None]
@@ -205,8 +230,14 @@ class nddeint_ACA(torch.autograd.Function):
                 params_inc2 = history_gradients[idx]
 
                 if compute_delay_gradient and params_inc2 is not None:
+                    if batch_history and trajectory_active[idx]:
+                        state, history = next(trajectory_inputs)
+                        with torch.no_grad():
+                            derivative = ctx.func(t - tau_i, state, func_args, history=history)
+                    else:
+                        derivative = trajectory_derivative(t - tau_i)
                     delay_derivative_inc[idx] += torch.sum(
-                        params_inc2 * trajectory_derivative(t - tau_i),
+                        params_inc2 * derivative,
                         dim=(tuple(range(len(params_inc2.shape)))),
                     )
 
