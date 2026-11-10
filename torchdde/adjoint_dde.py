@@ -129,9 +129,9 @@ class nddeint_ACA(torch.autograd.Function):
         aug_state.extend([torch.zeros_like(param) for param in params])
         transformer = TupleTensorTransformer.from_tuple(aug_state)
 
-        def trajectory_derivative(t):
+        def trajectory_derivative(t, state=None):
             if t >= ctx.t0:
-                y_t = state_interpolator(t)
+                y_t = state_interpolator(t) if state is None else state
                 history = (
                     state_history(t - ctx.func.delays, ctx.t0) if batch_history else [
                         state_interpolator(t - tau) if t - tau > ctx.t0
@@ -235,7 +235,11 @@ class nddeint_ACA(torch.autograd.Function):
                         with torch.no_grad():
                             derivative = ctx.func(t - tau_i, state, func_args, history=history)
                     else:
-                        derivative = trajectory_derivative(t - tau_i)
+                        # y(t - tau_i) was already looked up for this call.
+                        reuse = not batch_history and bool(t - tau_i > ctx.t0)
+                        derivative = trajectory_derivative(
+                            t - tau_i, history_values[idx] if reuse else None,
+                        )
                     delay_derivative_inc[idx] += torch.sum(
                         params_inc2 * derivative,
                         dim=(tuple(range(len(params_inc2.shape)))),
@@ -257,10 +261,12 @@ class nddeint_ACA(torch.autograd.Function):
                     history = (
                         next(future_histories)
                         if batch_history else [
-                            state_interpolator(t + tau_i - tau_j)
+                            # Entry idx is y(t) and is replaced by y_t below.
+                            None if j == idx
+                            else state_interpolator(t + tau_i - tau_j)
                             if t + tau_i - tau_j > ctx.ts[0]
                             else ctx.history_func(t + tau_i - tau_j)
-                            for tau_j in ctx.func.delays
+                            for j, tau_j in enumerate(ctx.func.delays)
                         ]
                     )
                     history[idx] = y_t
