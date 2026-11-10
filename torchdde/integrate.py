@@ -401,6 +401,9 @@ def _integrate_dde(
         ode_func, t0, t1, y0, dt0, func_args, solver.order()
     )
     dt = torch.clamp(dt, max=torch.min(delays))
+    dt = torch.where(t0 + dt > t1, t1 - t0, dt)
+    # Retain the controller endpoint (and its gradients) if no cap shortened it.
+    tnext = torch.where(tnext > t0 + dt, t0 + dt, tnext)
     solver_state = solver.init(ode_func, t0, y0, dt, func_args)
     state = State(
         y0,
@@ -448,16 +451,13 @@ def _integrate_dde(
             state.dt,
         )
         tprev = torch.clamp(tprev, max=t1)
-        # if the next step going beyond the smallest delay
-        # then our ys_interpolation isn't defined
-        # TODO: do a fixed point iteration algorithm
-        too_large = (tnext - tprev) > torch.min(delays)
-        tnext = torch.where(too_large, tprev + torch.min(delays), tnext)
-        # Clipping tnext if it goes beyond t1
-        # and update dt such that tprev + dt = tnext
-        tnext = torch.where((tprev + dt) > t1, t1, tprev + dt)
-        dt = torch.where((tprev + dt) > t1, t1 - tprev, dt)
-        dt = torch.where(too_large, torch.min(delays), dt)
+        # Cap the step before constructing its endpoint, so interpolation and
+        # the solver use the same interval even when the controller grows dt.
+        minimum_delay = torch.min(delays)
+        dt = torch.where(dt > minimum_delay, minimum_delay, dt)
+        beyond_end = (tprev + dt) > t1
+        tnext = torch.where(beyond_end, t1, tprev + dt)
+        dt = torch.where(beyond_end, t1 - tprev, dt)
         step_save_idx = 0
         if keep_step:
             interp = solver.build_interpolation(state.tprev, state.tnext, dense_info)
