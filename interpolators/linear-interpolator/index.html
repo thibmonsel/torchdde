@@ -563,7 +563,7 @@ All elements in batch must have the same ts.</p>
 
 
 <h5 id="torchdde.global_interpolation.TorchLinearInterpolator.add_point" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">add_point</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_t</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">],</span> <span class="n">new_y</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch ...&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+<code class="highlight language-python"><span class="n">add_point</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_t</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">],</span> <span class="n">new_y</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch ...&#39;</span><span class="p">],</span> <span class="n">right_y</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="s1">&#39;batch ...&#39;</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
 
 
 <a href="#torchdde.global_interpolation.TorchLinearInterpolator.add_point" class="headerlink" title="Permanent link">¤</a></h5>
@@ -575,7 +575,10 @@ All elements in batch must have the same ts.</p>
 Replacement keeps timestamps strictly increasing and does not emit a warning.</p>
 <ul>
 <li><code>new_t</code>: new timestamp added to the interpolation</li>
-<li><code>new_ys</code>: new observation added to the interpolation </li>
+<li><code>new_ys</code>: new observation added to the interpolation; for a jump, the value
+    at <code>new_t</code> and just below it</li>
+<li><code>right_y</code>: optional value just above <code>new_t</code> (the right limit of a jump).
+    Queries strictly inside the following interval start from it.</li>
 </ul>
 
     </div>
