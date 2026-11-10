@@ -48,18 +48,21 @@ class DenseInterpolation:
                 self.ts.shape[0] == self.infos[list(self.infos.keys())[0]].shape[0] + 1
             )
 
+    def _find_interval(self, t, left: bool):
+        maxlen = self.ts.shape[0] - 2
+        index = torch.searchsorted(self.ts, t, side="left" if left else "right")
+        return torch.clip(index - 1, 0, maxlen)
+
     def _interpret_t(
         self, t: Union[Float[torch.Tensor, ""], float], left: bool
     ) -> tuple[Integer[torch.Tensor, ""], Float[torch.Tensor, ""]]:
-        maxlen = self.ts.shape[0] - 2
-        index = torch.searchsorted(self.ts, t, side="left" if left else "right")
-        index = torch.clip(index - 1, 0, maxlen)
+        index = self._find_interval(t, left)
         # Will never access the final element of `ts`; this is correct behaviour.
         fractional_part = t - self.ts.index_select(0, index.reshape(1)).squeeze(0)
         return index, fractional_part
 
     def _get_local_interpolation(self, t, left: bool):
-        index, _ = self._interpret_t(t, left)
+        index = self._find_interval(t, left)
         # Scalar tensor indexing implicitly calls item(), synchronizing CUDA.
         # Keep the interval and data selection on the tensor's device instead.
         interval = self.ts.index_select(0, torch.stack((index, index + 1)))
@@ -90,8 +93,7 @@ class DenseInterpolation:
         ):
             return torch.stack([self(t, left=left) for t in times.unbind()])
         times = times * self.direction
-        index = torch.searchsorted(self.ts, times, side="left" if left else "right")
-        index = (index - 1).clamp(0, self.ts.shape[0] - 2)
+        index = self._find_interval(times, left)
         starts = self.ts.index_select(0, index)
         ends = self.ts.index_select(0, index + 1)
         coefficients = self.infos["_cached_coefficients"].index_select(0, index)
