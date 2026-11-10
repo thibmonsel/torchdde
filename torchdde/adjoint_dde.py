@@ -81,6 +81,7 @@ class nddeint_ACA(torch.autograd.Function):
         params = ctx.saved_tensors
         state_interpolator = ctx.ys_interpolator
         history_indices = {}
+        future_indices = {}
         batch_history = ctx.func.delays.numel() > 1
 
         def state_history(times, boundary):
@@ -164,6 +165,21 @@ class nddeint_ACA(torch.autograd.Function):
 
             # we need to add the second term of rhs in rhs_adjoint computation
             delay_derivative_inc = torch.zeros_like(ctx.func.delays)[..., None]
+            if batch_history:
+                # Preserve the scalar branch condition, including its strict
+                # terminal boundary, and fetch only the active future values.
+                active_future = (t < ctx.t1 - ctx.func.delays).tolist()
+                positions = tuple(i for i, active in enumerate(active_future) if active)
+                future_values = iter(())
+                if positions:
+                    if positions not in future_indices:
+                        future_indices[positions] = torch.tensor(positions, device=t.device)
+                    future_times = (t + ctx.func.delays).index_select(
+                        0, future_indices[positions],
+                    )
+                    future_values = iter(
+                        adjoint_interpolator.evaluate_many(future_times).unbind(0)
+                    )
             for idx, tau_i in enumerate(ctx.func.delays):
                 # This is computing part of the contribution of the gradient's
                 # loss w.r.t the parameters
@@ -182,8 +198,12 @@ class nddeint_ACA(torch.autograd.Function):
                 # if t+ tau_i > T then \lambda(t+tau_i) = 0
                 # computing second term of the adjoint dynamics
                 # \lambda_t \partial{f_\theta(t)}{g}
-                if t < ctx.t1 - tau_i:
-                    adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
+                has_future = active_future[idx] if batch_history else t < ctx.t1 - tau_i
+                if has_future:
+                    adjoint_t_plus_tau = (
+                        next(future_values) if batch_history
+                        else adjoint_interpolator(t + tau_i)
+                    )
                     y_t_plus_tau = state_interpolator(t + tau_i)
                     history = (
                         state_history(t + tau_i - ctx.func.delays, ctx.ts[0])
