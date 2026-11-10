@@ -99,9 +99,14 @@ def _optimal_step_size_with_pid(
     beta1 = (pcoeff + icoeff + dcoeff) / order
     beta2 = -(pcoeff + 2 * dcoeff) / order
     beta3 = dcoeff / order
-    zero_coeff_or_inv_error = (
-        lambda coeff, inv_error: coeff == 0 or torch.zeros_like(inv_error) == inv_error
-    )
+
+    def pid_factor(coeff, inv_error):
+        # A zero coefficient, or a missing (inf) error, contributes a factor 1.
+        # torch.where keeps this branch on-device instead of syncing on a bool.
+        if coeff == 0:
+            return torch.ones_like(inv_error)
+        return torch.where(inv_error == 0, 1.0, inv_error**coeff)
+
     scaled_error, prev_scaled_errors, prev_prev_scaled_errors = scaled_errors
 
     inv_scaled_error, inv_prev_scaled_errors, inv_prev_prev_scaled_errors = (
@@ -109,25 +114,13 @@ def _optimal_step_size_with_pid(
         prev_scaled_errors.reciprocal(),
         prev_prev_scaled_errors.reciprocal(),
     )
-    factor1 = (
-        torch.tensor(1)
-        if zero_coeff_or_inv_error(beta1, inv_scaled_error)
-        else inv_scaled_error**beta1
-    )
-    factor2 = (
-        torch.tensor(1)
-        if zero_coeff_or_inv_error(beta2, inv_prev_scaled_errors)
-        else inv_prev_scaled_errors**beta2
-    )
-    factor3 = (
-        torch.tensor(1)
-        if zero_coeff_or_inv_error(beta3, inv_prev_prev_scaled_errors)
-        else inv_prev_prev_scaled_errors**beta3
-    )
-    factor = torch.clip(
-        safety * factor1 * factor2 * factor3,
-        factormin,
-        factormax,
+    factor1 = pid_factor(beta1, inv_scaled_error)
+    factor2 = pid_factor(beta2, inv_prev_scaled_errors)
+    factor3 = pid_factor(beta3, inv_prev_prev_scaled_errors)
+    # factormin may be a tensor (it depends on step acceptance).
+    factor = torch.minimum(
+        torch.maximum(safety * factor1 * factor2 * factor3, torch.as_tensor(factormin)),
+        torch.as_tensor(factormax),
     )
     return last_dt * factor
 
@@ -197,8 +190,9 @@ class AdaptiveStepSizeController(AbstractStepSizeController):
             return t0 + dt0, dt0
 
     def _compute_scaled_error(self, y_error, y0, y1_candidate, norm):
-        _nan = torch.any(torch.isnan(y1_candidate))
-        y1_candidate = y0 if _nan else y1_candidate
+        y1_candidate = torch.where(
+            torch.isnan(y1_candidate).any(), y0, y1_candidate
+        )
         error_tol = self.atol + self.rtol * torch.max(y0.abs(), y1_candidate.abs())
         return norm(y_error / error_tol).abs().max()
 
@@ -208,6 +202,16 @@ class AdaptiveStepSizeController(AbstractStepSizeController):
         self.prev_prev_scaled_error = self.prev_scaled_error
         self.prev_scaled_error = self.scaled_error
         self.scaled_error = current_scaled_error
+
+    def _update_accepted_history(self, keep_step, current_scaled_error):
+        # Same as `if keep_step: self.update_scaled_error(...)`, without a sync.
+        self.prev_prev_scaled_error = torch.where(
+            keep_step, self.prev_scaled_error, self.prev_prev_scaled_error
+        )
+        self.prev_scaled_error = torch.where(
+            keep_step, self.scaled_error, self.prev_scaled_error
+        )
+        self.scaled_error = torch.where(keep_step, current_scaled_error, self.scaled_error)
 
     def adapt_step_size(
         self,
@@ -225,7 +229,7 @@ class AdaptiveStepSizeController(AbstractStepSizeController):
         y_error = torch.nan_to_num(y_error, nan=1)
         scaled_error = self._compute_scaled_error(y_error, y0, y1_candidate, rms_norm)
         keep_step = scaled_error <= 1
-        factormin = 1.0 if keep_step else 0.1
+        factormin = torch.where(keep_step, 1.0, 0.1)
         # The PID terms use the errors of the previous *accepted* steps; a
         # rejected step is retried and must not shift the history.
         scaled_errors = [
@@ -233,8 +237,7 @@ class AdaptiveStepSizeController(AbstractStepSizeController):
             self.scaled_error,
             self.prev_scaled_error,
         ]
-        if keep_step:
-            self.update_scaled_error(scaled_error)
+        self._update_accepted_history(keep_step, scaled_error)
         new_dt = _optimal_step_size_with_pid(
             dt,
             scaled_errors,

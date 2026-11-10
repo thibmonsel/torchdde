@@ -1,11 +1,12 @@
+import pytest
 import torch
 
 from torchdde import AdaptiveStepSizeController, Dopri5, integrate
 
 
-def _solve(controller):
-    ts = torch.linspace(0, 2, 11, dtype=torch.float64)
-    y0 = torch.tensor([[1.0, 0.5]], dtype=torch.float64)
+def _solve(controller, device="cpu"):
+    ts = torch.linspace(0, 2, 11, dtype=torch.float64, device=device)
+    y0 = torch.tensor([[1.0, 0.5]], dtype=torch.float64, device=device)
     return integrate(
         lambda t, y, args: torch.stack((y[:, 1], -4 * y[:, 0]), dim=-1),
         Dopri5(), ts[0], ts[-1], ts, y0, None,
@@ -58,3 +59,10 @@ def test_history_fills_slot_by_slot():
         controller.prev_scaled_error,
         controller.prev_prev_scaled_error,
     ) == tuple(errors[::-1])
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA unavailable")
+def test_cuda_solve_matches_cpu():
+    cpu = _solve(_pid_controller())
+    cuda = _solve(_pid_controller(), device="cuda")
+    assert torch.allclose(cuda.cpu(), cpu, rtol=1e-10, atol=1e-12)
