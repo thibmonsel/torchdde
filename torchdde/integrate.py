@@ -242,6 +242,7 @@ def _integrate_fixed(func, solver, t0, t1, ts, y0, func_args, dt0, max_steps,
     ys = y0.new_empty((y0.shape[0], len(save_times), *y0.shape[1:]))
     save_idx, count, aux = 0, 0, None
     solver_state = None
+    step_fixed = getattr(solver, "step_fixed", solver.step)
     while bool(clock < end if forward else clock > end):
         if count >= max_steps:
             raise RuntimeError("Maximum number of steps reached")
@@ -257,7 +258,7 @@ def _integrate_fixed(func, solver, t0, t1, ts, y0, func_args, dt0, max_steps,
             clock_dt = next_clock - clock
         if count == 0:
             solver_state = solver.init(func, tprev, y, dt, func_args)
-        y, _, dense_info, solver_state, aux = solver.step(
+        y, _, dense_info, solver_state, aux = step_fixed(
             func, tprev, y, dt, solver_state, func_args,
         )
         next_value = float(next_clock)
@@ -415,9 +416,14 @@ def _integrate_dde(
     ys = torch.empty(
         (y0.shape[0], ts.shape[0], *(y0.shape[1:])), device=y0.device, dtype=y0.dtype
     )
+    step = (
+        getattr(solver, "step_fixed", solver.step)
+        if type(stepsize_controller) is ConstantStepSizeController
+        else solver.step
+    )
     cond = state.tprev < t1 if (t1 > t0) else state.tprev > t1
     while cond and state.num_steps < max_steps:
-        y, y_error, dense_info, solver_state, aux = solver.step(
+        y, y_error, dense_info, solver_state, aux = step(
             ode_func,
             state.tprev,
             state.y,
@@ -553,9 +559,14 @@ def _integrate_ode(
     ys = torch.empty(
         (y0.shape[0], ts.shape[0], *(y0.shape[1:])), device=y0.device, dtype=y0.dtype
     )
+    step = (
+        getattr(solver, "step_fixed", solver.step)
+        if type(stepsize_controller) is ConstantStepSizeController
+        else solver.step
+    )
     cond = state.tprev < t1 if (t1 > t0) else state.tprev > t1
     while cond and state.num_steps < max_steps:
-        y, y_error, dense_info, solver_state, aux = solver.step(
+        y, y_error, dense_info, solver_state, aux = step(
             func,
             state.tprev,
             state.y,

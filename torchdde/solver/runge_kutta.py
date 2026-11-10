@@ -135,6 +135,14 @@ class ButcherTableau:
 
 
 class ExplicitRungeKutta(AbstractOdeSolver):
+    def step_fixed(self, func, t, y, dt, solver_state, func_args):
+        # An inherited fast entry point must not bypass a custom step override.
+        if getattr(self.step, "__func__", None) is not ExplicitRungeKutta.step:
+            return self.step(func, t, y, dt, solver_state, func_args)
+        return self.step(
+            func, t, y, dt, solver_state, func_args, compute_error=False,
+        )
+
     def __init__(
         self,
         tableau: ButcherTableau,
@@ -177,9 +185,11 @@ class ExplicitRungeKutta(AbstractOdeSolver):
         dt: Float[torch.Tensor, ""],
         solver_state: Union[Tuple[Any, ...], None],
         func_args: Any,
+        *,
+        compute_error: bool = True,
     ) -> Tuple[
         Float[torch.Tensor, "batch ..."],
-        Float[torch.Tensor, "batch ..."],
+        Union[Float[torch.Tensor, "batch ..."], None],
         dict[str, Float[torch.Tensor, "batch order"]],
         Union[Tuple[Float[torch.Tensor, "batch ..."]], None],
         Union[Float[torch.Tensor, " batch"], Any],
@@ -203,7 +213,10 @@ class ExplicitRungeKutta(AbstractOdeSolver):
         else:
             y1 = y + dt * torch.einsum("s, sbf -> bf", self.tableau.b, k)
 
-        y_error = dt * torch.einsum("s, sbf -> bf", self.tableau.b_err, k)
+        y_error = (
+            dt * torch.einsum("s, sbf -> bf", self.tableau.b_err, k)
+            if compute_error else None
+        )
         dense_info = dict(y0=y, y1=y1, k=k)
 
         if self.tableau.fsal:

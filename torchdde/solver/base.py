@@ -14,6 +14,14 @@ class AbstractOdeSolver(ABC):
 
     interpolation_cls: Type[AbstractLocalInterpolation]
 
+    def step_fixed(self, func, t, y, dt, solver_state, func_args):
+        """Step without requiring an error estimate.
+
+        Custom solvers retain their existing step implementation by default.
+        Solvers may override this to avoid unused error-estimation work.
+        """
+        return self.step(func, t, y, dt, solver_state, func_args)
+
     @abstractmethod
     def init(
         self,
