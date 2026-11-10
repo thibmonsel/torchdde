@@ -180,6 +180,9 @@ class nddeint_ACA(torch.autograd.Function):
                     future_values = iter(
                         adjoint_interpolator.evaluate_many(future_times).unbind(0)
                     )
+                    future_states = iter(
+                        state_interpolator.evaluate_many(future_times).unbind(0)
+                    )
             for idx, tau_i in enumerate(ctx.func.delays):
                 # This is computing part of the contribution of the gradient's
                 # loss w.r.t the parameters
@@ -204,7 +207,10 @@ class nddeint_ACA(torch.autograd.Function):
                         next(future_values) if batch_history
                         else adjoint_interpolator(t + tau_i)
                     )
-                    y_t_plus_tau = state_interpolator(t + tau_i)
+                    y_t_plus_tau = (
+                        next(future_states) if batch_history
+                        else state_interpolator(t + tau_i)
+                    )
                     history = (
                         state_history(t + tau_i - ctx.func.delays, ctx.ts[0])
                         if batch_history else [
