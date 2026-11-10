@@ -12,6 +12,14 @@ from torchdde.step_size_controller.base import AbstractStepSizeController
 from torchdde.step_size_controller.constant import ConstantStepSizeController
 
 
+def _evaluate_future_histories(future_times, delays, boundary, lookup):
+    """Collect history rows for all active future times in their original order."""
+    query_times = (future_times[:, None] - delays[None, :]).reshape(-1)
+    values = lookup(query_times, boundary)
+    width = delays.numel()
+    return [values[start : start + width] for start in range(0, len(values), width)]
+
+
 class nddeint_ACA(torch.autograd.Function):
     @staticmethod
     def forward(  # type: ignore
@@ -183,6 +191,9 @@ class nddeint_ACA(torch.autograd.Function):
                     future_states = iter(
                         state_interpolator.evaluate_many(future_times).unbind(0)
                     )
+                    future_histories = iter(_evaluate_future_histories(
+                        future_times, ctx.func.delays, ctx.ts[0], state_history,
+                    ))
             for idx, tau_i in enumerate(ctx.func.delays):
                 # This is computing part of the contribution of the gradient's
                 # loss w.r.t the parameters
@@ -212,7 +223,7 @@ class nddeint_ACA(torch.autograd.Function):
                         else state_interpolator(t + tau_i)
                     )
                     history = (
-                        state_history(t + tau_i - ctx.func.delays, ctx.ts[0])
+                        next(future_histories)
                         if batch_history else [
                             state_interpolator(t + tau_i - tau_j)
                             if t + tau_i - tau_j > ctx.ts[0]
