@@ -175,11 +175,18 @@ class AdaptiveStepSizeController(AbstractStepSizeController):
         self.factormax = factormax
         self.dtmin = dtmin
         self.dtmax = dtmax
+        self._reset_history()
+
+    def _reset_history(self):
+        # Scaled errors of the last two accepted steps; inf marks "no step yet".
         self.scaled_error = torch.inf * torch.tensor((1.0))
         self.prev_scaled_error = torch.inf * torch.tensor((1.0))
         self.prev_prev_scaled_error = torch.inf * torch.tensor((1.0))
 
     def init(self, func, t0, t1, y0, dt0, args, error_order):
+        # Each integration starts a fresh PID history, so results do not depend
+        # on earlier solves (previous training steps, or the adjoint forward pass).
+        self._reset_history()
         if dt0 is None:
             dt0 = _select_initial_step(
                 func, t0, y0, args, error_order, self.rtol, self.atol, rms_norm
@@ -226,14 +233,17 @@ class AdaptiveStepSizeController(AbstractStepSizeController):
         del func, args
         y_error = torch.nan_to_num(y_error, nan=1)
         scaled_error = self._compute_scaled_error(y_error, y0, y1_candidate, rms_norm)
-        self.update_scaled_error(scaled_error)
         keep_step = scaled_error <= 1
         factormin = 1.0 if keep_step else 0.1
+        # The PID terms use the errors of the previous *accepted* steps; a
+        # rejected step is retried and must not shift the history.
         scaled_errors = [
             scaled_error,
+            self.scaled_error,
             self.prev_scaled_error,
-            self.prev_prev_scaled_error,
         ]
+        if keep_step:
+            self.update_scaled_error(scaled_error)
         new_dt = _optimal_step_size_with_pid(
             dt,
             scaled_errors,
