@@ -87,6 +87,8 @@ class nddeint_ACA(torch.autograd.Function):
         solver = ctx.solver
         stepsize_controller = ctx.stepsize_controller
         params = ctx.saved_tensors
+        # Fixed delays do not need trajectory derivatives for delay gradients.
+        compute_delay_gradient = ctx.delay_param_index is not None
         state_interpolator = ctx.ys_interpolator
         history_indices = {}
         future_indices = {}
@@ -172,7 +174,8 @@ class nddeint_ACA(torch.autograd.Function):
                 rhs_adjoint_1 = torch.zeros_like(y_t)
 
             # we need to add the second term of rhs in rhs_adjoint computation
-            delay_derivative_inc = torch.zeros_like(ctx.func.delays)[..., None]
+            if compute_delay_gradient:
+                delay_derivative_inc = torch.zeros_like(ctx.func.delays)[..., None]
             if batch_history:
                 # Preserve the scalar branch condition, including its strict
                 # terminal boundary, and fetch only the active future values.
@@ -201,9 +204,7 @@ class nddeint_ACA(torch.autograd.Function):
                 # where g(t) = y(t-tau_i)
                 params_inc2 = history_gradients[idx]
 
-                if params_inc2 is None:
-                    pass
-                else:
+                if compute_delay_gradient and params_inc2 is not None:
                     delay_derivative_inc[idx] += torch.sum(
                         params_inc2 * trajectory_derivative(t - tau_i),
                         dim=(tuple(range(len(params_inc2.shape)))),
