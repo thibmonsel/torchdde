@@ -309,8 +309,12 @@ class nddeint_ACA(torch.autograd.Function):
             dt = t1 - t0
             dt = torch.clamp(dt, max=torch.min(ctx.func.delays))
             with torch.enable_grad():
+                # The loss term at t0 makes the adjoint jump there. Store both
+                # one-sided values: lambda(t0^+) (before the jump) starts the
+                # interval above t0, lambda(t0^-) serves lookups from below.
+                adjoint_right = aug_state[0].clone()
                 aug_state[0] += grad_output[:, i]
-                adjoint_interpolator.add_point(t0, aug_state[0])
+                adjoint_interpolator.add_point(t0, aug_state[0], right_y=adjoint_right)
                 aug_state = transformer.flatten(aug_state)
                 new_aug_state, _ = _integrate_ode(
                     augment_dyn,

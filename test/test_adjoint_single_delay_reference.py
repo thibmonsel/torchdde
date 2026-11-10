@@ -1,4 +1,6 @@
-"""Pin single-delay adjoint gradients to values from the pre-refactor lookups.
+"""Pin single-delay adjoint gradients, to catch unintended numerical changes.
+
+Regenerate the values only for intentional accuracy changes to the adjoint.
 
 The delay (0.3) is a multiple of the step (0.1), so the history boundary
 t - tau == t0 is hit exactly, covering both lookup branches.
@@ -10,12 +12,12 @@ from torch import nn
 from torchdde import RK4, integrate
 
 PARAM_GRADS = [
-    [[0.3137366962864829, 0.030413553843308124],
-     [0.08090841086784965, 0.009010831302612392]],
-    [[0.3229134049538217, -0.009241525122933168],
-     [0.08357896795751558, -0.0005913726228583653]],
+    [[0.3101451353326353, 0.030167044228006083],
+     [0.08197887203929763, 0.0090712422141648]],
+    [[0.31923802391118217, -0.008992427843783013],
+     [0.08466804489642865, -0.0006935351191357376]],
 ]
-DELAY_GRAD = [0.0320877541463187]
+DELAY_GRAD = [0.030977314048086357]
 
 
 class Model(nn.Module):
