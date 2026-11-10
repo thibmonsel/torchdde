@@ -82,3 +82,28 @@ def test_step_size_bounds(dtmin, dtmax):
         assert new_dt.dtype == torch.float64
         if expected is not None:
             assert torch.isclose(new_dt, torch.tensor(expected, dtype=torch.float64))
+
+
+@pytest.mark.parametrize("dtmax", [None, 0.05])
+def test_inf_step_size_raises_even_with_dtmax(dtmax):
+    controller = AdaptiveStepSizeController(atol=1e-6, rtol=1e-3, dtmax=dtmax)
+    t0 = torch.tensor(0.0)
+    y0 = torch.ones(1, 2)
+    dt = torch.tensor(float("inf"))
+    controller.init(None, t0, t0 + 1, y0, dt, None, 5)
+    with pytest.raises(ValueError, match="inf"):
+        controller.adapt_step_size(
+            None, t0, t0 + 1, y0, y0, None, torch.full_like(y0, 1e-3), 5, dt
+        )
+
+
+def test_tiny_step_size_warns():
+    controller = AdaptiveStepSizeController(atol=1e-6, rtol=1e-3)
+    t0 = torch.tensor(0.0)
+    y0 = torch.ones(1, 2)
+    dt = torch.tensor(1e-9)
+    controller.init(None, t0, t0 + 1, y0, dt, None, 5)
+    with pytest.warns(UserWarning, match="smaller than 1e-8"):
+        controller.adapt_step_size(
+            None, t0, t0 + dt, y0, y0, None, torch.full_like(y0, 1e3), 5, dt
+        )

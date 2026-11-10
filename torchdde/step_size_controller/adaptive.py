@@ -249,12 +249,18 @@ class AdaptiveStepSizeController(AbstractStepSizeController):
             factormin,
             self.factormax,
         )
-        if torch.isinf(new_dt):
-            raise ValueError("dt computed is inf")
+        # The inf check must see the unclamped dt, since dtmax would hide it.
+        unclamped_inf = torch.isinf(new_dt).reshape(())
         # Python-scalar bounds avoid building a new tensor on every step.
         if self.dtmin is not None or self.dtmax is not None:
             new_dt = torch.clamp(new_dt, min=self.dtmin, max=self.dtmax)
-        if torch.abs(new_dt) < 1e-8:
+        # Read both sanity flags back with a single host-device transfer.
+        is_inf, is_tiny = torch.stack(
+            (unclamped_inf, (new_dt.abs() < 1e-8).reshape(()))
+        ).tolist()
+        if is_inf:
+            raise ValueError("dt computed is inf")
+        if is_tiny:
             warnings.warn(
                 "AdaptiveStepSizeController yields a abs(dt) value is smaller than 1e-8"
             )
