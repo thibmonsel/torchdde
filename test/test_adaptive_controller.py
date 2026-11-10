@@ -66,3 +66,19 @@ def test_cuda_solve_matches_cpu():
     cpu = _solve(_pid_controller())
     cuda = _solve(_pid_controller(), device="cuda")
     assert torch.allclose(cuda.cpu(), cpu, rtol=1e-10, atol=1e-12)
+
+
+@pytest.mark.parametrize("dtmin, dtmax", [(None, 0.05), (0.02, None), (0.01, 0.03)])
+def test_step_size_bounds(dtmin, dtmax):
+    controller = AdaptiveStepSizeController(atol=1e-6, rtol=1e-3, dtmin=dtmin, dtmax=dtmax)
+    t0 = torch.tensor(0.0, dtype=torch.float64)
+    y0 = torch.ones(1, 2, dtype=torch.float64)
+    dt = torch.tensor(0.025, dtype=torch.float64)
+    controller.init(None, t0, t0 + 1, y0, dt, None, 5)
+    for y_error, expected in ((1e-12, dtmax), (1e3, dtmin)):
+        *_, new_dt = controller.adapt_step_size(
+            None, t0, t0 + dt, y0, y0, None, torch.full_like(y0, y_error), 5, dt
+        )
+        assert new_dt.dtype == torch.float64
+        if expected is not None:
+            assert torch.isclose(new_dt, torch.tensor(expected, dtype=torch.float64))

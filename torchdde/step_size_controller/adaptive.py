@@ -251,10 +251,9 @@ class AdaptiveStepSizeController(AbstractStepSizeController):
         )
         if torch.isinf(new_dt):
             raise ValueError("dt computed is inf")
-        if self.dtmin is not None:
-            new_dt = torch.max(new_dt, torch.tensor(self.dtmin))
-        if self.dtmax is not None:
-            new_dt = torch.min(new_dt, torch.tensor(self.dtmax))
+        # Python-scalar bounds avoid building a new tensor on every step.
+        if self.dtmin is not None or self.dtmax is not None:
+            new_dt = torch.clamp(new_dt, min=self.dtmin, max=self.dtmax)
         if torch.abs(new_dt) < 1e-8:
             warnings.warn(
                 "AdaptiveStepSizeController yields a abs(dt) value is smaller than 1e-8"
