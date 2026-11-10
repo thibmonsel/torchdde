@@ -129,8 +129,22 @@ class nddeint_ACA(torch.autograd.Function):
         aug_state.extend([torch.zeros_like(param) for param in params])
         transformer = TupleTensorTransformer.from_tuple(aug_state)
 
-        def trajectory_derivative(t, state=None):
-            if t >= ctx.t0:
+        # Bounds of the backward interval being integrated, set in the loop
+        # below. Several switches in the adjoint dynamics jump at breakpoints
+        # (t = T - tau, t = t_k - tau, t - tau = t0). Runge-Kutta stages sit on
+        # both interval endpoints, so a breakpoint on an endpoint must be seen
+        # from inside the interval: the stages at its top need the value below,
+        # those at its bottom the value above.
+        interior_bounds = [None, None]
+
+        def interior_time(t):
+            """`t` moved just inside the current interval, to decide switches."""
+            return torch.clamp(t, *interior_bounds)
+
+        def trajectory_derivative(t, state=None, on_trajectory=None):
+            if on_trajectory is None:
+                on_trajectory = bool(t >= ctx.t0)
+            if on_trajectory:
                 y_t = state_interpolator(t) if state is None else state
                 history = (
                     state_history(t - ctx.func.delays, ctx.t0) if batch_history else [
@@ -184,7 +198,9 @@ class nddeint_ACA(torch.autograd.Function):
             trajectory_inputs = iter(())
             if compute_delay_gradient and batch_history:
                 trajectory_times = t - ctx.func.delays
-                trajectory_active = (trajectory_times >= ctx.t0).tolist()
+                trajectory_active = (
+                    interior_time(t) - ctx.func.delays >= ctx.t0
+                ).tolist()
                 positions = tuple(
                     i for i, active in enumerate(trajectory_active)
                     if active and history_gradients[i] is not None
@@ -192,7 +208,12 @@ class nddeint_ACA(torch.autograd.Function):
                 if positions:
                     if positions not in trajectory_indices:
                         trajectory_indices[positions] = torch.tensor(positions, device=t.device)
-                    selected_times = trajectory_times.index_select(0, trajectory_indices[positions])
+                    # A breakpoint read from inside the interval can be active
+                    # while t - tau rounds to just below t0: query at t0 then.
+                    selected_times = torch.clamp(
+                        trajectory_times.index_select(0, trajectory_indices[positions]),
+                        min=ctx.t0,
+                    )
                     trajectory_inputs = iter(_evaluate_trajectory_inputs(
                         selected_times, ctx.func.delays, ctx.t0, state_interpolator,
                         state_history,
@@ -204,7 +225,8 @@ class nddeint_ACA(torch.autograd.Function):
             if batch_history:
                 # Preserve the scalar branch condition, including its strict
                 # terminal boundary, and fetch only the active future values.
-                active_future = (t < ctx.t1 - ctx.func.delays).tolist()
+                t_inside = interior_time(t)
+                active_future = (t_inside < ctx.t1 - ctx.func.delays).tolist()
                 positions = tuple(i for i, active in enumerate(active_future) if active)
                 future_values = iter(())
                 if positions:
@@ -213,9 +235,12 @@ class nddeint_ACA(torch.autograd.Function):
                     future_times = (t + ctx.func.delays).index_select(
                         0, future_indices[positions],
                     )
-                    future_values = iter(
-                        adjoint_interpolator.evaluate_many(future_times).unbind(0)
-                    )
+                    # The adjoint jumps at output times: look it up from inside.
+                    future_values = iter(adjoint_interpolator.evaluate_many(
+                        (t_inside + ctx.func.delays).index_select(
+                            0, future_indices[positions],
+                        )
+                    ).unbind(0))
                     future_states = iter(
                         state_interpolator.evaluate_many(future_times).unbind(0)
                     )
@@ -237,8 +262,11 @@ class nddeint_ACA(torch.autograd.Function):
                     else:
                         # y(t - tau_i) was already looked up for this call.
                         reuse = not batch_history and bool(t - tau_i > ctx.t0)
+                        on_trajectory = bool(interior_time(t) - tau_i >= ctx.t0)
                         derivative = trajectory_derivative(
-                            t - tau_i, history_values[idx] if reuse else None,
+                            torch.clamp(t - tau_i, min=ctx.t0) if on_trajectory else t - tau_i,
+                            history_values[idx] if reuse else None,
+                            on_trajectory=on_trajectory,
                         )
                     delay_derivative_inc[idx] += torch.sum(
                         params_inc2 * derivative,
@@ -248,11 +276,14 @@ class nddeint_ACA(torch.autograd.Function):
                 # if t+ tau_i > T then \lambda(t+tau_i) = 0
                 # computing second term of the adjoint dynamics
                 # \lambda_t \partial{f_\theta(t)}{g}
-                has_future = active_future[idx] if batch_history else t < ctx.t1 - tau_i
+                has_future = (
+                    active_future[idx] if batch_history
+                    else interior_time(t) < ctx.t1 - tau_i
+                )
                 if has_future:
                     adjoint_t_plus_tau = (
                         next(future_values) if batch_history
-                        else adjoint_interpolator(t + tau_i)
+                        else adjoint_interpolator(interior_time(t) + tau_i)
                     )
                     y_t_plus_tau = (
                         next(future_states) if batch_history
@@ -306,6 +337,13 @@ class nddeint_ACA(torch.autograd.Function):
                 raise RuntimeError("Maximum number of steps reached")
 
             t0, t1 = ts[i], ts[i - 1]
+            # Nudge by a few ulps of the time scale: enough to absorb rounding
+            # in t_k - tau, negligible against the step itself.
+            nudge = torch.minimum(
+                16 * torch.finfo(t0.dtype).eps * torch.clamp(t0.abs(), min=1.0),
+                (t0 - t1).abs() / 4,
+            )
+            interior_bounds[:] = [torch.minimum(t0, t1) + nudge, torch.maximum(t0, t1) - nudge]
             dt = t1 - t0
             dt = torch.clamp(dt, max=torch.min(ctx.func.delays))
             with torch.enable_grad():

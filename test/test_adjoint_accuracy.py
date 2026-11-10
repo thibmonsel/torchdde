@@ -38,14 +38,16 @@ def test_linear_interpolator_without_jumps_is_unchanged():
     assert interp(torch.tensor(1.25)).item() == pytest.approx(12.5)
 
 
-def _problem(loss_mode):
+def _problem(loss_mode, delays=(0.2,)):
     torch.manual_seed(0)
 
     class Model(nn.Module):
         def __init__(self):
             super().__init__()
-            self.delays = nn.Parameter(torch.tensor([0.2], dtype=torch.float64))
-            self.net = nn.Sequential(nn.Linear(4, 8), nn.Tanh(), nn.Linear(8, 2)).double()
+            self.delays = nn.Parameter(torch.tensor(delays, dtype=torch.float64))
+            self.net = nn.Sequential(
+                nn.Linear(2 * (1 + len(delays)), 8), nn.Tanh(), nn.Linear(8, 2)
+            ).double()
 
         def forward(self, t, y, args, *, history):
             return self.net(torch.cat([y, *history], dim=-1))
@@ -54,25 +56,53 @@ def _problem(loss_mode):
     ts = torch.linspace(0, 1, 21, dtype=torch.float64)
     y0 = torch.rand(4, 2, dtype=torch.float64) + 1
 
-    def gradients(dto):
-        model.zero_grad()
+    def loss(dto, dt0):
         ys = integrate(
             model, Dopri5(), ts[0], ts[-1], ts, lambda t: y0, None,
-            dt0=ts[1] - ts[0], delays=model.delays, discretize_then_optimize=dto,
+            dt0=torch.tensor(dt0, dtype=torch.float64), delays=model.delays,
+            discretize_then_optimize=dto, max_steps=4096,
         )
         ys = ys[:, -1:] if loss_mode == "final" else ys
-        (ys - y0[:, None]).square().mean().backward()
+        return (ys - y0[:, None]).square().mean()
+
+    def gradients(dto):
+        model.zero_grad()
+        loss(dto, 0.05).backward()
         return [p.grad.clone() for p in model.parameters()]
 
-    return gradients
+    def delay_finite_difference(eps=1e-6, dt0=0.05 / 16):
+        # DTO delay gradients carry their own discretisation error (moving the
+        # delay moves breakpoints against a fixed grid), so use a fine forward.
+        with torch.no_grad():
+            model.delays[0] += eps
+            plus = loss(True, dt0).item()
+            model.delays[0] -= 2 * eps
+            minus = loss(True, dt0).item()
+            model.delays[0] += eps
+        return (plus - minus) / (2 * eps)
+
+    return gradients, delay_finite_difference
 
 
 def _relative_error(actual, expected):
     return max(((a - e).norm() / e.norm()).item() for a, e in zip(actual, expected))
 
 
-def test_adjoint_parameter_gradients_with_loss_jumps():
-    gradients = _problem("mean")
-    # The mean loss makes the adjoint jump at every output time. Before the
-    # adjoint history stored both one-sided values this error was 2.5e-3.
-    assert _relative_error(gradients(False)[1:], gradients(True)[1:]) < 1e-3
+@pytest.mark.parametrize(
+    "loss_mode, delays",
+    [("mean", (0.2,)), ("final", (0.2,)), ("mean", (0.2, 0.4))],
+)
+def test_adjoint_parameter_gradients_match_exact_reference(loss_mode, delays):
+    # Errors were 2.5e-3 / 5.6e-4 / 3.8e-3 before the adjoint stored both
+    # one-sided values at loss jumps and read breakpoints from inside each
+    # backward interval; they are now ~2e-7.
+    gradients, _ = _problem(loss_mode, delays)
+    assert _relative_error(gradients(False)[1:], gradients(True)[1:]) < 1e-5
+
+
+@pytest.mark.parametrize("loss_mode", ["mean", "final"])
+def test_adjoint_delay_gradient_matches_finite_difference(loss_mode):
+    # Was 6.8e-3 for both losses; now ~1e-4, limited by the reference.
+    gradients, delay_finite_difference = _problem(loss_mode)
+    reference = delay_finite_difference()
+    assert abs(gradients(False)[0].item() - reference) < 1e-3 * abs(reference)
