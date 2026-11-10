@@ -4,7 +4,10 @@ import torch
 from jaxtyping import Float
 
 from torchdde.local_interpolation.base import AbstractLocalInterpolation
-from torchdde.local_interpolation.fourth_order_interpolation import linear_rescale
+from torchdde.local_interpolation.fourth_order_interpolation import (
+    evaluate_polynomials_many,
+    linear_rescale,
+)
 
 
 class ThirdOrderPolynomialInterpolation(AbstractLocalInterpolation):
@@ -15,6 +18,8 @@ class ThirdOrderPolynomialInterpolation(AbstractLocalInterpolation):
     """
 
     cache_coefficients = True
+    vectorized_evaluation = True
+    evaluate_many = staticmethod(evaluate_polynomials_many)
 
     def __init__(
         self,

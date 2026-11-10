@@ -8,6 +8,7 @@ from torchdde.solver.runge_kutta import ButcherTableau, ExplicitRungeKutta
 
 class _Dopri5Interpolation(FourthOrderPolynomialInterpolation):
     cache_coefficients = True
+    vectorized_evaluation = True
 
     c_mid = torch.tensor(
         [

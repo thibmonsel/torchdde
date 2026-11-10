@@ -13,6 +13,9 @@ class AbstractLocalInterpolation(ABC):
     # and exposes its coefficient tensor as .coeffs. Custom interpolators keep
     # the original raw dense_info path by default.
     cache_coefficients = False
+    # Explicit opt-in also requires evaluate_many(t0, t1, times, coefficients),
+    # returning [query, batch, ...] for coefficients [query, batch, order, ...].
+    vectorized_evaluation = False
 
     def __init__(
         self,

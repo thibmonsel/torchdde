@@ -18,6 +18,17 @@ def linear_rescale(t0, t, t1):
     return numerator / denominator
 
 
+def evaluate_polynomials_many(t0, t1, t, coefficients):
+    """Evaluate cached polynomials shaped [query, batch, order, ...]."""
+    terms = coefficients.unbind(dim=2)
+    value = terms[0]
+    normalized = linear_rescale(t0, t, t1)
+    normalized = normalized.reshape(t.shape[0], *([1] * (value.ndim - 1)))
+    for term in terms[1:]:
+        value = torch.addcmul(term, value, normalized)
+    return value
+
+
 class FourthOrderPolynomialInterpolation(AbstractLocalInterpolation):
     """Polynomial interpolation on [t0, t1].
 
@@ -26,6 +37,8 @@ class FourthOrderPolynomialInterpolation(AbstractLocalInterpolation):
     """
 
     cache_coefficients = True
+    vectorized_evaluation = True
+    evaluate_many = staticmethod(evaluate_polynomials_many)
 
     def __init__(
         self,

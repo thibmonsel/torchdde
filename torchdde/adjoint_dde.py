@@ -5,7 +5,7 @@ import torch.nn as nn
 from jaxtyping import Float
 
 from torchdde.global_interpolation.linear_interpolation import TorchLinearInterpolator
-from torchdde.integrate import _integrate_dde, _integrate_ode
+from torchdde.integrate import _evaluate_history_many, _integrate_dde, _integrate_ode
 from torchdde.misc import TupleTensorTransformer
 from torchdde.solver.base import AbstractOdeSolver
 from torchdde.step_size_controller.base import AbstractStepSizeController
@@ -80,6 +80,13 @@ class nddeint_ACA(torch.autograd.Function):
         stepsize_controller = ctx.stepsize_controller
         params = ctx.saved_tensors
         state_interpolator = ctx.ys_interpolator
+        history_indices = {}
+        batch_history = ctx.func.delays.numel() > 1
+
+        def state_history(times, boundary):
+            return _evaluate_history_many(
+                times, boundary, ctx.history_func, state_interpolator, history_indices,
+            )
 
         # adjoint history shape [N, N_t=1, D]
         # create an adjoint interpolator that will be
@@ -106,14 +113,12 @@ class nddeint_ACA(torch.autograd.Function):
         def trajectory_derivative(t):
             if t >= ctx.t0:
                 y_t = state_interpolator(t)
-                history = [
-                    (
-                        state_interpolator(t - tau)
-                        if t - tau > ctx.t0
-                        else ctx.history_func(t - tau)
-                    )
-                    for tau in ctx.func.delays
-                ]
+                history = (
+                    state_history(t - ctx.func.delays, ctx.t0) if batch_history else [
+                        state_interpolator(t - tau) if t - tau > ctx.t0
+                        else ctx.history_func(t - tau) for tau in ctx.func.delays
+                    ]
+                )
                 with torch.no_grad():
                     return ctx.func(t, y_t, func_args, history=history)
             history_time = t.detach().requires_grad_(True)
@@ -131,17 +136,15 @@ class nddeint_ACA(torch.autograd.Function):
                 state_interpolator(t) if t > ctx.t0 else ctx.history_func(t),
                 requires_grad=True,
             )
+            history_values = (
+                state_history(t - ctx.func.delays, ctx.t0) if batch_history else [
+                    state_interpolator(t - tau) if t - tau > ctx.t0
+                    else ctx.history_func(t - tau) for tau in ctx.func.delays
+                ]
+            )
             h_t_minus_tau = [
-                (
-                    torch.autograd.Variable(
-                        state_interpolator(t - tau), requires_grad=True
-                    )
-                    if t - tau > ctx.t0
-                    else torch.autograd.Variable(
-                        ctx.history_func(t - tau), requires_grad=True
-                    )
-                )
-                for tau in ctx.func.delays
+                torch.autograd.Variable(value, requires_grad=True)
+                for value in history_values
             ]
             func_t = ctx.func(t, y_t, func_args, history=h_t_minus_tau)
             # This correspond to the both terms :
@@ -182,14 +185,15 @@ class nddeint_ACA(torch.autograd.Function):
                 if t < ctx.t1 - tau_i:
                     adjoint_t_plus_tau = adjoint_interpolator(t + tau_i)
                     y_t_plus_tau = state_interpolator(t + tau_i)
-                    history = [
-                        (
+                    history = (
+                        state_history(t + tau_i - ctx.func.delays, ctx.ts[0])
+                        if batch_history else [
                             state_interpolator(t + tau_i - tau_j)
                             if t + tau_i - tau_j > ctx.ts[0]
                             else ctx.history_func(t + tau_i - tau_j)
-                        )
-                        for tau_j in ctx.func.delays
-                    ]
+                            for tau_j in ctx.func.delays
+                        ]
+                    )
                     history[idx] = y_t
                     func_t_plus_tau_i = ctx.func(
                         t + tau_i, y_t_plus_tau, func_args, history=history

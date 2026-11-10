@@ -8,6 +8,13 @@ from torchdde.local_interpolation.base import AbstractLocalInterpolation
 
 class FirstOrderPolynomialInterpolation(AbstractLocalInterpolation):
     cache_coefficients = True
+    vectorized_evaluation = True
+
+    @staticmethod
+    def evaluate_many(t0, t1, t, coefficients):
+        slope, y0, _ = coefficients.unbind(dim=2)
+        delta = (t - t0).reshape(t.shape[0], *([1] * (slope.ndim - 1)))
+        return torch.addcmul(y0, slope, delta)
 
     def __init__(
         self,

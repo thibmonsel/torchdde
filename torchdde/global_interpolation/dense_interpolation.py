@@ -77,6 +77,26 @@ class DenseInterpolation:
         out = self._get_local_interpolation(t, left).__call__(t, left=left)
         return out
 
+    def evaluate_many(self, times, left: bool = True):
+        """Evaluate a nonempty vector of query times, returning [query, batch, ...].
+
+        Custom interpolators retain their scalar evaluation unless their class
+        explicitly opts into vectorized_evaluation as well as coefficient caching.
+        """
+        if times.ndim != 1 or times.numel() == 0:
+            raise ValueError("Query times must be a nonempty one-dimensional tensor")
+        if not self._cache_coefficients or not self.interpolation_cls.__dict__.get(
+            "vectorized_evaluation", False
+        ):
+            return torch.stack([self(t, left=left) for t in times.unbind()])
+        times = times * self.direction
+        index = torch.searchsorted(self.ts, times, side="left" if left else "right")
+        index = (index - 1).clamp(0, self.ts.shape[0] - 2)
+        starts = self.ts.index_select(0, index)
+        ends = self.ts.index_select(0, index + 1)
+        coefficients = self.infos["_cached_coefficients"].index_select(0, index)
+        return self.interpolation_cls.evaluate_many(starts, ends, times, coefficients)
+
     def add_point(self, t, dense_info, interpolation=None):
         if self.direction:
             dense_info = self._prepare_info(self.ts[-1], t.reshape(()), dense_info, interpolation)

@@ -282,6 +282,28 @@ def _integrate_fixed(func, solver, t0, t1, ts, y0, func_args, dt0, max_steps,
     return ys, aux
 
 
+def _evaluate_history_many(times, boundary, history_func, interpolation, index_cache,
+                           include_close=False):
+    """Partition history queries once and batch only the dense-solution queries."""
+    if interpolation is None:
+        return [history_func(t) for t in times.unbind()]
+    in_history = times <= boundary
+    if include_close:
+        in_history = in_history | torch.isclose(times, boundary)
+    flags = in_history.tolist()
+    positions = tuple(i for i, flag in enumerate(flags) if not flag)
+    dense_values = iter(())
+    if positions:
+        if positions not in index_cache:
+            index_cache[positions] = torch.tensor(positions, device=times.device)
+        selected = times.index_select(0, index_cache[positions])
+        dense_values = iter(interpolation.evaluate_many(selected).unbind(0))
+    return [
+        history_func(t) if use_history else next(dense_values)
+        for t, use_history in zip(times.unbind(), flags)
+    ]
+
+
 def _integrate_dde(
     func: Union[torch.nn.Module, Callable],
     t0: Float[torch.Tensor, ""],
@@ -316,12 +338,20 @@ def _integrate_dde(
 
     # FSAL solvers and adaptive initial-step selection call ode_func during init.
     ys_interpolation = None
+    history_indices = {}
+    batch_history = delays.numel() > 1
 
     def ode_func(
         t: Float[torch.Tensor, ""],
         y: Float[torch.Tensor, "batch ..."],
         func_args: Any,
     ):
+        if batch_history:
+            history = _evaluate_history_many(
+                t - delays, t0, history_func, ys_interpolation, history_indices,
+                include_close=True,
+            )
+            return func(t, y, func_args, history=history)
         history = []
         for tau in delays:
             delayed_t = t - tau
