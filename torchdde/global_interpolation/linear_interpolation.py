@@ -35,22 +35,26 @@ class TorchLinearInterpolator:
         self.ys = self.ys.to(device)
         self.ts = self.ts.to(device)
 
+    def _find_interval(self, t, left: bool):
+        maxlen = self.ts.shape[0] - 2
+        index = torch.searchsorted(self.ts, t, side="left" if left else "right")
+        return torch.clip(index - 1, 0, maxlen)
+
     def _interpret_t(
         self, t: Union[Float[torch.Tensor, ""], float], left: bool
     ) -> tuple[Integer[torch.Tensor, ""], Float[torch.Tensor, ""]]:
-        maxlen = self.ts.shape[0] - 2
-        index = torch.searchsorted(self.ts, t, side="left" if left else "right")
-        index = torch.clip(index - 1, 0, maxlen)
+        index = self._find_interval(t, left)
         # Will never access the final element of `ts`; this is correct behaviour.
-        fractional_part = t - self.ts[index]
+        prev_t = self.ts.index_select(0, index.reshape(-1)).reshape(index.shape)
+        fractional_part = t - prev_t
         return index, fractional_part
 
     def __call__(
         self, t: Union[Float[torch.Tensor, ""], float], left=True
     ) -> Float[torch.Tensor, " batch ..."]:
+        if self.ys.shape[1] == 1:
+            return self.ys[:, 0]
         if t > self.ts[-1] or t < self.ts[0]:
-            if self.ys.shape[1] == 1:
-                return self.ys[:, 0]
             if torch.abs((t - self.ts[0])) < tiny:
                 return self.ys[:, 0]
             if torch.abs((t - self.ts[-1])) < tiny:
@@ -60,11 +64,17 @@ class TorchLinearInterpolator:
                 + f"ie t={t} > ts[-1]={self.ts[-1]} or t < ts[0]={self.ts[0]}"
             )
 
-        index, fractional_part = self._interpret_t(t, left)
-        prev_ys = self.ys[:, index]
-        next_ys = self.ys[:, index + 1]
-        prev_t = self.ts[index]
-        next_t = self.ts[index + 1]
+        index = self._find_interval(t, left)
+        # Keep query-dependent indices on the device: scalar tensor indexing
+        # implicitly extracts a Python integer and synchronizes CUDA.
+        indices = torch.stack((index, index + 1)).reshape(-1)
+        prev_t, next_t = self.ts.index_select(0, indices).reshape(
+            2, *index.shape
+        ).unbind(0)
+        prev_ys, next_ys = self.ys.index_select(1, indices).reshape(
+            self.ys.shape[0], 2, *index.shape, *self.ys.shape[2:]
+        ).unbind(1)
+        fractional_part = t - prev_t
         diff_t = next_t - prev_t
         return prev_ys + (next_ys - prev_ys) * (fractional_part / diff_t)
 
