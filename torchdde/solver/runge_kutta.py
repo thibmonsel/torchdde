@@ -204,7 +204,12 @@ class ExplicitRungeKutta(AbstractOdeSolver):
         k = f0.new_empty((self.tableau.n_stages, f0.shape[0], f0.shape[1]))
         k[0] = f0
         for i in range(1, self.tableau.n_stages):
-            y_i = torch.einsum("j, jbf -> bf", self.tableau.a[i, :i], k[:i])
+            if i == 1:
+                # A single weighted derivative needs no general contraction.
+                # Use f0 directly: later stages update the k buffer in-place.
+                y_i = self.tableau.a[i, 0] * f0
+            else:
+                y_i = torch.einsum("j, jbf -> bf", self.tableau.a[i, :i], k[:i])
             y_i = torch.addcmul(y, dt, y_i)
             k[i] = func(t_nodes[i], y_i, func_args)
 
