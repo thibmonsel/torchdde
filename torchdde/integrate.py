@@ -54,6 +54,7 @@ def integrate(
     delays: Optional[Float[torch.Tensor, " delays"]] = None,
     discretize_then_optimize: bool = False,
     max_steps: int = 2048,
+    adjoint_split_at_breakpoints: bool = True,
 ) -> Float[torch.Tensor, "batch time ..."]:
     """Solves a system of ODEs or DDEs.
     See the [Getting started](../usage/getting-started.md) page for example usage.
@@ -86,6 +87,14 @@ def integrate(
         If set to `True`, regular backpropagation will be used for training.
     - `max_steps` : The maximum number of steps to take before
     quitting the computation unconditionally.
+    - `adjoint_split_at_breakpoints` : DDE adjoint only. The adjoint dynamics
+        jump at `t1 - tau`, `t0 + tau` and `t_k - tau` for the output times
+        `t_k`. If `True` (default), the backward pass integrates up to each of
+        these, keeping the solver's order; gradients are then about as accurate
+        as with `discretize_then_optimize=True`. When delays are not multiples
+        of the output spacing this makes the backward pass about twice as
+        expensive. If `False`, steps may cross them, and gradients are only
+        first-order accurate in the output spacing.
 
     **Returns:**
 
@@ -138,6 +147,7 @@ def integrate(
                 stepsize_controller,
                 dt0,
                 max_steps,
+                adjoint_split_at_breakpoints,
             )
         else:
             assert isinstance(y0, torch.Tensor)

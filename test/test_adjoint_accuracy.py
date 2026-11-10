@@ -49,7 +49,7 @@ def test_split_interval_merges_close_breakpoints(dtype):
     assert len(_split_interval(start, end, [])) == 2
 
 
-def _problem(loss_mode, delays=(0.2,)):
+def _problem(loss_mode, delays=(0.2,), split=True):
     torch.manual_seed(0)
 
     class Model(nn.Module):
@@ -72,6 +72,7 @@ def _problem(loss_mode, delays=(0.2,)):
             model, Dopri5(), ts[0], ts[-1], ts, lambda t: y0, None,
             dt0=torch.tensor(dt0, dtype=torch.float64), delays=model.delays,
             discretize_then_optimize=dto, max_steps=4096,
+            adjoint_split_at_breakpoints=split,
         )
         ys = ys[:, -1:] if loss_mode == "final" else ys
         return (ys - y0[:, None]).square().mean()
@@ -134,3 +135,15 @@ def test_adjoint_gradients_with_delays_off_the_output_grid(loss_mode, delays):
     if len(delays) == 1:
         reference = delay_finite_difference()
         assert abs(adjoint[0].item() - reference) < 1e-3 * abs(reference)
+
+
+def test_adjoint_breakpoint_splitting_can_be_disabled():
+    # Off the grid, disabling the splitting brings back the cheaper but
+    # first-order backward pass; on the grid it changes nothing.
+    off_split, _ = _problem("mean", (0.23,), split=True)
+    off_plain, _ = _problem("mean", (0.23,), split=False)
+    assert _relative_error(off_split(False)[1:], off_plain(False)[1:]) > 1e-5
+    on_split, _ = _problem("mean", (0.2,), split=True)
+    on_plain, _ = _problem("mean", (0.2,), split=False)
+    for a, b in zip(on_split(False), on_plain(False)):
+        torch.testing.assert_close(a, b, rtol=0, atol=0)

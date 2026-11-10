@@ -86,9 +86,11 @@ class nddeint_ACA(torch.autograd.Function):
         stepsize_controller: AbstractStepSizeController = ConstantStepSizeController(),
         dt0: Optional[Float[torch.Tensor, ""]] = None,
         max_steps: Optional[int] = 2048,
+        split_at_breakpoints: bool = True,
         *params,  # type: ignore
     ) -> Float[torch.Tensor, "batch time ..."]:
         # Saving parameters for backward()
+        ctx.split_at_breakpoints = split_at_breakpoints
         ctx.history_func = history_func
         ctx.stepsize_controller = stepsize_controller
         ctx.solver = solver
@@ -387,7 +389,7 @@ class nddeint_ACA(torch.autograd.Function):
         # order, so every breakpoint becomes the endpoint of a sub-interval.
         breakpoints = _adjoint_breakpoints(
             ctx.t0, ctx.t1, ts, ctx.func.delays, grad_output,
-        )
+        ) if ctx.split_at_breakpoints else []
 
         # computing the adjoint dynamics
         current_num_steps = 0
@@ -425,7 +427,8 @@ class nddeint_ACA(torch.autograd.Function):
                 aug_state = transformer.unflatten(new_aug_state)
 
         params_incr = aug_state[1:]
-        tuple_nones = (None, None, None, None, None, None, None, None, None, None)
+        # One None per non-parameter input of forward().
+        tuple_nones = (None,) * 11
         return *tuple_nones, *params_incr
 
 
@@ -440,6 +443,7 @@ def ddesolve_adjoint(
     stepsize_controller: AbstractStepSizeController = ConstantStepSizeController(),
     dt0: Optional[Float[torch.Tensor, ""]] = None,
     max_steps: Optional[int] = 2048,
+    split_at_breakpoints: bool = True,
 ) -> Union[Float[torch.Tensor, "batch time ..."], Any]:
     r"""Main function to integrate a constant time delay DDE with the adjoint method
 
@@ -449,6 +453,8 @@ def ddesolve_adjoint(
     - `func`: Pytorch model, i.e vector field
     - `ts`: Integration span
     - `solver`: ODE solver use
+    - `split_at_breakpoints`: integrate the adjoint piecewise between the
+        delay breakpoints (see [`torchdde.integrate`][]).
 
     **Returns:**
 
@@ -466,6 +472,7 @@ def ddesolve_adjoint(
         stepsize_controller,
         dt0,
         max_steps,
+        split_at_breakpoints,
         *params,
     )
     return ys
