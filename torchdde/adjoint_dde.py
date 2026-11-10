@@ -27,6 +27,49 @@ def _evaluate_trajectory_inputs(times, delays, boundary, interpolation, lookup):
     return list(zip(states, histories))
 
 
+def _adjoint_breakpoints(t0, t1, ts, delays, grad_output):
+    """Times where the adjoint dynamics jump, sorted increasingly.
+
+    For each delay tau: the future term switches on at T - tau, each loss
+    jump at an output time t_k reaches back to t_k - tau through lambda(t + tau),
+    and the trajectory derivative y'(t - tau) jumps where t - tau = t0.
+    """
+    taus = delays.detach().reshape(-1).tolist()
+    has_jump = (grad_output != 0).reshape(
+        grad_output.shape[0], grad_output.shape[1], -1
+    ).any(dim=2).any(dim=0).tolist()
+    jump_times = [t for t, jump in zip(ts.detach().tolist(), has_jump) if jump]
+    start, end = float(t0), float(t1)
+    points = set()
+    for tau in taus:
+        points.update((end - tau, start + tau))
+        points.update(t - tau for t in jump_times)
+    return sorted(points)
+
+
+def _split_interval(start, end, breakpoints):
+    """Nodes from `start` to `end` (backwards) with the breakpoints inside.
+
+    Breakpoints within a tiny fraction of the interval of an endpoint are
+    treated as lying on it: that endpoint is already read from the inside.
+    """
+    hi, lo = float(start), float(end)
+    # Below the time dtype's resolution two times are indistinguishable.
+    resolution = 64 * torch.finfo(start.dtype).eps * max(1.0, abs(hi), abs(lo))
+    tolerance = max(1e-6 * (hi - lo), resolution)
+    inside = [b for b in reversed(breakpoints) if lo + tolerance < b < hi - tolerance]
+    nodes = [start]
+    for value in start.new_tensor(inside).unbind() if inside else ():
+        # Merge breakpoints closer than the tolerance (rounding to the time
+        # dtype can also make neighbours coincide).
+        if float(nodes[-1]) - float(value) > tolerance:
+            nodes.append(value)
+    if len(nodes) > 1 and float(nodes[-1]) - lo <= tolerance:
+        nodes.pop()
+    nodes.append(end)
+    return nodes
+
+
 class nddeint_ACA(torch.autograd.Function):
     @staticmethod
     def forward(  # type: ignore
@@ -329,6 +372,23 @@ class nddeint_ACA(torch.autograd.Function):
                 (rhs_adjoint_1, *params_inc)
             )
 
+        def set_interior_bounds(start, end):
+            # Nudge by a few ulps of the time scale: enough to absorb rounding
+            # in t_k - tau, negligible against the step itself.
+            nudge = torch.minimum(
+                16 * torch.finfo(start.dtype).eps * torch.clamp(start.abs(), min=1.0),
+                (start - end).abs() / 4,
+            )
+            interior_bounds[:] = [
+                torch.minimum(start, end) + nudge, torch.maximum(start, end) - nudge,
+            ]
+
+        # Integrating across a jump of the dynamics would cost Runge-Kutta its
+        # order, so every breakpoint becomes the endpoint of a sub-interval.
+        breakpoints = _adjoint_breakpoints(
+            ctx.t0, ctx.t1, ts, ctx.func.delays, grad_output,
+        )
+
         # computing the adjoint dynamics
         current_num_steps = 0
         for i in range(len(ts) - 1, 0, -1):
@@ -337,15 +397,7 @@ class nddeint_ACA(torch.autograd.Function):
                 raise RuntimeError("Maximum number of steps reached")
 
             t0, t1 = ts[i], ts[i - 1]
-            # Nudge by a few ulps of the time scale: enough to absorb rounding
-            # in t_k - tau, negligible against the step itself.
-            nudge = torch.minimum(
-                16 * torch.finfo(t0.dtype).eps * torch.clamp(t0.abs(), min=1.0),
-                (t0 - t1).abs() / 4,
-            )
-            interior_bounds[:] = [torch.minimum(t0, t1) + nudge, torch.maximum(t0, t1) - nudge]
-            dt = t1 - t0
-            dt = torch.clamp(dt, max=torch.min(ctx.func.delays))
+            nodes = _split_interval(t0, t1, breakpoints)
             with torch.enable_grad():
                 # The loss term at t0 makes the adjoint jump there. Store both
                 # one-sided values: lambda(t0^+) (before the jump) starts the
@@ -353,19 +405,23 @@ class nddeint_ACA(torch.autograd.Function):
                 adjoint_right = aug_state[0].clone()
                 aug_state[0] += grad_output[:, i]
                 adjoint_interpolator.add_point(t0, aug_state[0], right_y=adjoint_right)
-                aug_state = transformer.flatten(aug_state)
-                new_aug_state, _ = _integrate_ode(
-                    augment_dyn,
-                    t0,
-                    t1,
-                    t1[None],
-                    aug_state,
-                    func_args,
-                    solver,
-                    stepsize_controller,
-                    dt,
-                    ctx.max_steps,
-                )
+                flat_state = transformer.flatten(aug_state)
+                for start, end in zip(nodes[:-1], nodes[1:]):
+                    set_interior_bounds(start, end)
+                    dt = torch.clamp(end - start, max=torch.min(ctx.func.delays))
+                    new_aug_state, _ = _integrate_ode(
+                        augment_dyn,
+                        start,
+                        end,
+                        end[None],
+                        flat_state,
+                        func_args,
+                        solver,
+                        stepsize_controller,
+                        dt,
+                        ctx.max_steps,
+                    )
+                    flat_state = new_aug_state[:, 0]
                 aug_state = transformer.unflatten(new_aug_state)
 
         params_incr = aug_state[1:]

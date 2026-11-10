@@ -9,6 +9,7 @@ import torch
 from torch import nn
 
 from torchdde import Dopri5, integrate
+from torchdde.adjoint_dde import _split_interval
 from torchdde.global_interpolation.linear_interpolation import TorchLinearInterpolator
 
 
@@ -36,6 +37,16 @@ def test_linear_interpolator_without_jumps_is_unchanged():
     interp.add_point(torch.tensor(1.5), torch.tensor([[15.0]]))
     assert interp.ys_right is None
     assert interp(torch.tensor(1.25)).item() == pytest.approx(12.5)
+
+
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+def test_split_interval_merges_close_breakpoints(dtype):
+    start, end = torch.tensor(0.55, dtype=dtype), torch.tensor(0.5, dtype=dtype)
+    breakpoints = [0.4, 0.5 + 1e-12, 0.52, 0.52 + 1e-12, 0.53, 0.55 - 1e-12, 0.6]
+    nodes = [float(node) for node in _split_interval(start, end, breakpoints)]
+    assert nodes == pytest.approx([0.55, 0.53, 0.52, 0.5])
+    assert all(a > b for a, b in zip(nodes, nodes[1:]))
+    assert len(_split_interval(start, end, [])) == 2
 
 
 def _problem(loss_mode, delays=(0.2,)):
@@ -70,7 +81,7 @@ def _problem(loss_mode, delays=(0.2,)):
         loss(dto, 0.05).backward()
         return [p.grad.clone() for p in model.parameters()]
 
-    def delay_finite_difference(eps=1e-6, dt0=0.05 / 16):
+    def delay_finite_difference(eps=1e-6, dt0=0.05 / 64):
         # DTO delay gradients carry their own discretisation error (moving the
         # delay moves breakpoints against a fixed grid), so use a fine forward.
         with torch.no_grad():
@@ -106,3 +117,20 @@ def test_adjoint_delay_gradient_matches_finite_difference(loss_mode):
     gradients, delay_finite_difference = _problem(loss_mode)
     reference = delay_finite_difference()
     assert abs(gradients(False)[0].item() - reference) < 1e-3 * abs(reference)
+
+
+@pytest.mark.parametrize(
+    "loss_mode, delays",
+    [("mean", (0.23,)), ("final", (0.37,)), ("mean", (0.23, 0.37))],
+)
+def test_adjoint_gradients_with_delays_off_the_output_grid(loss_mode, delays):
+    # Off the grid, breakpoints t_k - tau, T - tau and t0 + tau fall inside
+    # output intervals; the backward pass integrates up to each of them.
+    # Before, parameter errors were 3e-4 to 7e-4 and delay errors up to 1.5e-2.
+    gradients, delay_finite_difference = _problem(loss_mode, delays)
+    adjoint, dto = gradients(False), gradients(True)
+    # DTO itself is only accurate to ~4e-5 here (its forward crosses breakpoints).
+    assert _relative_error(adjoint[1:], dto[1:]) < 1e-4
+    if len(delays) == 1:
+        reference = delay_finite_difference()
+        assert abs(adjoint[0].item() - reference) < 1e-3 * abs(reference)
