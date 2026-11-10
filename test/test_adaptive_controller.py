@@ -41,3 +41,20 @@ def test_rejected_step_keeps_accepted_error_history():
                                torch.tensor(0.1, dtype=torch.float64))
     assert float(controller.scaled_error) == accepted
     assert not torch.isfinite(controller.prev_scaled_error)
+
+
+def test_history_fills_slot_by_slot():
+    controller = _pid_controller()
+    errors = [torch.tensor(0.5), torch.tensor(0.25), torch.tensor(0.125)]
+    controller.update_scaled_error(errors[0])
+    assert controller.scaled_error == errors[0]
+    assert not torch.isfinite(controller.prev_scaled_error)
+    controller.update_scaled_error(errors[1])
+    assert (controller.scaled_error, controller.prev_scaled_error) == tuple(errors[1::-1])
+    assert not torch.isfinite(controller.prev_prev_scaled_error)
+    controller.update_scaled_error(errors[2])
+    assert (
+        controller.scaled_error,
+        controller.prev_scaled_error,
+        controller.prev_prev_scaled_error,
+    ) == tuple(errors[::-1])

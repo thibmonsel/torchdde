@@ -203,20 +203,11 @@ class AdaptiveStepSizeController(AbstractStepSizeController):
         return norm(y_error / error_tol).abs().max()
 
     def update_scaled_error(self, current_scaled_error):
-        if not torch.isfinite(self.scaled_error):
-            self.scaled_error = current_scaled_error
-            return
-        if torch.isfinite(self.scaled_error) and not torch.isfinite(
-            self.prev_scaled_error
-        ):
-            self.prev_scaled_error = self.scaled_error
-            self.scaled_error = current_scaled_error
-            return
-        else:
-            self.prev_prev_scaled_error = self.prev_scaled_error
-            self.prev_scaled_error = self.scaled_error
-            self.scaled_error = current_scaled_error
-            return
+        # Shifting the inf placeholders along is equivalent to filling the
+        # history slot by slot, and needs no host-device synchronisation.
+        self.prev_prev_scaled_error = self.prev_scaled_error
+        self.prev_scaled_error = self.scaled_error
+        self.scaled_error = current_scaled_error
 
     def adapt_step_size(
         self,
